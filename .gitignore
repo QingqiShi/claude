@@ -1,9 +1,10 @@
-# Claude Code internal files
-projects/
-shell-snapshots/
-statsig/
-todos/
+# Ignore everything by default
+*
 
-# Keep only prompt files
-!prompts/
+# Explicitly allow only prompt files
+!.gitignore
 !CLAUDE.md
+!agents/
+!agents/**
+!output-styles/
+!output-styles/**

@@ -1,0 +1,9 @@
+# Claude Code internal files
+projects/
+shell-snapshots/
+statsig/
+todos/
+
+# Keep only prompt files
+!prompts/
+!CLAUDE.md

@@ -40,6 +40,25 @@ Always use the Context7 MCP to access latest Claude Code documentation. Max toke
 
 Capture core user intention. Eliminate ambiguity. Ensure immediate actionability.
 
+## Modern Agent Architecture (2025)
+
+Based on recent modernization work, effective Claude Code agents follow three core principles:
+
+1. **Much shorter, simple, focused** (40-100 lines vs 100-264 lines)
+2. **Clear tool usage protocols** with structured command sequences
+3. **Designed for orchestrator system** with clear input/output patterns
+
+**Key Structural Elements:**
+- **Required Inputs** section with specific bail conditions
+- **Tool Usage Protocol** with step-by-step command examples  
+- **Output Format** templates for consistent results
+- **Essential Requirements** for orchestrator integration
+
+**Command Handling:**
+- Testing/build agents get commands from CLAUDE.md or use repo-explorer
+- Agents bail if required commands unavailable from either source
+- Use exact commands found, never infer or guess
+
 Prompt file locations:
 
 - Sub-agents: ~/.claude/agents

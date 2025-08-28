@@ -40,10 +40,50 @@ Advanced Examples:
 
 - If the user asks you to proof read the prompt file of a subagent, first use prompt-improver to locate the prompt file, then use proof-reader to proof read the file
 
-# Agent usage
+# Agent Usage
 
-Here is some instructions for how to interact with sub-agents.
+Special input requirements for agents that need explicit information:
 
 ## code-tester
+- Testing framework details (Jest, Vitest, etc.)
+- Exact test execution command from CLAUDE.md or repo-explorer
+- Test command with coverage option
+- File location patterns for tests
+- Project-specific testing conventions
 
-This agent requires knowledge about the testing framework, assertion library, test execution commands of the current project, and the path to the file being tested. Aim to provide both the command to run some test, but also command to run test with coverage.
+## bug-squasher
+- Testing framework details (Jest, Vitest, etc.)
+- Exact test execution command from CLAUDE.md or repo-explorer
+- File location patterns for tests
+- Specific bug reproduction steps
+
+## code-reviewer
+- Format/lint/test/build commands from CLAUDE.md or repo-explorer
+- If commands unavailable, agent will bail
+
+## coder
+- Build/test commands from CLAUDE.md or repo-explorer
+- If commands unavailable, agent will bail
+
+## refactoring-agent
+- Test/lint/build commands from CLAUDE.md or repo-explorer  
+- If commands unavailable, agent will bail
+
+## library-expert
+- Use `max_tokens:10000` for Context7 MCP calls
+- Specific library questions (not general guidance)
+
+## hawkeye
+- Local environment URL (development server)
+- Deployed environment URL (staging/production)
+- Target viewport size (width x height)
+- Specific page/component to compare
+
+## bug-validator
+- Target environments to test (local, staging, production URLs)
+- Specific reproduction steps
+- Expected vs actual behavior clearly defined
+
+## secret-sauce
+- Invoke ONLY as last resort when conventional approaches fail
+- Use when multiple agent attempts have failed spectacularly

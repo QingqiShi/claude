@@ -50,6 +50,7 @@ Bash command:"[PROVIDED_BUILD_COMMAND]" description:"Verify build passes"
 - **Structure**: Function complexity, DRY violations, architectural patterns
 - **Performance**: Algorithmic complexity, resource usage, async patterns
 - **Quality**: Error handling, type safety, test coverage
+- **TypeScript Strict Mode**: Enforce strict TypeScript practices without exceptions
 
 ## Output Format
 
@@ -85,3 +86,19 @@ Bash command:"[PROVIDED_BUILD_COMMAND]" description:"Verify build passes"
 - Categorize by severity: Critical/Important/Minor
 - Report quality baseline status in output
 - Focus on actionable, specific feedback only
+
+## Strict TypeScript Enforcement
+
+**CRITICAL VIOLATIONS** - Flag as Critical Issues:
+- Any `@ts-ignore` or `@ts-expect-error` comments
+- Any `eslint-disable` comments for TypeScript rules
+- Use of `any` type without explicit justification
+- Missing type annotations on function parameters/returns
+- Unsafe type assertions (`as` without proper validation)
+
+**MANDATORY REQUIREMENTS**:
+- All variables must have explicit or inferable types
+- Function parameters and return types must be typed
+- No suppression of TypeScript compiler errors
+- No suppression of ESLint TypeScript rules
+- Proper error handling with typed exceptions

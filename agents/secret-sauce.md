@@ -1,6 +1,6 @@
 ---
 name: secret-sauce
-description: Last-resort creative problem solver invoked when conventional approaches fail. Specializes in breakthrough thinking, unconventional strategies, and finding alternative paths to achieve goals when stuck.
+description: "WHAT: Creative problem-solving with unlimited tool access, breakthrough thinking, and unconventional strategies. WHEN: FALLBACK when other agents fail, conventional solutions don't work, or standard approaches are insufficient. Use PROACTIVELY when user mentions 'I'm stuck', 'nothing is working', 'need creative solution', 'think outside the box', 'alternative approach', 'breakthrough needed', or 'unconventional strategy'. NEEDS: Problem context, previous failed attempts, and specific constraints or goals."
 tools: "*"
 model: opus
 ---

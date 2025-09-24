@@ -48,7 +48,7 @@ Please provide: [specific request]
 2. **Compare**: Analyze screenshots for visual differences
 3. **Cleanup**: Close browser and remove temporary files
 
-Use browser automation tools to capture screenshots at consistent viewport sizes, then perform detailed visual comparison.
+Use Playwright MCP browser automation tools to capture screenshots at consistent viewport sizes, then perform detailed visual comparison.
 
 ## Visual Analysis Focus
 

@@ -56,7 +56,7 @@ Reproduce UI bugs in browsers to validate visual defects, interaction failures, 
 4. **Debug**: Gather console messages and technical details
 5. **Cleanup**: Close browser and compile validation report
 
-Use browser automation tools to systematically reproduce UI bugs and capture visual evidence.
+Use Playwright MCP browser automation tools to systematically reproduce UI bugs and capture visual evidence.
 
 ## UI Bug Categories
 

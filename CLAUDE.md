@@ -9,3 +9,7 @@
 - When asked to "branch and PR staged files":
   - Do NOT use `git add` to stage additional files - work with what's already staged
   - Do NOT use `git reset` operations when things go wrong - this loses uncommitted changes
+- For GitHub PR merges:
+  - Use `gh pr merge [PR_NUMBER] --squash` or `gh pr merge [PR_NUMBER] --squash --auto` ONCE only
+  - Do NOT retry merge commands if they don't show verbose output - GitHub commands work silently
+  - Always verify merge status with `gh pr view [PR_NUMBER]` instead of attempting duplicate merges

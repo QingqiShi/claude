@@ -6,5 +6,7 @@
 !CLAUDE.md
 !agents/
 !agents/**
+!skills/
+!skills/**
 !output-styles/
 !output-styles/**

@@ -2,16 +2,35 @@
 
 Ready-to-use templates for creating Agent Skills.
 
+For comprehensive authoring guidance including workflows, patterns, and anti-patterns, see [references/best-practices.md](references/best-practices.md).
+
+## Contents
+
+- [File Structure Guidelines](#important-file-structure-guidelines)
+- [Simple Single-File Skill](#simple-single-file-skill)
+- [Skill with Tool Restrictions](#skill-with-tool-restrictions)
+- [Multi-File Skill with Progressive Disclosure](#multi-file-skill-with-progressive-disclosure)
+- [Skill with Executable Scripts](#skill-with-executable-scripts)
+- [Minimal Skill Template](#minimal-skill-template)
+- [Domain-Specific Skill Template](#domain-specific-skill-template)
+- [Testing and Development Skill Template](#testing-and-development-skill-template)
+- [Quick Template Selection Guide](#quick-template-selection-guide)
+- [Customization Tips](#customization-tips)
+
 ## Important: File Structure Guidelines
 
 **All skills require only SKILL.md** - that's the only file you need to create initially.
 
+**Key principle**: Be concise. Assume Claude is already smart - only add context Claude doesn't have.
+
 **DO NOT create:**
+
 - ❌ README.md - Not part of progressive disclosure, won't be loaded
 - ❌ Documentation files for users - Skills are for Claude, not end users
 
 **Only add additional files when:**
-- SKILL.md exceeds ~5k tokens (split into ADVANCED.md, REFERENCE.md, etc.)
+
+- SKILL.md exceeds ~400-500 lines
 - Need executable scripts (helper.py, validate.sh, etc.)
 - Have mutually exclusive content that shouldn't all load at once
 
@@ -49,6 +68,7 @@ description: Generate clear commit messages from git diffs. Use when writing com
 
 For a change adding user authentication:
 ```
+
 Add user authentication with JWT
 
 - Implement JWT token generation and validation
@@ -57,7 +77,9 @@ Add user authentication with JWT
 - Update API to require authentication
 
 Fixes #123
+
 ```
+
 ```
 
 **When to use:** Single capability, no external scripts, all instructions fit comfortably in one file.
@@ -137,6 +159,7 @@ For each file reviewed, provide:
 For complex skills with different scenarios requiring different context.
 
 **Directory structure:**
+
 ```
 pdf-processor/
   ├── SKILL.md (main instructions and common tasks)
@@ -148,7 +171,8 @@ pdf-processor/
 ```
 
 **SKILL.md:**
-```yaml
+
+````yaml
 ---
 name: Advanced PDF Processor
 description: Extract text, fill forms, merge PDFs, validate documents. Use for PDF manipulation, form filling, or document processing. Requires pdfplumber and pypdf packages.
@@ -164,9 +188,10 @@ import pdfplumber
 with pdfplumber.open("document.pdf") as pdf:
     text = pdf.pages[0].extract_text()
     print(text)
-```
+````
 
 Extract text from all pages:
+
 ```python
 import pdfplumber
 with pdfplumber.open("document.pdf") as pdf:
@@ -185,6 +210,7 @@ with pdfplumber.open("document.pdf") as pdf:
 ## Requirements
 
 This skill requires the following packages:
+
 - `pdfplumber` - For text extraction
 - `pypdf` - For PDF manipulation
 
@@ -193,6 +219,7 @@ Request installation if not available.
 ## Common Tasks
 
 ### Extract tables
+
 ```python
 import pdfplumber
 with pdfplumber.open("document.pdf") as pdf:
@@ -202,6 +229,7 @@ with pdfplumber.open("document.pdf") as pdf:
 ```
 
 ### Merge PDFs
+
 ```python
 from pypdf import PdfMerger
 merger = PdfMerger()
@@ -210,7 +238,8 @@ merger.append("file2.pdf")
 merger.write("merged.pdf")
 merger.close()
 ```
-```
+
+````
 
 **FORMS.md:**
 ```markdown
@@ -223,14 +252,15 @@ Detailed guidance for filling PDF forms.
 Use the extract_fields script:
 ```bash
 python scripts/extract_fields.py input.pdf
-```
+````
 
 This lists all fields with their names and types.
 
 ## Filling Forms
 
 [Detailed form-filling instructions here...]
-```
+
+````
 
 **REFERENCE.md:**
 ```markdown
@@ -239,7 +269,7 @@ This lists all fields with their names and types.
 Complete API documentation for pdfplumber and pypdf.
 
 [Detailed API docs here...]
-```
+````
 
 **When to use:** Complex skills with multiple scenarios, where different contexts need different information.
 
@@ -250,6 +280,7 @@ Complete API documentation for pdfplumber and pypdf.
 Use scripts for deterministic operations.
 
 **Directory structure:**
+
 ```
 data-validator/
   ├── SKILL.md
@@ -260,7 +291,8 @@ data-validator/
 ```
 
 **SKILL.md:**
-```yaml
+
+````yaml
 ---
 name: Data Validator
 description: Validate JSON, CSV, and XML data files for structure and schema compliance. Use when validating data files or checking format correctness.
@@ -276,9 +308,10 @@ This skill includes deterministic validation scripts for common data formats.
 
 ```bash
 python scripts/validate_json.py <file.json> [schema.json]
-```
+````
 
 Validates:
+
 - JSON syntax
 - Schema compliance (if schema provided)
 - Common structural issues
@@ -290,6 +323,7 @@ python scripts/validate_csv.py <file.csv> [--headers]
 ```
 
 Validates:
+
 - CSV format
 - Column consistency
 - Header presence (if --headers flag used)
@@ -301,6 +335,7 @@ python scripts/validate_xml.py <file.xml> [schema.xsd]
 ```
 
 Validates:
+
 - XML syntax
 - XSD schema compliance (if schema provided)
 - Well-formedness
@@ -308,21 +343,25 @@ Validates:
 ## Output Format
 
 All scripts output:
+
 - ✅ PASS: File is valid
 - ❌ FAIL: Specific errors found
 
 ## Examples
 
 Validate JSON with schema:
+
 ```bash
 python scripts/validate_json.py data.json schema.json
 ```
 
 Validate CSV with headers:
+
 ```bash
 python scripts/validate_csv.py data.csv --headers
 ```
-```
+
+````
 
 **scripts/validate_json.py:**
 ```python
@@ -347,7 +386,7 @@ if __name__ == "__main__":
 
     valid = validate_json(sys.argv[1])
     sys.exit(0 if valid else 1)
-```
+````
 
 **When to use:** Tasks requiring deterministic operations (validation, sorting, parsing, calculations).
 
@@ -375,6 +414,7 @@ description: [What it does and when to use it, including trigger keywords]
 ```
 
 **File structure:**
+
 ```
 skill-name/
   └── SKILL.md (that's it!)
@@ -388,7 +428,7 @@ skill-name/
 
 Template for organization-specific workflows.
 
-```yaml
+````yaml
 ---
 name: API Integration Helper
 description: Help integrate with our company REST API. Use when working with API endpoints, authentication, or API requests.
@@ -401,9 +441,10 @@ description: Help integrate with our company REST API. Use when working with API
 All API requests require JWT token:
 ```bash
 export API_TOKEN="your-token-here"
-```
+````
 
 Include in requests:
+
 ```bash
 curl -H "Authorization: Bearer $API_TOKEN" https://api.company.com/endpoint
 ```
@@ -411,11 +452,13 @@ curl -H "Authorization: Bearer $API_TOKEN" https://api.company.com/endpoint
 ## Common Endpoints
 
 ### List Users
+
 ```bash
 GET /api/v1/users
 ```
 
 ### Create User
+
 ```bash
 POST /api/v1/users
 Content-Type: application/json
@@ -440,7 +483,8 @@ See [EXAMPLES.md](EXAMPLES.md) for complete integration examples.
 ## API Reference
 
 Full API documentation: [REFERENCE.md](REFERENCE.md)
-```
+
+````
 
 **When to use:** Capturing organizational knowledge, internal tools, company-specific workflows.
 
@@ -485,9 +529,10 @@ For function:
 ```python
 def add(a: int, b: int) -> int:
     return a + b
-```
+````
 
 Generate:
+
 ```python
 import pytest
 
@@ -509,6 +554,7 @@ def test_add_zero():
 - Use descriptive test names
 - Include edge cases
 - Mock external dependencies
+
 ```
 
 **When to use:** Development workflow automation, code generation, testing assistance.
@@ -539,3 +585,4 @@ For more guidance on creating and improving skills, see:
 - [SKILL.md](SKILL.md) - Creation process
 - [EVALUATING.md](EVALUATING.md) - Testing methodology
 - [DEBUGGING.md](DEBUGGING.md) - Debugging and improvement
+```

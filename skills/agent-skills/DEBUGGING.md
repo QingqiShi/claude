@@ -2,6 +2,28 @@
 
 This guide covers debugging common issues and iteratively improving Agent Skills.
 
+**Key approach**: Use iterative development with Claude. Have one Claude instance (Claude A) help design and refine the skill, while another instance (Claude B) tests it in real usage. Observe Claude B's behavior and return to Claude A with improvements.
+
+For comprehensive debugging strategies and improvement patterns, see [references/best-practices.md](references/best-practices.md).
+
+## Contents
+
+- [Debugging Guide](#debugging-guide)
+  - [Skill doesn't trigger](#issue-skill-doesnt-trigger)
+  - [Skill activates incorrectly](#issue-skill-activates-incorrectly)
+  - [Skill loads too much context](#issue-skill-loads-too-much-context)
+  - [Skill execution is inconsistent](#issue-skill-execution-is-inconsistent)
+  - [Scripts don't execute](#issue-scripts-dont-execute)
+- [Improvement Process](#improvement-process)
+  - [Claude A/B Pattern](#iterative-development-with-claude-claude-ab-pattern)
+  - [Observe usage](#1-observe-claude-using-the-skill)
+  - [Self-reflection](#2-ask-claude-to-self-reflect)
+  - [Refactor patterns](#3-refactor-based-on-usage-patterns)
+  - [Test improvements](#4-test-improvements)
+- [Best Practices for Maintenance](#best-practices-for-maintenance)
+- [Quick Debugging Reference](#quick-debugging-reference)
+- [When to Refactor](#when-to-refactor)
+
 ## Debugging Guide
 
 ### Issue: Skill doesn't trigger
@@ -13,11 +35,13 @@ This guide covers debugging common issues and iteratively improving Agent Skills
 Vague descriptions make discovery difficult.
 
 **Too vague:**
+
 ```yaml
 description: Helps with data
 ```
 
 **Specific:**
+
 ```yaml
 description: Analyze Excel spreadsheets, create pivot tables, generate charts. Use when working with Excel files, spreadsheets, or .xlsx files.
 ```
@@ -72,11 +96,13 @@ This shows skill loading errors and helps identify issues.
 #### Check 1: Description too broad
 
 **Too broad:**
+
 ```yaml
 description: For data analysis
 ```
 
 **Focused:**
+
 ```yaml
 description: Analyze sales data in Excel files and CRM exports. Use for sales reports, pipeline analysis, revenue tracking.
 ```
@@ -88,6 +114,7 @@ description: Analyze sales data in Excel files and CRM exports. Use for sales re
 Make descriptions distinct:
 
 **Bad (overlapping):**
+
 ```yaml
 # Skill 1
 description: For data analysis
@@ -97,6 +124,7 @@ description: For analyzing data
 ```
 
 **Good (distinct):**
+
 ```yaml
 # Skill 1
 description: Analyze sales data in Excel files and CRM exports. Use for sales reports, pipeline analysis, revenue tracking.
@@ -116,6 +144,7 @@ description: Analyze log files and system metrics. Use for performance monitorin
 #### Solution: Split content into focused files
 
 Keep frequently-used content in SKILL.md:
+
 ```yaml
 ---
 name: PDF Processor
@@ -136,6 +165,7 @@ Extract text:
 ```
 
 Move specialized content to separate files:
+
 - **FORMS.md** - Only loaded for form-filling tasks
 - **REFERENCE.md** - Only loaded when API details needed
 - **ADVANCED.md** - Only loaded for complex scenarios
@@ -151,17 +181,22 @@ Move specialized content to separate files:
 #### Solution: Convert operations to code
 
 **Before (instructions):**
+
 ```markdown
 Sort the items alphabetically, handling special characters correctly.
 ```
 
 **After (script):**
-```markdown
+
+````markdown
 Run the sorting script:
+
 ```bash
 python scripts/sort_items.py input.txt
 ```
-```
+````
+
+````
 
 **Benefits of scripts:**
 - Deterministic behavior
@@ -186,18 +221,20 @@ ls -la .claude/skills/skill-name/scripts/
 # Add execute permissions
 chmod +x .claude/skills/skill-name/scripts/*.py
 chmod +x .claude/skills/skill-name/scripts/*.sh
-```
+````
 
 #### Check 2: File paths
 
 Use forward slashes (Unix style) in all paths:
 
 **Correct:**
+
 ```markdown
 Run: `python scripts/helper.py input.txt`
 ```
 
 **Wrong:**
+
 ```markdown
 Run: `python scripts\helper.py input.txt`
 ```
@@ -219,9 +256,34 @@ Claude will request installation when needed.
 
 ## Improvement Process
 
+### Iterative Development with Claude (Claude A/B Pattern)
+
+The most effective approach uses two Claude instances:
+
+**Claude A** (skill designer):
+
+- Helps you create and refine the skill
+- Suggests improvements based on observations
+- Designs better structure and organization
+
+**Claude B** (skill user):
+
+- Tests the skill in real usage scenarios
+- Demonstrates actual behavior patterns
+- Reveals gaps and issues in practice
+
+**Workflow**:
+
+1. Work with Claude A to create initial skill based on a task you completed together
+2. Test with Claude B on similar tasks, observing its behavior
+3. Return to Claude A with observations: "When Claude B used this skill, it forgot to filter test accounts"
+4. Claude A suggests improvements (make rules more prominent, restructure workflow, etc.)
+5. Apply changes and repeat
+
 ### 1. Observe Claude using the skill
 
 Watch for:
+
 - **Unexpected trajectories:** Claude goes down wrong path
 - **Unnecessary file loads:** Loads files it doesn't need
 - **Missing context:** Lacks information to complete task
@@ -242,6 +304,7 @@ What aspects of the skill worked well? Capture that in the instructions.
 ```
 
 Claude can help identify:
+
 - Unclear instructions
 - Missing examples
 - Ambiguous guidance
@@ -264,6 +327,7 @@ Claude can help identify:
 ### 4. Test improvements
 
 After making changes:
+
 1. Run same tasks that previously failed
 2. Verify issues are resolved
 3. Check for new issues introduced
@@ -277,11 +341,13 @@ After making changes:
 One capability per skill:
 
 **Focused:**
+
 - "PDF form filling"
 - "Excel data analysis"
 - "Git commit messages"
 
 **Too broad:**
+
 - "Document processing" → Split into PDF, Word, Excel skills
 - "Data tools" → Split by data type or operation
 
@@ -300,6 +366,7 @@ Don't over-engineer from the start.
 ### 3. Think from Claude's perspective
 
 Monitor how Claude:
+
 - **Discovers** the skill (from description)
 - **Loads** content (what files are accessed)
 - **Uses** instructions (which sections are helpful)
@@ -321,6 +388,7 @@ Adjust based on observed behavior.
 ```
 
 Claude can suggest:
+
 - Better ways to phrase instructions
 - Missing information
 - Clearer examples
@@ -345,6 +413,7 @@ Helps track what changed and why.
 ### 6. Test thoroughly
 
 Before sharing with team:
+
 - Test with representative tasks
 - Test edge cases
 - Test negative cases (shouldn't trigger)
@@ -354,13 +423,16 @@ Before sharing with team:
 ### 7. Use progressive disclosure
 
 **Level 1: Metadata**
+
 - Keep description focused and trigger-rich
 
 **Level 2: Instructions**
+
 - SKILL.md under 5k tokens
 - Frequently-needed content only
 
 **Level 3+: Resources**
+
 - Split specialized content to separate files
 - Add scripts for deterministic operations
 - Include reference materials as needed
@@ -370,6 +442,7 @@ Before sharing with team:
 When to use scripts instead of instructions:
 
 ✅ **Use scripts for:**
+
 - Sorting and ordering
 - Validation and verification
 - Parsing structured data
@@ -378,6 +451,7 @@ When to use scripts instead of instructions:
 - Deterministic transformations
 
 ❌ **Use instructions for:**
+
 - Flexible analysis
 - Natural language tasks
 - Creative writing
@@ -396,10 +470,12 @@ Track versions in content (not frontmatter):
 ## Changelog
 
 ### 2.1.0 (2025-10-18)
+
 - Added retry logic for failed requests
 - Updated authentication flow
 
 ### 2.0.0 (2025-09-01)
+
 - Breaking: Changed API endpoint structure
 - Added OAuth support
 ```
@@ -407,6 +483,7 @@ Track versions in content (not frontmatter):
 ### 10. Share via git
 
 **For teams:**
+
 ```bash
 # Add to project
 mkdir -p .claude/skills/team-skill

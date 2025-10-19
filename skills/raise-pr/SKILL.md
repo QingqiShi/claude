@@ -1,373 +1,373 @@
 ---
-name: PR Raiser
-description: Create pull requests with smart branch names and descriptions. Use when the user wants to raise a PR, create a pull request, push changes, or submit code for review. Analyzes staged changes to infer meaningful branch names and PR titles automatically.
+name: Raising Pull Requests
+description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. Use when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
 ---
 
-# PR Raiser
+# Raising Pull Requests
 
 Automates the PR workflow: branch creation, quality checks, commit, and PR creation with intelligent branch names and descriptions based on code analysis.
 
 ## Workflow
 
+**IMPORTANT**: Copy this checklist and track your progress through the PR creation workflow:
+
+```
+PR Creation Progress:
+- [ ] Step 1: Check branch safety
+- [ ] Step 2: Stage files and run quality checks
+- [ ] Step 3: Analyze changes with pr-research agent
+- [ ] Step 4: Construct branch name, PR title, and commit message
+- [ ] Step 5: Push and create PR
+- [ ] Step 6: Return results
+```
+
 Follow these steps in order when raising a pull request:
 
 ### 1. Check Branch Safety
 
-**IMPORTANT**: Before proceeding, verify the current branch is safe for creating a new branch.
+Verify the current branch before creating a new branch:
 
 ```bash
 git branch --show-current
 ```
 
-- **If on main/master branch**: ✅ Safe to proceed
-- **If on another branch**: ⚠️ **STOP** and ask user:
-  - "You're currently on `<branch-name>`. Would you like to:"
-    1. "Stash changes and switch to main/master for a clean branch?"
-    2. "Stack changes on top of current branch `<branch-name>`?"
+- **On main/master**: ✅ Proceed to next step
+- **On another branch**: ⚠️ Ask user to choose:
+  1. Stash changes and switch to main/master for a clean branch
+  2. Stack changes on top of current branch
   - Wait for user decision before proceeding
 
 ### 2. Stage Files and Run Quality Checks
 
-Stage all modified files and run **project-specific** quality checks.
+Stage files and run project-specific quality checks in a validation loop.
 
-**Important**: Look for project-specific commands that run only on changed files:
-- Check `package.json` scripts for commands like `lint:changed`, `lint:staged`, `format:changed`
-- Check for lint-staged, husky, or other pre-commit tools
-- Prefer commands that run only on staged/changed files for speed
-- Fall back to full `lint` and `format` commands if changed-file versions don't exist
+**Quality check workflow:**
 
-```bash
-# Stage all changes
-git add -A
+1. **Stage all changes:**
 
-# Look for and run project-specific linting on changed files
-# Examples: pnpm lint:changed, npm run lint:staged, pnpm lint --fix
-<run project's lint command for changed files>
+   ```bash
+   git add -A
+   ```
 
-# Look for and run project-specific formatting on changed files
-# Examples: pnpm format:changed, npm run format, pnpm prettier --write
-<run project's format command for changed files>
+2. **Find project-specific commands** (check `package.json`):
 
-# Check if linting/formatting created new changes
-git status
-```
+   - Prefer: `lint:changed`, `lint:staged`, `format:changed` (faster)
+   - Fallback: `lint`, `format` (if changed-file versions don't exist)
 
-**After running lint/format:**
-- If new changes detected: Stage them with `git add -A`
-- If lint/format **fails**: ⚠️ **STOP** and warn the user with specific errors
-- If no quality check commands exist: Ask user if they want to skip quality checks
-- If successful: ✅ Proceed to next step
+3. **Run quality checks:**
+
+   ```bash
+   # Run linting (examples: pnpm lint:changed, npm run lint:staged)
+   <run project's lint command>
+
+   # Run formatting (examples: pnpm format:changed, npm run format)
+   <run project's format command>
+   ```
+
+4. **Validation loop** (iterate until passing):
+   - **If checks pass**: ✅ Proceed to next step
+   - **If checks modify files**: Stage changes with `git add -A`, then verify with `git status`
+   - **If checks fail**: ⚠️ **STOP** - Show specific errors and ask user to fix
+   - **If no quality commands exist**: Ask user if they want to skip quality checks
+
+**Important**: Do not proceed until quality checks pass or user explicitly approves skipping them.
 
 ### 3. Analyze Changes
 
-**Use the pr-research agent to understand what changed and why.** This is critical for creating meaningful branch names, PR titles, and descriptions.
-
-Launch the pr-research agent using the Task tool:
+**Use the pr-research agent** to understand what changed and why. This is critical for meaningful branch names, PR titles, and descriptions.
 
 ```
 Task tool with subagent_type: "pr-research"
 Prompt: "Analyze the staged git changes to understand what changed and why."
 ```
 
-The pr-research agent will:
-1. Run git commands (`git status`, `git diff --staged`, `git log`)
-2. Read relevant files if needed for context
-3. Provide analysis of what changed and the inferred intent/purpose
+The agent provides:
 
-The agent response will include:
 - **What Changed** - factual summary of modifications
-- **Why (Inferred Intent)** - purpose and reasoning behind changes
-- **Change Type** - feature, bug fix, refactoring, docs, etc.
+- **Why (Inferred Intent)** - purpose and reasoning
+- **Change Type** - feature, fix, refactor, docs, test, chore, perf, style
 - **Key Details** - important technical context
 
 ### 4. Construct Branch Name, PR Title, and Commit Message
 
-Based on the pr-research agent's analysis, **you** (the main agent) should construct:
+Based on pr-research analysis, construct:
 
-**Branch Name:**
-- Format: `<type>/<description-in-kebab-case>`
-- Type: Use conventional commit type (feat, fix, refactor, docs, test, chore, perf, style)
-- Description: Short, descriptive name based on the PURPOSE (max 50 chars)
-- Examples:
-  - `feat/jwt-authentication`
-  - `fix/memory-leak-in-parser`
-  - `refactor/context-api-migration`
+**Branch Name** - Format: `<type>/<description-in-kebab-case>`
 
-**PR Title:**
-- Format: `<type>: <description>`
-- Follow conventional commit format
-- Type must be lowercase
-- NO capitalization after the colon
-- Explain WHY, not just WHAT (max 72 chars)
-- Examples:
-  - `feat: add JWT authentication for API security`
-  - `fix: resolve memory leak in parser module`
-  - `refactor: migrate from Redux to Context API`
+- Type: feat, fix, refactor, docs, test, chore, perf, style
+- Description: Purpose-based, max 50 chars
+- Examples: `feat/jwt-authentication`, `fix/memory-leak-in-parser`
 
-**Commit Message:**
-- Format:
-  ```
-  <type>: <short description>
+**PR Title** - Format: `<type>: <description>`
 
-  <detailed explanation from pr-research analysis>
-  <explain what and why based on the agent's findings>
-  ```
-- First line: max 72 characters, conventional commit format
-- Blank line between subject and body
-- Body: Use the pr-research agent's analysis to explain the change
+- Lowercase type, no capitalization after colon
+- Explain WHY, not just WHAT, max 72 chars
+- Examples: `feat: add JWT authentication for API security`
+
+**Commit Message** - Use HEREDOC pattern:
+
+```
+<type>: <short description>
+
+<detailed explanation from pr-research analysis>
+```
+
+- First line: max 72 characters
+- Body: Explain what and why
 - Do NOT include Claude Code references
 
-Now create the branch and commit:
+**Create branch and commit:**
 
 ```bash
 # Create and checkout new branch
 git checkout -b <branch_name>
 
-# Create commit with conventional format
-git commit -m "<commit_message>"
+# Commit using HEREDOC for proper formatting
+git commit -m "$(cat <<'EOF'
+<type>: <short description>
+
+<detailed explanation from pr-research analysis>
+EOF
+)"
 ```
 
 ### 5. Push and Create PR
 
-Based on the pr-research agent's analysis, construct a PR description that explains the changes clearly.
+Construct PR description using pr-research analysis:
 
-**PR Description Structure:**
-```
+**PR Description Template:**
+
+```markdown
 ## Summary
-<Use the "Why (Inferred Intent)" from pr-research analysis>
+
+<Why (Inferred Intent) from pr-research>
 
 ## Changes
-<Use the "What Changed" from pr-research analysis as bullet points>
+
+<What Changed as bullet points>
 
 ## Key Details
-<Include any important technical context from the analysis>
+
+<Important technical context>
 
 ## Test Plan
-<If applicable, mention how to test these changes>
+
+<How to test these changes (if applicable)>
 ```
 
-Push the branch and create the PR:
+**Push and create PR:**
 
 ```bash
 # Push with upstream tracking
 git push -u origin <branch_name>
 
-# Create PR with gh CLI using the PR title you constructed
+# Create PR using HEREDOC
 gh pr create --title "<pr_title>" --body "$(cat <<'EOF'
-<your constructed PR description based on pr-research analysis>
+## Summary
+<inferred intent>
+
+## Changes
+- <change 1>
+- <change 2>
+
+## Key Details
+<technical context>
 EOF
 )"
 ```
 
 **Guidelines:**
-- Use the pr-research agent's analysis to inform the description
-- Focus on why these changes matter, not just what changed
-- Keep it concise but informative
+
+- Focus on WHY changes matter
 - Do NOT include Claude Code references
+- Keep concise but informative
 
 ### 6. Return Results
 
-After successful PR creation:
+Provide PR URL and summary:
 
-1. Provide the PR URL for easy access
-2. Confirm successful completion with summary:
-   ```
-   ✅ Pull request created successfully!
+```
+✅ Pull request created successfully!
 
-   Branch: <branch_name>
-   PR: <pr_url>
-   Title: <pr_title>
+Branch: <branch_name>
+PR: <pr_url>
+Title: <pr_title>
 
-   Summary: <brief description>
-   ```
+Summary: <brief description>
+```
 
 ## Error Handling
 
-Handle common errors gracefully:
+**Common errors and responses:**
 
-- **Linting fails**: Show errors and ask if user wants to fix or skip
-- **No remote repository**: Warn user and ask if they want to set up remote
-- **Branch already exists**: Ask if user wants to use different name or checkout existing
+- **Linting fails**: Show errors, ask if user wants to fix or skip
+- **No remote repository**: Warn and ask if they want to set up remote
+- **Branch already exists**: Ask for different name or checkout existing
 - **PR creation fails**: Show gh CLI error and suggest fixes
-- **No changes staged**: Warn user that there are no changes to commit
-- **pr-research agent fails**: Show the error and fall back to asking user for branch name and PR title
-
-## Best Practices
-
-1. **Always use the pr-research agent** - Don't skip the analysis step
-2. **Wait for quality checks** - Don't proceed if lint/format fails
-3. **Respect user decisions** - Don't auto-proceed on branch safety checks
-4. **Use conventional commits** - Strictly follow the format
-5. **Focus on intent** - Branch names and PR titles should explain purpose, not just list files
-6. **Keep it concise** - Branch names under 50 chars, PR titles under 72 chars
-7. **Test plan matters** - Always consider how changes should be tested
+- **No changes staged**: Warn that there are no changes to commit
+- **pr-research agent fails**: Fall back to asking user for branch name and PR title
 
 ## Examples
 
+Examples demonstrate the complete flow from pr-research analysis to final PR.
+
 ### Example 1: Feature Addition
 
-**Changes**: Added JWT authentication endpoints and middleware
+**Input** - pr-research agent analysis:
 
-**pr-research agent analysis**:
 ```
-## What Changed
-Added JWT authentication system with four new/modified files:
+What Changed: Added JWT authentication system with token generation, validation middleware, /login and /logout endpoints
+
+Why: Implement authentication to secure the API, which currently allows unrestricted access
+
+Change Type: feature
+
+Key Details: JWT for stateless auth, middleware for selective route protection
+```
+
+**Output** - You construct:
+
+Branch: `feat/jwt-authentication`
+
+PR Title: `feat: add JWT authentication for API security`
+
+Commit:
+
+```bash
+git commit -m "$(cat <<'EOF'
+feat: add JWT authentication for API security
+
+Implement JWT token generation and validation to secure the API.
+Add login/logout endpoints and session middleware.
+Update API routes to require authentication where needed.
+EOF
+)"
+```
+
+PR Description:
+
+```markdown
+## Summary
+
+Implements JWT-based authentication to secure the API, addressing the current security gap of unrestricted access.
+
+## Changes
+
 - Created JWT token generation and validation utilities
 - Created authentication middleware for protecting routes
 - Added new /login and /logout endpoints
 - Integrated auth middleware into existing API routes
 
-## Why (Inferred Intent)
-The changes implement a complete JWT-based authentication system to secure the API. This addresses a security need - the API currently has no authentication, allowing unrestricted access. The implementation follows standard JWT patterns with token-based sessions.
-
-## Change Type
-feature
-
 ## Key Details
-- Uses JWT (JSON Web Tokens) for stateless authentication
+
+- Uses JWT for stateless authentication
 - Middleware pattern allows selective route protection
-- Login endpoint generates tokens, logout invalidates them
-- Existing API functionality preserved, just adds auth layer
+- Existing API functionality preserved
 ```
-
-**You construct**:
-- Branch name: `feat/jwt-authentication`
-- PR title: `feat: add JWT authentication for API security`
-- Commit message:
-  ```
-  feat: add JWT authentication for API security
-
-  Implement JWT token generation and validation to secure the API.
-  Add login/logout endpoints and session middleware.
-  Update API routes to require authentication where needed.
-  ```
-- PR description:
-  ```markdown
-  ## Summary
-  Implements a complete JWT-based authentication system to secure the API. This addresses the current security gap where the API has no authentication and allows unrestricted access.
-
-  ## Changes
-  - Created JWT token generation and validation utilities
-  - Created authentication middleware for protecting routes
-  - Added new /login and /logout endpoints
-  - Integrated auth middleware into existing API routes
-
-  ## Key Details
-  - Uses JWT (JSON Web Tokens) for stateless authentication
-  - Middleware pattern allows selective route protection
-  - Login endpoint generates tokens, logout invalidates them
-  - Existing API functionality preserved, just adds auth layer
-  ```
-
-**Result**: Branch created, committed, pushed, and PR opened with title and description above.
 
 ### Example 2: Bug Fix
 
-**Changes**: Fixed memory leak in parser by clearing event listeners
+**Input** - pr-research agent analysis:
 
-**pr-research agent analysis**:
 ```
-## What Changed
-Modified parser module to properly clean up event listeners:
+What Changed: Modified parser to clean up event listeners in destructor and dispose method
+
+Why: Fix memory leak where listeners were never removed after disposal, causing unbounded memory growth in long-running processes
+
+Change Type: bug fix
+
+Key Details: Particularly problematic in server environments, follows standard dispose pattern
+```
+
+**Output** - You construct:
+
+Branch: `fix/parser-memory-leak`
+
+PR Title: `fix: resolve memory leak in parser module`
+
+Commit:
+
+```bash
+git commit -m "$(cat <<'EOF'
+fix: resolve memory leak in parser module
+
+Remove event listeners in cleanup phase to prevent memory accumulation.
+Add proper disposal of parser instances when no longer needed.
+EOF
+)"
+```
+
+PR Description:
+
+```markdown
+## Summary
+
+Fixes memory leak where event listeners were never removed after parser disposal, causing unbounded memory growth in long-running processes.
+
+## Changes
+
 - Added cleanup logic in parser destructor
 - Implemented event listener removal in dispose method
-- Both files work together to prevent listener accumulation
-
-## Why (Inferred Intent)
-Fixes a memory leak where event listeners were never removed after parser instances were disposed. In long-running processes, each parser instance would leave listeners attached, causing memory to grow unbounded. The fix ensures proper cleanup.
-
-## Change Type
-bug fix
 
 ## Key Details
-- Memory leak particularly problematic in server environments
-- Fix follows standard dispose pattern for event-driven code
-- No functional changes to parser behavior, only cleanup
+
+- Particularly problematic in server environments
+- Follows standard dispose pattern for event-driven code
+- No functional changes to parser behavior
 ```
-
-**You construct**:
-- Branch name: `fix/parser-memory-leak`
-- PR title: `fix: resolve memory leak in parser module`
-- Commit message:
-  ```
-  fix: resolve memory leak in parser module
-
-  Remove event listeners in cleanup phase to prevent memory accumulation.
-  Add proper disposal of parser instances when no longer needed.
-  ```
-- PR description:
-  ```markdown
-  ## Summary
-  Fixes a memory leak where event listeners were never removed after parser instances were disposed, causing memory to grow unbounded in long-running processes.
-
-  ## Changes
-  - Added cleanup logic in parser destructor
-  - Implemented event listener removal in dispose method
-  - Both files work together to prevent listener accumulation
-
-  ## Key Details
-  - Memory leak particularly problematic in server environments
-  - Fix follows standard dispose pattern for event-driven code
-  - No functional changes to parser behavior, only cleanup
-  ```
-
-**Result**: Branch created, committed, pushed, and PR opened with title and description above.
 
 ### Example 3: Refactoring
 
-**Changes**: Replaced Redux with React Context API for simpler state management
+**Input** - pr-research agent analysis:
 
-**pr-research agent analysis**:
 ```
-## What Changed
-Complete state management migration from Redux to React Context API:
+What Changed: Migrated from Redux to React Context API - removed Redux (~500 lines), created Context providers and hooks (~200 lines), updated components
+
+Why: Simplify state management as Redux is over-engineered for this application's simple state needs
+
+Change Type: refactoring
+
+Key Details: ~60% code reduction, no functional changes, atomic migration
+```
+
+**Output** - You construct:
+
+Branch: `refactor/context-api-migration`
+
+PR Title: `refactor: migrate from Redux to Context API`
+
+Commit:
+
+```bash
+git commit -m "$(cat <<'EOF'
+refactor: migrate from Redux to Context API
+
+Simplify state management by replacing Redux with React Context API.
+Reduces boilerplate and improves maintainability for the current use case.
+No functional changes to application behavior.
+EOF
+)"
+```
+
+PR Description:
+
+```markdown
+## Summary
+
+Simplifies state management by replacing Redux with React Context API. Redux was over-engineered for this application's simple state needs.
+
+## Changes
+
 - Removed all Redux store, actions, reducers (~500 lines)
 - Created new Context providers and hooks (~200 lines)
 - Updated all components to use new Context hooks
-- No changes to component behavior or UI
-
-## Why (Inferred Intent)
-Simplifies state management by replacing Redux with React's built-in Context API. For this application's use case, Redux was over-engineered - the state is simple enough that Context API provides all needed functionality with significantly less boilerplate.
-
-## Change Type
-refactoring
 
 ## Key Details
+
 - ~60% reduction in state management code
 - No functional changes - application behavior identical
 - Migration done atomically to avoid broken intermediate states
 ```
-
-**You construct**:
-- Branch name: `refactor/context-api-migration`
-- PR title: `refactor: migrate from Redux to Context API`
-- Commit message:
-  ```
-  refactor: migrate from Redux to Context API
-
-  Simplify state management by replacing Redux with React Context API.
-  Reduces boilerplate and improves maintainability for the current use case.
-  No functional changes to application behavior.
-  ```
-- PR description:
-  ```markdown
-  ## Summary
-  Simplifies state management by replacing Redux with React's built-in Context API. For this application's use case, Redux was over-engineered - the state is simple enough that Context API provides all needed functionality with significantly less boilerplate.
-
-  ## Changes
-  - Removed all Redux store, actions, reducers (~500 lines)
-  - Created new Context providers and hooks (~200 lines)
-  - Updated all components to use new Context hooks
-  - No changes to component behavior or UI
-
-  ## Key Details
-  - ~60% reduction in state management code
-  - No functional changes - application behavior identical
-  - Migration done atomically to avoid broken intermediate states
-  - Context API sufficient for current complexity level
-  ```
-
-**Result**: Branch created, committed, pushed, and PR opened with title and description above.
 
 ## Conventional Commit Types
 

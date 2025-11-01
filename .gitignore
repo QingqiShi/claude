@@ -4,6 +4,7 @@
 # Explicitly allow only prompt files
 !.gitignore
 !CLAUDE.md
+!settings.json
 !agents/
 !agents/**
 !skills/

@@ -17,3 +17,6 @@ Always follow the following rules. Do not under any circumstances ignore these:
   - **DO NOT assume you know the "next best option"** - propose it and get approval first
   - Explain clearly: (1) what you tried, (2) why it failed, (3) what options exist, (4) wait for user decision
 - Never assume errors to be "pre-existing", this is almost never the case.
+- When you are unsure about a solution, always try to verify rather than guessing or pattern matching. **NEVER GUESS**
+
+Reminder, if you violate the above instructions it will always waste me more time and is NOT HELPFUL.

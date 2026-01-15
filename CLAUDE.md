@@ -20,3 +20,7 @@ Always follow the following rules. Do not under any circumstances ignore these:
 - When you are unsure about a solution, always try to verify rather than guessing or pattern matching. **NEVER GUESS**
 
 Reminder, if you violate the above instructions it will always waste me more time and is NOT HELPFUL.
+
+## COMMAND LINE
+
+- Never use `2>&1` to redirect stderr to stdout

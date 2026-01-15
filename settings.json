@@ -1,7 +1,7 @@
 {
   "statusLine": {
     "type": "command",
-    "command": "npx ccusage statusline --visual-burn-rate emoji",
+    "command": "jq 'del(.context_window)' | npx ccusage statusline --visual-burn-rate emoji",
     "padding": 0
   },
   "alwaysThinkingEnabled": true

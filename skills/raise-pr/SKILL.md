@@ -85,7 +85,7 @@ The agent provides:
 
 - **What Changed** - factual summary of modifications
 - **Why (Inferred Intent)** - purpose and reasoning
-- **Change Type** - feature, fix, refactor, docs, test, chore, perf, style
+- **Change Type** - feat, fix, refactor, perf, style, test, docs, build, ci, chore
 - **Key Details** - important technical context
 
 ### 4. Construct Branch Name, PR Title, and Commit Message
@@ -94,7 +94,7 @@ Based on pr-research analysis, construct:
 
 **Branch Name** - Format: `<type>/<description-in-kebab-case>`
 
-- Type: feat, fix, refactor, docs, test, chore, perf, style
+- Type: feat, fix, refactor, perf, style, test, docs, build, ci, chore
 - Description: Purpose-based, max 50 chars
 - Examples: `feat/jwt-authentication`, `fix/memory-leak-in-parser`
 
@@ -373,14 +373,17 @@ Simplifies state management by replacing Redux with React Context API. Redux was
 
 Reference for constructing branch names, PR titles, and commit messages:
 
-- **feat**: New feature for the user
-- **fix**: Bug fix for the user
-- **refactor**: Code change that neither fixes a bug nor adds a feature
-- **docs**: Documentation only changes
-- **test**: Adding or updating tests
-- **chore**: Changes to build process, auxiliary tools, or dependencies
+- **feat**: New feature or functionality
+- **fix**: Bug fix
+- **refactor**: Code restructuring without behavior change
 - **perf**: Performance improvements
-- **style**: Code style changes (formatting, missing semi-colons, etc.)
+- **style**: Formatting only (whitespace, semicolons)
+- **test**: Adding or updating tests
+- **docs**: Documentation changes
+- **build**: Build system, dependencies, project config (Node version, webpack, Docker)
+- **ci**: CI/CD configuration and scripts (GitHub Actions, Jenkins)
+- **chore**: Miscellaneous (gitignore, editor configs)
+- **revert**: Reverting a previous commit
 
 ## Notes
 

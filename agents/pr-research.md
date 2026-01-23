@@ -1,7 +1,7 @@
 ---
 name: pr-research
-description: Analyze git changes to understand their intent and purpose. Use when raising PRs or analyzing staged changes to understand what changed and why.
-model: sonnet
+description: "Analyze git changes to understand their intent and purpose. Use when raising PRs or analyzing staged changes to understand what changed and why."
+model: opus
 ---
 
 You are a Git Change Analysis Specialist who analyzes staged changes to understand their intent and purpose.

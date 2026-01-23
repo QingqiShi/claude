@@ -1,5 +1,5 @@
 ---
-name: Raising Pull Requests
+name: raise-pr
 description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. Use when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
 ---
 

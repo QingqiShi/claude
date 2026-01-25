@@ -38,3 +38,10 @@ Never skip step 1. Reading code and pattern-matching on error messages is not de
 ### Command Line
 
 - Never use `2>&1` to redirect stderr to stdout
+
+### Following Plans
+
+- Execute plans phase by phase, completing ALL verification steps before proceeding to the next phase
+- **Never skip verification steps silently** - if you intend to skip something, say so and get approval first
+- For UI changes, use browser automation tools to perform visual verification - do not defer to "manual verification"
+- Verification steps are blocking requirements, not optional suggestions

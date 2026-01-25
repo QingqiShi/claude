@@ -74,27 +74,31 @@ Do not proceed until quality checks pass or user explicitly approves skipping th
 
 ### 3. Analyze Changes
 
-Use the pr-research agent to understand what changed and why. This is critical for meaningful branch names, PR titles, and descriptions.
+Use the pr-research agent to get a factual summary of what changed.
 
 ```
 Task tool with subagent_type: "pr-research"
-Prompt: "Analyze the staged git changes to understand what changed and why."
+Prompt: "Analyze the staged git changes and report what was modified."
 ```
 
-The agent provides:
+The agent provides factual information:
 
-- **What Changed** - factual summary of modifications
-- **Why (Inferred Intent)** - purpose and reasoning
-- **Change Type** - feat, fix, refactor, perf, style, test, docs, build, ci, chore
-- **Key Details** - important technical context
+- **Files Changed** - what files were added, modified, or deleted
+- **Summary of Modifications** - what code was changed
+- **Observations** - patterns and technical context
 
-**If intent is unclear from the analysis**: Ask the user before proceeding. The "why" is the most important part of a PR description. Examples:
+Based on this analysis, **you** determine:
+
+1. **Intent** - Why were these changes made? What problem do they solve?
+2. **Change Type** - Is this a feat, fix, refactor, etc.? (See Conventional Commit Types below)
+
+**If intent is unclear**: Ask the user before proceeding. The "why" is the most important part of a PR description. Examples:
 - "I see changes to the lint config, but I'm not sure why. Is this fixing a broken command? Adding stricter rules?"
 - "This looks like a dependency upgrade. What does the new version provide that we need?"
 
 ### 4. Construct Branch Name, PR Title, and Commit Message
 
-Based on pr-research analysis, construct:
+Based on the pr-research facts and your determination of intent/change type, construct:
 
 **Branch Name** - Format: `<type>/<description-in-kebab-case>`
 
@@ -123,7 +127,7 @@ git commit -m "<type>: <short description>"
 
 ### 5. Push and Create PR
 
-Construct PR description using pr-research analysis.
+Construct PR description using the pr-research facts and your understanding of intent.
 
 **PR Description Principles:**
 
@@ -226,7 +230,7 @@ For detailed examples, see [references/examples.md](references/examples.md).
 - This skill requires `gh` CLI to be installed and authenticated
 - Quality checks are **project-specific** - look for lint/format commands in the project's package.json or configuration
 - Prefer quality check commands that run only on changed files (e.g., `lint:changed`, `lint:staged`) for better performance
-- The pr-research agent is critical for understanding intent - do not skip it
+- The pr-research agent provides factual analysis - do not skip it
 - Always use conventional commit format
 - **PR descriptions should explain WHY, not list WHAT** - reviewers can see the code diff
 - **When intent is unclear, ask the user** - a good PR description requires understanding the purpose

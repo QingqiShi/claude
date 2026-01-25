@@ -1,6 +1,6 @@
 ---
 name: raise-pr
-description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. Use when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
+description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. This skill should be used when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
 ---
 
 # Raising Pull Requests
@@ -9,7 +9,7 @@ Automates the PR workflow: branch creation, quality checks, commit, and PR creat
 
 ## Workflow
 
-**IMPORTANT**: Copy this checklist and track your progress through the PR creation workflow:
+Copy this checklist to track progress through the PR creation workflow:
 
 ```
 PR Creation Progress:
@@ -21,7 +21,7 @@ PR Creation Progress:
 - [ ] Step 6: Return results
 ```
 
-Follow these steps in order when raising a pull request:
+Follow these steps in order when raising a pull request.
 
 ### 1. Check Branch Safety
 
@@ -31,8 +31,8 @@ Verify the current branch before creating a new branch:
 git branch --show-current
 ```
 
-- **On main/master**: ✅ Proceed to next step
-- **On another branch**: ⚠️ Ask user to choose:
+- **On main/master**: Proceed to next step
+- **On another branch**: Ask the user to choose:
   1. Stash changes and switch to main/master for a clean branch
   2. Stack changes on top of current branch
   - Wait for user decision before proceeding
@@ -65,16 +65,16 @@ Stage files and run project-specific quality checks in a validation loop.
    ```
 
 4. **Validation loop** (iterate until passing):
-   - **If checks pass**: ✅ Proceed to next step
+   - **If checks pass**: Proceed to next step
    - **If checks modify files**: Stage changes with `git add -A`, then verify with `git status`
-   - **If checks fail**: ⚠️ **STOP** - Show specific errors and ask user to fix
+   - **If checks fail**: **STOP** - Show specific errors and ask user to fix
    - **If no quality commands exist**: Ask user if they want to skip quality checks
 
-**Important**: Do not proceed until quality checks pass or user explicitly approves skipping them.
+Do not proceed until quality checks pass or user explicitly approves skipping them.
 
 ### 3. Analyze Changes
 
-**Use the pr-research agent** to understand what changed and why. This is critical for meaningful branch names, PR titles, and descriptions.
+Use the pr-research agent to understand what changed and why. This is critical for meaningful branch names, PR titles, and descriptions.
 
 ```
 Task tool with subagent_type: "pr-research"
@@ -87,6 +87,10 @@ The agent provides:
 - **Why (Inferred Intent)** - purpose and reasoning
 - **Change Type** - feat, fix, refactor, perf, style, test, docs, build, ci, chore
 - **Key Details** - important technical context
+
+**If intent is unclear from the analysis**: Ask the user before proceeding. The "why" is the most important part of a PR description. Examples:
+- "I see changes to the lint config, but I'm not sure why. Is this fixing a broken command? Adding stricter rules?"
+- "This looks like a dependency upgrade. What does the new version provide that we need?"
 
 ### 4. Construct Branch Name, PR Title, and Commit Message
 
@@ -101,58 +105,50 @@ Based on pr-research analysis, construct:
 **PR Title** - Format: `<type>: <description>`
 
 - Lowercase type, no capitalization after colon
-- Explain WHY, not just WHAT, max 72 chars
-- Examples: `feat: add JWT authentication for API security`
+- Concise summary of what changed, max 72 chars
+- Examples: `feat: add JWT authentication`, `fix: resolve memory leak in parser`
 
-**Commit Message** - Use HEREDOC pattern:
+**Commit Message** - Keep it brief. The PR description is where detail lives.
 
-```
-<type>: <short description>
-
-<detailed explanation from pr-research analysis>
-```
-
-- First line: max 72 characters
-- Body: Explain what and why
+- First line: Same as PR title
+- Optional body: Brief context if needed
 - Do NOT include Claude Code references
 
 **Create branch and commit:**
 
 ```bash
-# Create and checkout new branch
 git checkout -b <branch_name>
-
-# Commit using HEREDOC for proper formatting
-git commit -m "$(cat <<'EOF'
-<type>: <short description>
-
-<detailed explanation from pr-research analysis>
-EOF
-)"
+git commit -m "<type>: <short description>"
 ```
 
 ### 5. Push and Create PR
 
-Construct PR description using pr-research analysis:
+Construct PR description using pr-research analysis.
+
+**PR Description Principles:**
+
+The goal of a PR description is to explain **what changed** and **why**. Reviewers can see the code diff themselves, so:
+
+- **Never list files or individual code changes** - the reviewer will see these in the diff
+- **Focus on intent** - Why is this PR being raised? What problem does it solve?
+- **Provide context the diff doesn't show** - Background, motivation, trade-offs, future implications
+- **Keep it concise** - A few sentences is often enough
+
+**If intent is unclear**: Ask the user before creating the PR. Examples of questions to clarify:
+- "Is this fixing a bug? If so, what was the issue?"
+- "What prompted this change?"
+- "What's the benefit of this refactor?"
 
 **PR Description Template:**
 
 ```markdown
 ## Summary
 
-<Why (Inferred Intent) from pr-research>
+<1-3 sentences explaining WHY this change is being made and WHAT it accomplishes at a high level>
 
-## Changes
+## Context
 
-<What Changed as bullet points>
-
-## Key Details
-
-<Important technical context>
-
-## Test Plan
-
-<How to test these changes (if applicable)>
+<Optional: Background information, what led to this change, any non-obvious trade-offs or decisions>
 ```
 
 **Push and create PR:**
@@ -164,30 +160,28 @@ git push -u origin <branch_name>
 # Create PR using HEREDOC
 gh pr create --title "<pr_title>" --body "$(cat <<'EOF'
 ## Summary
-<inferred intent>
 
-## Changes
-- <change 1>
-- <change 2>
+<why and what at high level>
 
-## Key Details
-<technical context>
+## Context
+
+<background if needed>
 EOF
 )"
 ```
 
 **Guidelines:**
 
-- Focus on WHY changes matter
+- Do NOT list files changed or bullet-point every modification
 - Do NOT include Claude Code references
-- Keep concise but informative
+- Prefer 2-5 sentences over long structured lists
 
 ### 6. Return Results
 
 Provide PR URL and summary:
 
 ```
-✅ Pull request created successfully!
+PR created successfully.
 
 Branch: <branch_name>
 PR: <pr_url>
@@ -198,7 +192,7 @@ Summary: <brief description>
 
 ## Error Handling
 
-**Common errors and responses:**
+Common errors and responses:
 
 - **Linting fails**: Show errors, ask if user wants to fix or skip
 - **No remote repository**: Warn and ask if they want to set up remote
@@ -206,168 +200,6 @@ Summary: <brief description>
 - **PR creation fails**: Show gh CLI error and suggest fixes
 - **No changes staged**: Warn that there are no changes to commit
 - **pr-research agent fails**: Fall back to asking user for branch name and PR title
-
-## Examples
-
-Examples demonstrate the complete flow from pr-research analysis to final PR.
-
-### Example 1: Feature Addition
-
-**Input** - pr-research agent analysis:
-
-```
-What Changed: Added JWT authentication system with token generation, validation middleware, /login and /logout endpoints
-
-Why: Implement authentication to secure the API, which currently allows unrestricted access
-
-Change Type: feature
-
-Key Details: JWT for stateless auth, middleware for selective route protection
-```
-
-**Output** - You construct:
-
-Branch: `feat/jwt-authentication`
-
-PR Title: `feat: add JWT authentication for API security`
-
-Commit:
-
-```bash
-git commit -m "$(cat <<'EOF'
-feat: add JWT authentication for API security
-
-Implement JWT token generation and validation to secure the API.
-Add login/logout endpoints and session middleware.
-Update API routes to require authentication where needed.
-EOF
-)"
-```
-
-PR Description:
-
-```markdown
-## Summary
-
-Implements JWT-based authentication to secure the API, addressing the current security gap of unrestricted access.
-
-## Changes
-
-- Created JWT token generation and validation utilities
-- Created authentication middleware for protecting routes
-- Added new /login and /logout endpoints
-- Integrated auth middleware into existing API routes
-
-## Key Details
-
-- Uses JWT for stateless authentication
-- Middleware pattern allows selective route protection
-- Existing API functionality preserved
-```
-
-### Example 2: Bug Fix
-
-**Input** - pr-research agent analysis:
-
-```
-What Changed: Modified parser to clean up event listeners in destructor and dispose method
-
-Why: Fix memory leak where listeners were never removed after disposal, causing unbounded memory growth in long-running processes
-
-Change Type: bug fix
-
-Key Details: Particularly problematic in server environments, follows standard dispose pattern
-```
-
-**Output** - You construct:
-
-Branch: `fix/parser-memory-leak`
-
-PR Title: `fix: resolve memory leak in parser module`
-
-Commit:
-
-```bash
-git commit -m "$(cat <<'EOF'
-fix: resolve memory leak in parser module
-
-Remove event listeners in cleanup phase to prevent memory accumulation.
-Add proper disposal of parser instances when no longer needed.
-EOF
-)"
-```
-
-PR Description:
-
-```markdown
-## Summary
-
-Fixes memory leak where event listeners were never removed after parser disposal, causing unbounded memory growth in long-running processes.
-
-## Changes
-
-- Added cleanup logic in parser destructor
-- Implemented event listener removal in dispose method
-
-## Key Details
-
-- Particularly problematic in server environments
-- Follows standard dispose pattern for event-driven code
-- No functional changes to parser behavior
-```
-
-### Example 3: Refactoring
-
-**Input** - pr-research agent analysis:
-
-```
-What Changed: Migrated from Redux to React Context API - removed Redux (~500 lines), created Context providers and hooks (~200 lines), updated components
-
-Why: Simplify state management as Redux is over-engineered for this application's simple state needs
-
-Change Type: refactoring
-
-Key Details: ~60% code reduction, no functional changes, atomic migration
-```
-
-**Output** - You construct:
-
-Branch: `refactor/context-api-migration`
-
-PR Title: `refactor: migrate from Redux to Context API`
-
-Commit:
-
-```bash
-git commit -m "$(cat <<'EOF'
-refactor: migrate from Redux to Context API
-
-Simplify state management by replacing Redux with React Context API.
-Reduces boilerplate and improves maintainability for the current use case.
-No functional changes to application behavior.
-EOF
-)"
-```
-
-PR Description:
-
-```markdown
-## Summary
-
-Simplifies state management by replacing Redux with React Context API. Redux was over-engineered for this application's simple state needs.
-
-## Changes
-
-- Removed all Redux store, actions, reducers (~500 lines)
-- Created new Context providers and hooks (~200 lines)
-- Updated all components to use new Context hooks
-
-## Key Details
-
-- ~60% reduction in state management code
-- No functional changes - application behavior identical
-- Migration done atomically to avoid broken intermediate states
-```
 
 ## Conventional Commit Types
 
@@ -385,11 +217,16 @@ Reference for constructing branch names, PR titles, and commit messages:
 - **chore**: Miscellaneous (gitignore, editor configs)
 - **revert**: Reverting a previous commit
 
+## References
+
+For detailed examples, see [references/examples.md](references/examples.md).
+
 ## Notes
 
 - This skill requires `gh` CLI to be installed and authenticated
 - Quality checks are **project-specific** - look for lint/format commands in the project's package.json or configuration
 - Prefer quality check commands that run only on changed files (e.g., `lint:changed`, `lint:staged`) for better performance
-- The pr-research agent is critical for understanding intent - don't skip it
-- Always use conventional commit format - it's a strict requirement
-- Focus on explaining **why** changes were made, not just **what** changed
+- The pr-research agent is critical for understanding intent - do not skip it
+- Always use conventional commit format
+- **PR descriptions should explain WHY, not list WHAT** - reviewers can see the code diff
+- **When intent is unclear, ask the user** - a good PR description requires understanding the purpose

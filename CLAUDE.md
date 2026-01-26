@@ -45,3 +45,8 @@ Never skip step 1. Reading code and pattern-matching on error messages is not de
 - **Never skip verification steps silently** - if you intend to skip something, say so and get approval first
 - For UI changes, use browser automation tools to perform visual verification - do not defer to "manual verification"
 - Verification steps are blocking requirements, not optional suggestions
+
+### Research
+
+- Prefer official documentation over third-party blog posts
+- When investigating bugs on GitHub issues, prefer maintainer responses over community workarounds

@@ -32,6 +32,7 @@ git branch --show-current
 ```
 
 - **On main/master**: Proceed to next step
+- **Detached HEAD** (empty output): Treat as main/master, proceed to next step
 - **On another branch**: Ask the user to choose:
   1. Stash changes and switch to main/master for a clean branch
   2. Stack changes on top of current branch

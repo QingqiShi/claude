@@ -143,14 +143,12 @@ Collect results from both sub-agents. Compile into a single report.
   1. <numbered list of specific fixes needed>
 ```
 
-**PASS/FAIL thresholds** (5 checks):
-- Overflow: FAIL if any element overflows by >2px
+**PASS/FAIL rules** (5 checks) — any issue in a category means FAIL:
+- Overflow: FAIL if any element overflows by >2px (2px tolerance for sub-pixel rendering)
 - Contrast: FAIL if any WCAG AA failure exists
-- Interactive States: FAIL if any critical issue (missing pointer cursor on buttons, no focus indicator)
-- Tokens: FAIL if any broken token reference exists
-- Visual Review: FAIL if any critical severity issue found
-
-Hardcoded colors are reported in the Tokens section for context but are informational only — they do not trigger FAIL.
+- Interactive States: FAIL if any issue exists
+- Tokens: FAIL if any broken token reference or hardcoded color is found
+- Visual Review: FAIL if any issue found (critical, moderate, or minor)
 
 ## Multiple Pages
 

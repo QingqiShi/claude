@@ -143,12 +143,7 @@ Collect results from both sub-agents. Compile into a single report.
   1. <numbered list of specific fixes needed>
 ```
 
-**PASS/FAIL rules** (5 checks) — any issue in a category means FAIL:
-- Overflow: FAIL if any element overflows by >2px (2px tolerance for sub-pixel rendering)
-- Contrast: FAIL if any WCAG AA failure exists
-- Interactive States: FAIL if any issue exists
-- Tokens: FAIL if any broken token reference or hardcoded color is found
-- Visual Review: FAIL if any issue found (critical, moderate, or minor)
+Any issue in any category means FAIL. Every issue found must appear in the action items list.
 
 ## Multiple Pages
 

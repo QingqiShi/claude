@@ -51,7 +51,6 @@ Stage files and run project-specific quality checks in a validation loop.
    ```
 
 2. **Find project-specific commands** (check `package.json`):
-
    - Prefer: `lint:changed`, `lint:staged`, `format:changed` (faster)
    - Fallback: `lint`, `format` (if changed-file versions don't exist)
 
@@ -94,6 +93,7 @@ Based on this analysis, **you** determine:
 2. **Change Type** - Is this a feat, fix, refactor, etc.? (See Conventional Commit Types below)
 
 **If intent is unclear**: Ask the user before proceeding. The "why" is the most important part of a PR description. Examples:
+
 - "I see changes to the lint config, but I'm not sure why. Is this fixing a broken command? Adding stricter rules?"
 - "This looks like a dependency upgrade. What does the new version provide that we need?"
 
@@ -117,7 +117,7 @@ Based on the pr-research facts and your determination of intent/change type, con
 
 - First line: Same as PR title
 - Optional body: Brief context if needed
-- Do NOT include Claude Code references
+- Do NOT include "Co-Authored-By: Claude" references
 
 **Create branch and commit:**
 
@@ -140,6 +140,7 @@ The goal of a PR description is to explain **what changed** and **why**. Reviewe
 - **Keep it concise** - A few sentences is often enough
 
 **If intent is unclear**: Ask the user before creating the PR. Examples of questions to clarify:
+
 - "Is this fixing a bug? If so, what was the issue?"
 - "What prompted this change?"
 - "What's the benefit of this refactor?"
@@ -178,7 +179,7 @@ EOF
 **Guidelines:**
 
 - Do NOT list files changed or bullet-point every modification
-- Do NOT include Claude Code references
+- Do NOT include "Co-Authored-By: Claude" references
 - Prefer 2-5 sentences over long structured lists
 
 ### 6. Return Results

@@ -1,7 +1,6 @@
 ---
 name: design-verify
 description: Verifies visual correctness of design and UI changes using browser automation. This skill should be used after any design changes, visual updates, CSS modifications, theme changes, or component styling work to verify no overflow issues exist, light and dark modes render correctly, all design tokens propagate properly, contrast meets WCAG standards, and interactive states are intact. Trigger phrases include "verify the design", "check the UI", "verify visual changes", "check dark mode", "check for overflow".
-allowed-tools: Bash(agent-browser:*), Task(design-verify:*)
 ---
 
 # Design Verification
@@ -30,6 +29,7 @@ Before launching sub-agents, examine the conversation history to determine what 
 - **`description`**: One sentence describing what changed (e.g., "Restyled the pricing card component").
 
 If the context is ambiguous (e.g., the user says "verify the design" with no prior conversation about what changed), ask the user:
+
 - What page/component did you change?
 - Are there specific elements or interactions to focus on?
 
@@ -151,6 +151,6 @@ If multiple pages or routes require verification, repeat Steps 1-2 for each URL 
 
 ## Script Reference
 
-| Script | Purpose |
-|--------|---------|
+| Script                               | Purpose                                                                                                |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------ |
 | [scripts/audit.js](scripts/audit.js) | Full audit: overflow detection, WCAG contrast, interactive states, token propagation, hardcoded colors |

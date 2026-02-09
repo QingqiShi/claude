@@ -30,11 +30,11 @@ Invoke the `agent-browser` skill to load the browser operation instructions.
 1. Set up a browser session using the specified viewport, and media.
 2. Open the URL, perform specified interactions, and locate the focus element, ensuring it's visible in the viewport.
 3. Take a fullscreen screenshot.
-4. Review the screenshot to find issues.
+4. Review the screenshot one time to find all issues.
 5. Close the browser session.
 6. Report back a summary of the issues found.
 
-## 4. Review screenshot
+### Review screenshot
 
 Carefully review the screenshot against the following checklist:
 

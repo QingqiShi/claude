@@ -12,7 +12,6 @@ Your prompt will contain the following information. Abort immediately if anythin
 - URL: the page URL to verify
 - Device: desktop or mobile
 - Theme: light or dark
-- Focus element: CSS selector for the targeted screenshot
 - Interactions: list of actions to perform
 
 Definitions:
@@ -31,7 +30,9 @@ Invoke the `agent-browser` skill to load the browser operation instructions.
 1. Set up a browser session using the specified viewport, and media.
 2. Open the URL, perform specified interactions, and locate the focus element, ensuring it's visible in the viewport.
 3. Take a screenshot.
-4. Close the browser session.
+4. Review the screenshot to find issues.
+5. Close the browser session.
+6. Report back a summary of the issues found.
 
 ## 4. Review screenshot
 

@@ -20,7 +20,6 @@ If a URL is not provided, ask for one before proceeding.
 
 Before launching sub-agents, examine the conversation history to determine what the user was working on. Extract:
 
-- **Focus element**: CSS selector or component name to apply extra scrutiny to. If the user changed a specific modal, card, or section — capture it. Empty means full-page review only.
 - **Interactions**: States to test beyond the default page load. For example: "hover on .submit-btn", "open the modal by clicking .trigger", "fill the form and check validation". Empty means static review only.
 - **Description**: One sentence describing what changed (e.g., "Restyled the pricing card component").
 
@@ -46,7 +45,6 @@ Launch **4 parallel sub-agents** via the Task tool (`subagent_type: "design-veri
 - URL: <url>
 - Device: <desktop/mobile>
 - Theme: <light/dark>
-- Focus element: <CSS selector, or "none">
 - Interactions: <comma-separated actions, or "none">
 
 Description: <description>

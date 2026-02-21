@@ -9,5 +9,8 @@
 !agents/**
 !skills/
 !skills/**
+skills/**/.playwright-cli/
+skills/**/*.png
+.DS_Store
 !output-styles/
 !output-styles/**

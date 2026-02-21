@@ -5,234 +5,82 @@ description: Create pull requests with intelligent branch names and descriptions
 
 # Raising Pull Requests
 
-Automates the PR workflow: branch creation, quality checks, commit, and PR creation with intelligent branch names and descriptions based on code analysis.
-
-## Workflow
-
-Copy this checklist to track progress through the PR creation workflow:
-
-```
-PR Creation Progress:
-- [ ] Step 1: Check branch safety
-- [ ] Step 2: Stage files and run quality checks
-- [ ] Step 3: Analyze changes with pr-research agent
-- [ ] Step 4: Construct branch name, PR title, and commit message
-- [ ] Step 5: Push and create PR
-- [ ] Step 6: Return results
-```
-
-Follow these steps in order when raising a pull request.
+Follow these steps in order.
 
 ### 1. Check Branch Safety
-
-Verify the current branch before creating a new branch:
 
 ```bash
 git branch --show-current
 ```
 
-- **On main/master**: Proceed to next step
-- **Detached HEAD** (empty output): Treat as main/master, proceed to next step
-- **On another branch**: Ask the user to choose:
-  1. Stash changes and switch to main/master for a clean branch
-  2. Stack changes on top of current branch
-  - Wait for user decision before proceeding
+- **On main/master or detached HEAD**: Proceed
+- **On another branch**: Ask user whether to (a) stash and switch to main/master, or (b) stack on current branch
 
 ### 2. Stage Files and Run Quality Checks
 
-Stage files and run project-specific quality checks in a validation loop.
-
-**Quality check workflow:**
-
-1. **Stage all changes:**
-
-   ```bash
-   git add -A
-   ```
-
-2. **Find project-specific commands** (check `package.json`):
-   - Prefer: `lint:changed`, `lint:staged`, `format:changed` (faster)
-   - Fallback: `lint`, `format` (if changed-file versions don't exist)
-
-3. **Run quality checks:**
-
-   ```bash
-   # Run linting (examples: pnpm lint:changed, npm run lint:staged)
-   <run project's lint command>
-
-   # Run formatting (examples: pnpm format:changed, npm run format)
-   <run project's format command>
-   ```
-
-4. **Validation loop** (iterate until passing):
-   - **If checks pass**: Proceed to next step
-   - **If checks modify files**: Stage changes with `git add -A`, then verify with `git status`
-   - **If checks fail**: **STOP** - Show specific errors and ask user to fix
-   - **If no quality commands exist**: Ask user if they want to skip quality checks
-
-Do not proceed until quality checks pass or user explicitly approves skipping them.
+1. Stage all changes: `git add -A`
+2. Check `package.json` for lint/format commands (prefer `lint:changed`/`format:changed` over `lint`/`format`)
+3. Run any found commands. If they modify files, re-stage and re-run. If they fail, stop and ask user.
+4. If no quality commands exist, ask user if they want to skip.
 
 ### 3. Analyze Changes
 
-Use the pr-research agent to get a factual summary of what changed.
+Spawn the pr-research agent:
 
 ```
 Task tool with subagent_type: "pr-research"
 Prompt: "Analyze the staged git changes and report what was modified."
 ```
 
-The agent provides factual information:
+From the agent's factual report, determine the **intent** (why were these changes made?) and **change type** (feat, fix, refactor, etc.).
 
-- **Files Changed** - what files were added, modified, or deleted
-- **Summary of Modifications** - what code was changed
-- **Observations** - patterns and technical context
+If intent is unclear, ask the user before proceeding.
 
-Based on this analysis, **you** determine:
+### 4. Branch, Commit, Push, and Create PR
 
-1. **Intent** - Why were these changes made? What problem do they solve?
-2. **Change Type** - Is this a feat, fix, refactor, etc.? (See Conventional Commit Types below)
+**Branch name**: `<type>/<description-in-kebab-case>` (max 50 chars)
 
-**If intent is unclear**: Ask the user before proceeding. The "why" is the most important part of a PR description. Examples:
+**PR title**: `<type>: <description>` (lowercase, max 72 chars)
 
-- "I see changes to the lint config, but I'm not sure why. Is this fixing a broken command? Adding stricter rules?"
-- "This looks like a dependency upgrade. What does the new version provide that we need?"
+**Commit message**: Same as PR title. No Co-Authored-By.
 
-### 4. Construct Branch Name, PR Title, and Commit Message
+**PR description**: Explain **why** the change is being made, not what files changed — reviewers can see the diff. Keep it to 2-5 sentences. Use this template:
 
-Based on the pr-research facts and your determination of intent/change type, construct:
+```markdown
+## Summary
+<why and what at high level>
 
-**Branch Name** - Format: `<type>/<description-in-kebab-case>`
-
-- Type: feat, fix, refactor, perf, style, test, docs, build, ci, chore
-- Description: Purpose-based, max 50 chars
-- Examples: `feat/jwt-authentication`, `fix/memory-leak-in-parser`
-
-**PR Title** - Format: `<type>: <description>`
-
-- Lowercase type, no capitalization after colon
-- Concise summary of what changed, max 72 chars
-- Examples: `feat: add JWT authentication`, `fix: resolve memory leak in parser`
-
-**Commit Message** - Keep it brief. The PR description is where detail lives.
-
-- First line: Same as PR title
-- Optional body: Brief context if needed
-- Do NOT include "Co-Authored-By: Claude" references
-
-**Create branch and commit:**
+## Context
+<optional: background, trade-offs, decisions>
+```
 
 ```bash
 git checkout -b <branch_name>
 git commit -m "<type>: <short description>"
-```
-
-### 5. Push and Create PR
-
-Construct PR description using the pr-research facts and your understanding of intent.
-
-**PR Description Principles:**
-
-The goal of a PR description is to explain **what changed** and **why**. Reviewers can see the code diff themselves, so:
-
-- **Never list files or individual code changes** - the reviewer will see these in the diff
-- **Focus on intent** - Why is this PR being raised? What problem does it solve?
-- **Provide context the diff doesn't show** - Background, motivation, trade-offs, future implications
-- **Keep it concise** - A few sentences is often enough
-
-**If intent is unclear**: Ask the user before creating the PR. Examples of questions to clarify:
-
-- "Is this fixing a bug? If so, what was the issue?"
-- "What prompted this change?"
-- "What's the benefit of this refactor?"
-
-**PR Description Template:**
-
-```markdown
-## Summary
-
-<1-3 sentences explaining WHY this change is being made and WHAT it accomplishes at a high level>
-
-## Context
-
-<Optional: Background information, what led to this change, any non-obvious trade-offs or decisions>
-```
-
-**Push and create PR:**
-
-```bash
-# Push with upstream tracking
 git push -u origin <branch_name>
-
-# Create PR using HEREDOC
 gh pr create --title "<pr_title>" --body "$(cat <<'EOF'
 ## Summary
-
-<why and what at high level>
-
+...
 ## Context
-
-<background if needed>
+...
 EOF
 )"
 ```
 
-**Guidelines:**
-
-- Do NOT list files changed or bullet-point every modification
-- Do NOT include "Co-Authored-By: Claude" references
-- Prefer 2-5 sentences over long structured lists
-
-### 6. Return Results
-
-Provide PR URL and summary:
-
-```
-PR created successfully.
-
-Branch: <branch_name>
-PR: <pr_url>
-Title: <pr_title>
-
-Summary: <brief description>
-```
-
-## Error Handling
-
-Common errors and responses:
-
-- **Linting fails**: Show errors, ask if user wants to fix or skip
-- **No remote repository**: Warn and ask if they want to set up remote
-- **Branch already exists**: Ask for different name or checkout existing
-- **PR creation fails**: Show gh CLI error and suggest fixes
-- **No changes staged**: Warn that there are no changes to commit
-- **pr-research agent fails**: Fall back to asking user for branch name and PR title
+Return the PR URL, branch name, and title when done.
 
 ## Conventional Commit Types
 
-Reference for constructing branch names, PR titles, and commit messages:
+feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert
 
-- **feat**: New feature or functionality
-- **fix**: Bug fix
-- **refactor**: Code restructuring without behavior change
-- **perf**: Performance improvements
-- **style**: Formatting only (whitespace, semicolons)
-- **test**: Adding or updating tests
-- **docs**: Documentation changes
-- **build**: Build system, dependencies, project config (Node version, webpack, Docker)
-- **ci**: CI/CD configuration and scripts (GitHub Actions, Jenkins)
-- **chore**: Miscellaneous (gitignore, editor configs)
-- **revert**: Reverting a previous commit
+## Error Handling
+
+- **Linting fails**: Show errors, ask user
+- **Branch already exists**: Ask for different name
+- **PR creation fails**: Show error and suggest fixes
+- **No changes staged**: Warn user
+- **pr-research agent fails**: Ask user for branch name and PR title
 
 ## References
 
 For detailed examples, see [references/examples.md](references/examples.md).
-
-## Notes
-
-- This skill requires `gh` CLI to be installed and authenticated
-- Quality checks are **project-specific** - look for lint/format commands in the project's package.json or configuration
-- Prefer quality check commands that run only on changed files (e.g., `lint:changed`, `lint:staged`) for better performance
-- The pr-research agent provides factual analysis - do not skip it
-- Always use conventional commit format
-- **PR descriptions should explain WHY, not list WHAT** - reviewers can see the code diff
-- **When intent is unclear, ask the user** - a good PR description requires understanding the purpose

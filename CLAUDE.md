@@ -38,6 +38,7 @@ Never skip step 1. Reading code and pattern-matching on error messages is not de
 ### Command Line
 
 - Never use `2>&1` to redirect stderr to stdout
+- Assume the current directory is the working directory for the git repository — no need to specify `-C` paths
 
 ### Following Plans
 

@@ -13,7 +13,8 @@ Follow these steps in order.
 git branch --show-current
 ```
 
-- **On main/master or detached HEAD**: Proceed
+- **On main/master or detached HEAD**: Proceed (will create a new branch in step 4)
+- **In a worktree** (working directory is under `.claude/worktrees/`): The worktree already has its own branch — it will be renamed in step 4.
 - **On another branch**: Ask user whether to (a) stash and switch to main/master, or (b) stack on current branch
 
 ### 2. Stage Files and Run Quality Checks
@@ -55,7 +56,11 @@ If intent is unclear, ask the user before proceeding.
 ```
 
 ```bash
+# If in a worktree: rename the current branch instead of creating a new one
+git branch -m <branch_name>
+# Otherwise:
 git checkout -b <branch_name>
+
 git commit -m "<type>: <short description>"
 git push -u origin <branch_name>
 gh pr create --title "<pr_title>" --body "$(cat <<'EOF'

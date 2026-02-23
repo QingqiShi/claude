@@ -42,6 +42,12 @@ Never skip step 1. Reading code and pattern-matching on error messages is not de
 - If quality checks (lint, build, tests) fail due to files you didn't touch, **stop and tell the user** — do not delete or revert those files to make checks pass
 - When running in parallel with other agents, expect to see unfamiliar changes — leave them alone
 
+### Worktrees
+
+- **When working inside a worktree, NEVER run commands against the main repo** — all git operations, file edits, and shell commands must target the worktree directory
+- Do NOT `cd` to the original repo path to pull, checkout, or do anything else — the whole point of a worktree is isolation
+- If you need to update from upstream, run `git checkout origin/main` from within the worktree
+
 ### Command Line
 
 - Never use `2>&1` to redirect stderr to stdout

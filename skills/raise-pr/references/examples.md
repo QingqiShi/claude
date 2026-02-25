@@ -1,10 +1,10 @@
 # PR Creation Examples
 
-Examples demonstrating the complete flow from pr-research analysis to final PR.
+Examples demonstrating the complete flow from staged diff analysis to final PR.
 
 ## Example 1: Feature Addition
 
-**Input** - pr-research agent analysis:
+**Analysis from staged diff:**
 
 ```
 What Changed: Added JWT authentication system with token generation, validation middleware, /login and /logout endpoints
@@ -38,7 +38,7 @@ Uses stateless JWT tokens so we don't need session storage. The middleware patte
 
 ## Example 2: Bug Fix
 
-**Input** - pr-research agent analysis:
+**Analysis from staged diff:**
 
 ```
 What Changed: Modified parser to clean up event listeners in destructor and dispose method
@@ -68,7 +68,7 @@ Fixes a memory leak in the parser module. Event listeners were never being remov
 
 ## Example 3: Refactoring
 
-**Input** - pr-research agent analysis:
+**Analysis from staged diff:**
 
 ```
 What Changed: Migrated from Redux to React Context API - removed Redux (~500 lines), created Context providers and hooks (~200 lines), updated components
@@ -99,4 +99,3 @@ Replaces Redux with React Context API. Redux was over-engineered for this app's 
 
 No functional changes to the application. The migration was done atomically to avoid any broken intermediate states.
 ```
-

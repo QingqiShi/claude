@@ -1,17 +1,36 @@
 ---
 name: raise-pr
 description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. This skill should be used when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
+context: fork
 ---
 
 # Raising Pull Requests
+
+## Git Context
+
+Current branch: !`git branch --show-current`
+
+Working directory: !`pwd`
+
+Status:
+!`git status --short`
+
+Staged diff:
+!`git diff --cached`
+
+Unstaged diff:
+!`git diff`
+
+Recent commits:
+!`git log --oneline -5`
+
+---
 
 Follow these steps in order.
 
 ### 1. Check Branch Safety
 
-```bash
-git branch --show-current
-```
+Use the branch name from Git Context above.
 
 - **On main/master or detached HEAD**: Proceed (will create a new branch in step 4)
 - **In a worktree** (working directory is under `.claude/worktrees/`): The worktree already has its own branch — it will be renamed in step 4.
@@ -26,14 +45,12 @@ git branch --show-current
 
 ### 3. Analyze Changes
 
-Spawn the pr-research agent:
+Using the injected Git Context above (status, staged diff, unstaged diff, recent commits) plus a fresh `git diff --cached` after staging in step 2, analyze the changes:
 
-```
-Task tool with subagent_type: "pr-research"
-Prompt: "Analyze the staged git changes and report what was modified."
-```
-
-From the agent's factual report, determine the **intent** (why were these changes made?) and **change type** (feat, fix, refactor, etc.).
+1. **Files changed**: List files with a brief description of what changed in each
+2. **Summary**: Factual summary of what was added, removed, or modified
+3. **Intent**: Why were these changes made? Infer from the diff content and commit history.
+4. **Change type**: feat, fix, refactor, perf, style, test, docs, build, ci, chore, or revert
 
 If intent is unclear, ask the user before proceeding.
 
@@ -84,7 +101,7 @@ feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert
 - **Branch already exists**: Ask for different name
 - **PR creation fails**: Show error and suggest fixes
 - **No changes staged**: Warn user
-- **pr-research agent fails**: Ask user for branch name and PR title
+- **Intent unclear from diff**: Ask user for branch name and PR title
 
 ## References
 

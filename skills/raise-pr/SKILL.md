@@ -26,7 +26,17 @@ Recent commits:
 
 ---
 
-Follow these steps in order.
+## Argument Handling
+
+If this skill was invoked with arguments, handle them first:
+
+- **`--base-from-main`**: Run `git stash` to save current changes, then `git checkout main` (or `master`), then `git stash pop`. Now proceed to step 2 (you are on main, step 1 will pass).
+- **`--stack-on-current`**: Skip step 1 entirely. The user has confirmed they want to create a new branch stacked on top of the current branch. Proceed to step 2. In step 4, create a new branch from the current branch as the base.
+- **`--commit-to-current`**: Skip step 1 entirely. The user has confirmed they want to commit directly into the current branch. Proceed to step 2. In step 4, do NOT create a new branch — commit and push directly to the current branch.
+
+If no arguments were provided, follow all steps in order.
+
+---
 
 ### 1. Check Branch Safety
 
@@ -34,7 +44,16 @@ Use the branch name from Git Context above.
 
 - **On main/master or detached HEAD**: Proceed (will create a new branch in step 4)
 - **In a worktree** (working directory is under `.claude/worktrees/`): The worktree already has its own branch — it will be renamed in step 4.
-- **On another branch**: Ask user whether to (a) stash and switch to main/master, or (b) stack on current branch
+- **On another branch**: This skill runs in a forked context and cannot ask the user directly. You MUST stop immediately and respond with ONLY this message:
+
+> Currently on branch `<branch_name>`, which is not main/master or a worktree branch.
+>
+> Use the **AskUserQuestion** tool to ask the user which option they prefer, then re-invoke the skill with the chosen flag:
+> - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there → `/raise-pr --base-from-main`
+> - **Stack on current branch** — create a new branch based on `<branch_name>` → `/raise-pr --stack-on-current`
+> - **Commit into current branch** — commit and push directly to `<branch_name>` → `/raise-pr --commit-to-current`
+
+Do NOT proceed with any other steps. Stop here and return the message above.
 
 ### 2. Stage Files and Run Quality Checks
 

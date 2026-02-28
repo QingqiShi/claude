@@ -4,7 +4,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "jq 'del(.context_window)' | pnpx ccusage statusline --visual-burn-rate emoji",
+    "command": "bash /Users/qingqishi/.claude/statusline-command.sh",
     "padding": 0
   },
   "enabledPlugins": {
@@ -14,5 +14,9 @@
     "typescript-lsp@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
 }

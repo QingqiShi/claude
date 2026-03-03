@@ -49,6 +49,7 @@ Use the branch name from Git Context above.
 > Currently on branch `<branch_name>`, which is not main/master or a worktree branch.
 >
 > Use the **AskUserQuestion** tool to ask the user which option they prefer, then re-invoke the skill with the chosen flag:
+>
 > - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there → `/raise-pr --base-from-main`
 > - **Stack on current branch** — create a new branch based on `<branch_name>` → `/raise-pr --stack-on-current`
 > - **Commit into current branch** — commit and push directly to `<branch_name>` → `/raise-pr --commit-to-current`
@@ -58,9 +59,7 @@ Do NOT proceed with any other steps. Stop here and return the message above.
 ### 2. Stage Files and Run Quality Checks
 
 1. Stage all changes: `git add -A`
-2. Check `package.json` for lint/format commands (prefer `lint:changed`/`format:changed` over `lint`/`format`)
-3. Run any found commands. If they modify files, re-stage and re-run. If they fail, stop and ask user.
-4. If no quality commands exist, ask user if they want to skip.
+2. Run project specific quality checks such as lint, build, format etc.
 
 ### 3. Analyze Changes
 
@@ -85,9 +84,11 @@ If intent is unclear, ask the user before proceeding.
 
 ```markdown
 ## Summary
+
 <why and what at high level>
 
 ## Context
+
 <optional: background, trade-offs, decisions>
 ```
 

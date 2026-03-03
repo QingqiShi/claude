@@ -15,9 +15,6 @@ Working directory: !`pwd`
 Status:
 !`git status --short`
 
-Staged diff:
-!`git diff --cached`
-
 Unstaged diff:
 !`git diff`
 
@@ -63,7 +60,7 @@ Do NOT proceed with any other steps. Stop here and return the message above.
 
 ### 3. Analyze Changes
 
-Using the injected Git Context above (status, staged diff, unstaged diff, recent commits) plus a fresh `git diff --cached` after staging in step 2, analyze the changes:
+Using the injected Git Context above (status, diff), analyze the changes:
 
 1. **Files changed**: List files with a brief description of what changed in each
 2. **Summary**: Factual summary of what was added, removed, or modified
@@ -77,8 +74,6 @@ If intent is unclear, ask the user before proceeding.
 **Branch name**: `<type>/<description-in-kebab-case>` (max 50 chars)
 
 **PR title**: `<type>: <description>` (lowercase, max 72 chars)
-
-**Commit message**: Same as PR title. No Co-Authored-By.
 
 **PR description**: Explain **why** the change is being made, not what files changed — reviewers can see the diff. Keep it to 2-5 sentences. Use this template:
 

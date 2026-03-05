@@ -1,6 +1,7 @@
 ---
 name: raise-pr
 description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. This skill should be used when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
+user-invocable: false
 context: fork
 ---
 
@@ -27,7 +28,7 @@ Recent commits:
 
 If this skill was invoked with arguments, handle them first:
 
-- **`--base-from-main`**: Run `git stash` to save current changes, then `git checkout main` (or `master`), then `git stash pop`. Now proceed to step 2 (you are on main, step 1 will pass).
+- **`--base-from-main`**: Run `git stash -u` to save current changes (including untracked files), then `git checkout main` (or `master`), then `git stash pop`. Now proceed to step 2 (you are on main, step 1 will pass).
 - **`--stack-on-current`**: Skip step 1 entirely. The user has confirmed they want to create a new branch stacked on top of the current branch. Proceed to step 2. In step 4, create a new branch from the current branch as the base.
 - **`--commit-to-current`**: Skip step 1 entirely. The user has confirmed they want to commit directly into the current branch. Proceed to step 2. In step 4, do NOT create a new branch — commit and push directly to the current branch.
 
@@ -41,22 +42,31 @@ Use the branch name from Git Context above.
 
 - **On main/master or detached HEAD**: Proceed (will create a new branch in step 4)
 - **In a worktree** (working directory is under `.claude/worktrees/`): The worktree already has its own branch — it will be renamed in step 4.
-- **On another branch**: This skill runs in a forked context and cannot ask the user directly. You MUST stop immediately and respond with ONLY this message:
+- **On another branch**: This skill runs in a forked context (a separate subagent), so it cannot prompt the user interactively. The choice of how to handle a non-main branch affects PR topology and must be made by the user. You MUST stop immediately and return the following message. The main agent that receives this message MUST call the `AskUserQuestion` tool — do NOT simply print the options as text.
 
 > Currently on branch `<branch_name>`, which is not main/master or a worktree branch.
 >
-> Use the **AskUserQuestion** tool to ask the user which option they prefer, then re-invoke the skill with the chosen flag:
+> IMPORTANT: You (the main agent) MUST use the `AskUserQuestion` tool to present these options to the user. Do NOT paraphrase them as plain text output — call the tool.
 >
-> - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there → `/raise-pr --base-from-main`
-> - **Stack on current branch** — create a new branch based on `<branch_name>` → `/raise-pr --stack-on-current`
-> - **Commit into current branch** — commit and push directly to `<branch_name>` → `/raise-pr --commit-to-current`
+> Each option below has different consequences — committing here adds to this branch's PR, switching to main creates an independent PR, and stacking creates a dependent branch. Only the user can decide which is appropriate.
+>
+> Options to present via `AskUserQuestion`:
+> - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there → re-invoke with `/raise-pr --base-from-main`
+> - **Stack on current branch** — create a new branch based on `<branch_name>` → re-invoke with `/raise-pr --stack-on-current`
+> - **Commit into current branch** — commit and push directly to `<branch_name>` → re-invoke with `/raise-pr --commit-to-current`
 
 Do NOT proceed with any other steps. Stop here and return the message above.
 
 ### 2. Stage Files and Run Quality Checks
 
 1. Stage all changes: `git add -A`
-2. Run project specific quality checks such as lint, build, format etc.
+2. Discover and run project quality checks. Look for:
+   - `package.json` `scripts` (e.g. `lint`, `build`, `format`, `typecheck`)
+   - `Makefile` targets
+   - CI config (`.github/workflows/`, `.gitlab-ci.yml`)
+   - `CLAUDE.md` instructions for pre-commit checks
+
+   Run whichever checks are available (lint, build, format, etc.).
 
 ### 3. Analyze Changes
 

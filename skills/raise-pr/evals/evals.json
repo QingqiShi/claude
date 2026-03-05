@@ -1,0 +1,118 @@
+{
+  "skill_name": "raise-pr",
+  "evals": [
+    {
+      "id": 1,
+      "name": "feature-on-main",
+      "prompt": "I just added JWT authentication to this API — token generation, validation middleware, and login/logout routes. Please create a PR for these changes.",
+      "fixture": "fixtures/feature-on-main.sh",
+      "args": "",
+      "expected_output": "Creates a feat/ branch, conventional commit, pushes, and opens a PR with ## Summary explaining why JWT auth was added.",
+      "expectations": [
+        "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
+        "Branch type is feat/",
+        "Commit message starts with feat:",
+        "Branch is pushed to remote",
+        "gh pr create is called via shim",
+        "PR title is lowercase, ≤72 chars, starts with feat:",
+        "PR body contains ## Summary",
+        "PR description explains why (securing the API), not just what files changed"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "non-main-branch-stop",
+      "prompt": "Please create a PR for my changes.",
+      "fixture": "fixtures/non-main-branch.sh",
+      "args": "",
+      "expected_output": "Detects non-main branch, stops immediately, returns message with branch name and all three flags.",
+      "expectations": [
+        "No new commits were made",
+        "No git add was executed",
+        "gh pr create was NOT called",
+        "Stop message mentions the branch name feature/existing-work",
+        "Stop message mentions --base-from-main",
+        "Stop message mentions --stack-on-current",
+        "Stop message mentions --commit-to-current"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "refactor-on-main",
+      "prompt": "I refactored the data pipeline from callbacks to async/await. Please create a PR.",
+      "fixture": "fixtures/refactor-on-main.sh",
+      "args": "",
+      "expected_output": "Creates a refactor/ branch, conventional commit, PR that mentions all changed files and classifies as refactor.",
+      "expectations": [
+        "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
+        "Branch type is refactor/",
+        "Commit message starts with refactor:",
+        "Branch is pushed to remote",
+        "PR title starts with refactor:",
+        "PR body contains ## Summary",
+        "Analysis mentions reader.js, transformer.js, writer.js, and pipeline.js",
+        "PR description explains why (simplifying from callbacks to async/await)"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "flag-base-from-main",
+      "prompt": "Please create a PR for my changes.",
+      "fixture": "fixtures/non-main-branch.sh",
+      "args": "--base-from-main",
+      "expected_output": "Stashes changes, switches to main, pops stash, creates new branch from main, commits, pushes, creates PR.",
+      "expectations": [
+        "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
+        "Commit message starts with <type>:",
+        "Branch is pushed to remote",
+        "Branch is based on main (main is ancestor of HEAD)",
+        "gh pr create is called",
+        "PR body contains ## Summary"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "flag-stack-on-current",
+      "prompt": "Please create a PR for my changes.",
+      "fixture": "fixtures/non-main-branch.sh",
+      "args": "--stack-on-current",
+      "expected_output": "Skips branch safety, creates new branch from feature/existing-work, commits, pushes, creates PR.",
+      "expectations": [
+        "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
+        "Commit message starts with <type>:",
+        "Branch is pushed to remote",
+        "New branch created (not still on feature/existing-work)",
+        "Branch is based on feature/existing-work (it is an ancestor)",
+        "gh pr create is called",
+        "PR body contains ## Summary"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "flag-commit-to-current",
+      "prompt": "Please create a PR for my changes.",
+      "fixture": "fixtures/non-main-branch.sh",
+      "args": "--commit-to-current",
+      "expected_output": "Skips branch safety, commits directly to feature/existing-work, pushes, creates PR.",
+      "expectations": [
+        "Still on feature/existing-work (no new branch created)",
+        "Commit message starts with <type>:",
+        "Branch is pushed to remote",
+        "gh pr create is called",
+        "PR body contains ## Summary"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "message-interpretation",
+      "prompt": "I asked you to create a PR and the skill returned this message:\n\n> Currently on branch `feature/existing-work`, which is not main/master or a worktree branch.\n>\n> IMPORTANT: You (the main agent) MUST use the `AskUserQuestion` tool to present these options to the user. Do NOT paraphrase them as plain text output — call the tool.\n>\n> Each option below has different consequences — committing here adds to this branch's PR, switching to main creates an independent PR, and stacking creates a dependent branch. Only the user can decide which is appropriate.\n>\n> Options to present via `AskUserQuestion`:\n> - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there → re-invoke with `/raise-pr --base-from-main`\n> - **Stack on current branch** — create a new branch based on `feature/existing-work` → re-invoke with `/raise-pr --stack-on-current`\n> - **Commit into current branch** — commit and push directly to `feature/existing-work` → re-invoke with `/raise-pr --commit-to-current`\n\nPlease handle this appropriately.",
+      "fixture": null,
+      "args": "",
+      "expected_output": "Main agent uses AskUserQuestion tool to present the three options to the user, then plans to re-invoke /raise-pr with the chosen flag.",
+      "expectations": [
+        "User is prompted to choose (via AskUserQuestion or text question)",
+        "Three options are presented: base-from-main, stack-on-current, commit-to-current"
+      ]
+    }
+  ]
+}

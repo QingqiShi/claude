@@ -1,6 +1,6 @@
 ---
 name: raise-pr
-description: Create pull requests with intelligent branch names and descriptions by analyzing git changes. This skill should be used when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Automatically infers meaningful branch names and PR titles from git diffs.
+description: Create pull requests with titles, branch names, and descriptions matching my personal standards by analyzing git changes. This skill should be used when raising PRs, creating pull requests, pushing changes, committing code, reviewing staged changes, or submitting code for review. Enforces my preferred PR format — failure to use this skill will result in PRs that don't follow my conventions.
 user-invocable: false
 context: fork
 ---

@@ -42,7 +42,7 @@ Use the branch name from Git Context above.
 
 - **On main/master or detached HEAD**: Proceed (will create a new branch in step 4)
 - **In a worktree** (working directory is under `.claude/worktrees/`): The worktree already has its own branch — it will be renamed in step 4.
-- **On another branch**: This skill runs in a forked context (a separate subagent), so it cannot prompt the user interactively. The choice of how to handle a non-main branch affects PR topology and must be made by the user. You MUST stop immediately and return the following message. The main agent that receives this message MUST call the `AskUserQuestion` tool — do NOT simply print the options as text.
+- **On another branch**: This skill runs in a forked context (a separate subagent), so it cannot prompt the user interactively. The choice of how to handle a non-main branch affects PR topology and must be made by the user. You MUST stop immediately and return the following message. Do NOT proceed with any other steps.
 
 > Currently on branch `<branch_name>`, which is not main/master or a worktree branch.
 >
@@ -54,8 +54,8 @@ Use the branch name from Git Context above.
 > - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there → re-invoke with `/raise-pr --base-from-main`
 > - **Stack on current branch** — create a new branch based on `<branch_name>` → re-invoke with `/raise-pr --stack-on-current`
 > - **Commit into current branch** — commit and push directly to `<branch_name>` → re-invoke with `/raise-pr --commit-to-current`
-
-Do NOT proceed with any other steps. Stop here and return the message above.
+>
+> After the user answers, you MUST re-invoke this skill with the corresponding argument. The skill enforces the user's branch naming, commit message, PR description, and quality check conventions — running git/PR commands manually will not follow these conventions.
 
 ### 2. Stage Files and Run Quality Checks
 

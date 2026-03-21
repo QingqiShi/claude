@@ -222,6 +222,105 @@ case "$TEST_ID" in
     fi
     ;;
 
+  8)  # Bug fix with GitHub issue
+    check_branch_name_format
+    check_commit_message_format
+    check_pushed_to_remote
+    check_pr_created
+    # Should be fix/ branch
+    cd "$REPO_DIR"
+    branch="$(git branch --show-current 2>/dev/null || echo '')"
+    if [[ "$branch" == fix/* ]]; then
+      assert "Branch type is fix/" "true" "branch=$branch"
+    else
+      assert "Branch type is fix/" "false" "branch=$branch"
+    fi
+    # PR body should contain "Closes #87"
+    if [[ -f "$CAPTURE_DIR/gh_pr_create_args.json" ]]; then
+      body="$(python3 -c "import json; d=json.load(open('$CAPTURE_DIR/gh_pr_create_args.json')); print(d['body'])" 2>/dev/null || echo '')"
+      if echo "$body" | grep -qi 'closes #87\|fixes #87'; then
+        assert "PR body contains Closes #87" "true" "found issue reference"
+      else
+        assert "PR body contains Closes #87" "false" "not found in body"
+      fi
+      if echo "$body" | grep -q '## Context'; then
+        assert "PR body does NOT contain ## Context" "false" "found ## Context"
+      else
+        assert "PR body does NOT contain ## Context" "true" "no ## Context found"
+      fi
+    fi
+    ;;
+
+  9)  # Unclear intent — should stop
+    cd "$REPO_DIR"
+    # No new commits should have been made (initial commit only)
+    local_commits="$(git log --oneline main 2>/dev/null | wc -l | tr -d ' ')"
+    if [[ "$local_commits" == "1" ]]; then
+      assert "No new commits were made" "true" "commit count=$local_commits"
+    else
+      assert "No new commits were made" "false" "commit count=$local_commits"
+    fi
+
+    # No gh pr create
+    if [[ ! -f "$CAPTURE_DIR/gh_pr_create_args.json" ]]; then
+      assert "gh pr create was NOT called" "true" "no capture file"
+    else
+      assert "gh pr create was NOT called" "false" "capture file exists"
+    fi
+
+    # Transcript should mention intent and AskUserQuestion
+    if [[ -n "$TRANSCRIPT" ]]; then
+      if transcript_contains "intent" || transcript_contains "motivation" || transcript_contains "why"; then
+        assert "Stop message mentions intent" "true" "found"
+      else
+        assert "Stop message mentions intent" "false" "not found"
+      fi
+      if transcript_contains "AskUserQuestion" || transcript_contains "ask the user" || transcript_contains "explain the"; then
+        assert "Stop message mentions AskUserQuestion or asks the user" "true" "found"
+      else
+        assert "Stop message mentions AskUserQuestion or asks the user" "false" "not found"
+      fi
+      if transcript_contains "re-invoke" || transcript_contains "raise-pr" || transcript_contains "/raise-pr"; then
+        assert "Stop message mentions re-invoking the skill" "true" "found"
+      else
+        assert "Stop message mentions re-invoking the skill" "false" "not found"
+      fi
+    fi
+    ;;
+
+  10)  # Trivial typo fix
+    check_branch_name_format
+    check_commit_message_format
+    check_pushed_to_remote
+    check_pr_created
+    # Should be fix/ branch
+    cd "$REPO_DIR"
+    branch="$(git branch --show-current 2>/dev/null || echo '')"
+    if [[ "$branch" == fix/* ]]; then
+      assert "Branch type is fix/" "true" "branch=$branch"
+    else
+      assert "Branch type is fix/" "false" "branch=$branch"
+    fi
+    # PR body should NOT contain ## Context
+    if [[ -f "$CAPTURE_DIR/gh_pr_create_args.json" ]]; then
+      body="$(python3 -c "import json; d=json.load(open('$CAPTURE_DIR/gh_pr_create_args.json')); print(d['body'])" 2>/dev/null || echo '')"
+      if echo "$body" | grep -q '## Context'; then
+        assert "PR body does NOT contain ## Context" "false" "found ## Context"
+      else
+        assert "PR body does NOT contain ## Context" "true" "no ## Context found"
+      fi
+      # Summary should be short — extract text between ## Summary and next ## or end
+      summary_text="$(echo "$body" | sed -n '/## Summary/,/^##\|^$/p' | grep -v '##' | tr -d '\n' | xargs)"
+      # Count sentences (rough: split on '. ')
+      sentence_count="$(echo "$summary_text" | grep -o '\.' | wc -l | tr -d ' ')"
+      if [[ "$sentence_count" -le 3 ]]; then
+        assert "PR summary section is short (≤3 sentences)" "true" "sentences≈$sentence_count"
+      else
+        assert "PR summary section is short (≤3 sentences)" "false" "sentences≈$sentence_count"
+      fi
+    fi
+    ;;
+
   7)  # Message interpretation — AskUserQuestion tool use
     # Primary: check if AskUserQuestion was called via MCP shim capture
     auq_capture="$CAPTURE_DIR/ask_user_question_args.json"

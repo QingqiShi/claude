@@ -74,10 +74,24 @@ Using the injected Git Context above (status, diff), analyze the changes:
 
 1. **Files changed**: List files with a brief description of what changed in each
 2. **Summary**: Factual summary of what was added, removed, or modified
-3. **Intent**: Why were these changes made? Infer from the diff content and commit history.
+3. **Intent**: Why were these changes made? This is the **motivation**, not a restatement of what changed — reviewers can see the diff. Infer from the conversation history, diff content, and commit history. A PR description that says "refactored X" without explaining *why* X was refactored is useless.
 4. **Change type**: feat, fix, refactor, perf, style, test, docs, build, ci, chore, or revert
+5. **GitHub issue**: Check if there is a GitHub issue number referenced in the conversation context (e.g. from a URL like `github.com/.../issues/123`, a mention like `#123`, or an issue body the user pasted). If found, note the issue number for use in the PR description.
 
-If intent is unclear, ask the user before proceeding.
+**Intent is "unclear" when any of these are true:**
+- The conversation history doesn't match the diff (e.g. the user discussed topic A but the changes are about topic B)
+- You can describe *what* changed but not *why* it's being changed (e.g. "moved function to a new module" — but why? upcoming feature? circular dependency? performance?)
+- The change is mechanical (rename, restructure, migration) with no stated motivation
+
+Intent is **not** unclear when the why is self-evident from the diff — e.g. fixing a typo, adding a missing null check that caused a crash, or implementing a feature the user explicitly requested in conversation.
+
+**If intent is unclear**: This skill runs in a forked context (a separate subagent), so it cannot prompt the user interactively. You MUST stop immediately and return the following message. Do NOT proceed with any other steps.
+
+> The diff is staged and quality checks have passed, but I cannot confidently determine the **intent** (the *why*) behind these changes from the diff and conversation history alone. I can see *what* changed, but a PR description that just restates the diff is not useful.
+>
+> IMPORTANT: You (the main agent) MUST use the `AskUserQuestion` tool to ask the user to explain the motivation behind these changes. Do NOT paraphrase this as plain text output — call the tool.
+>
+> Once the user provides context, you MUST re-invoke this skill (`/raise-pr`) so it can generate the branch name, commit message, and PR description using the user's stated intent. The skill enforces naming, commit, and PR conventions — running git/PR commands manually will not follow these conventions.
 
 ### 4. Branch, Commit, Push, and Create PR
 
@@ -85,16 +99,20 @@ If intent is unclear, ask the user before proceeding.
 
 **PR title**: `<type>: <description>` (lowercase, max 72 chars)
 
-**PR description**: Explain **why** the change is being made, not what files changed — reviewers can see the diff. Keep it to 2-5 sentences. Use this template:
+**PR description**: Use this template:
 
 ```markdown
 ## Summary
 
-<why and what at high level>
+<why and what at high level — typically 2-5 sentences, but for trivial/one-line changes a single sentence is fine>
+
+Closes #<issue_number>
+<!-- only if a GitHub issue was identified in step 3 -->
 
 ## Context
+<!-- optional — omit entirely if there is nothing to add beyond the summary -->
 
-<optional: background, trade-offs, decisions>
+<background, trade-offs, decisions that aren't obvious from the summary or the diff>
 ```
 
 ```bash
@@ -108,17 +126,11 @@ git push -u origin <branch_name>
 gh pr create --title "<pr_title>" --body "$(cat <<'EOF'
 ## Summary
 ...
-## Context
-...
 EOF
 )"
 ```
 
 Return the PR URL, branch name, and title when done.
-
-## Conventional Commit Types
-
-feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert
 
 ## Error Handling
 
@@ -126,7 +138,7 @@ feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert
 - **Branch already exists**: Ask for different name
 - **PR creation fails**: Show error and suggest fixes
 - **No changes staged**: Warn user
-- **Intent unclear from diff**: Ask user for branch name and PR title
+- **Intent unclear from diff**: Terminate and return message to main agent (see step 3)
 
 ## References
 

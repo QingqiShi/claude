@@ -19,5 +19,7 @@
     "skill-creator@claude-plugins-official": true
   },
   "alwaysThinkingEnabled": true,
+  "effortLevel": "high",
+  "voiceEnabled": true,
   "skipDangerousModePermissionPrompt": true
 }

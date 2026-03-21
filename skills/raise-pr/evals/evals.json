@@ -113,6 +113,58 @@
         "User is prompted to choose (via AskUserQuestion or text question)",
         "Three options are presented: base-from-main, stack-on-current, commit-to-current"
       ]
+    },
+    {
+      "id": 8,
+      "name": "bugfix-with-github-issue",
+      "prompt": "getUserDisplayName and formatUserEmail are crashing when called with null users — see https://github.com/acme/user-service/issues/87. Please create a PR for the fix.",
+      "fixture": "fixtures/bugfix-with-issue.sh",
+      "args": "",
+      "expected_output": "Creates a fix/ branch, conventional commit, PR with ## Summary and Closes #87. No ## Context section needed.",
+      "expectations": [
+        "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
+        "Branch type is fix/",
+        "Commit message starts with fix:",
+        "Branch is pushed to remote",
+        "gh pr create is called",
+        "PR title starts with fix:",
+        "PR body contains ## Summary",
+        "PR body contains Closes #87",
+        "PR body does NOT contain ## Context"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "unclear-intent-stop",
+      "prompt": "Please create a PR for my changes.",
+      "fixture": "fixtures/unclear-intent.sh",
+      "args": "",
+      "expected_output": "Detects that intent is unclear (mechanical restructuring with no stated motivation), stops, returns message asking main agent to query the user.",
+      "expectations": [
+        "No new commits were made",
+        "gh pr create was NOT called",
+        "Stop message mentions intent",
+        "Stop message mentions AskUserQuestion or asks the user",
+        "Stop message mentions re-invoking the skill"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "trivial-typo-fix",
+      "prompt": "I fixed a typo in the connection error message — 'databse conncetion' should be 'database connection'. Please create a PR.",
+      "fixture": "fixtures/trivial-typo.sh",
+      "args": "",
+      "expected_output": "Creates a fix/ branch, short single-sentence summary, no ## Context section.",
+      "expectations": [
+        "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
+        "Branch type is fix/",
+        "Commit message starts with fix:",
+        "Branch is pushed to remote",
+        "gh pr create is called",
+        "PR body contains ## Summary",
+        "PR body does NOT contain ## Context",
+        "PR summary section is short (≤3 sentences)"
+      ]
     }
   ]
 }

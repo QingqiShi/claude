@@ -76,7 +76,7 @@ Using the injected Git Context above (status, diff), analyze the changes:
 2. **Summary**: Factual summary of what was added, removed, or modified
 3. **Intent**: Why were these changes made? This is the **motivation**, not a restatement of what changed — reviewers can see the diff. Infer from the conversation history, diff content, and commit history. A PR description that says "refactored X" without explaining *why* X was refactored is useless.
 4. **Change type**: feat, fix, refactor, perf, style, test, docs, build, ci, chore, or revert
-5. **GitHub issue**: Check if there is a GitHub issue number referenced in the conversation context (e.g. from a URL like `github.com/.../issues/123`, a mention like `#123`, or an issue body the user pasted). If found, note the issue number for use in the PR description.
+5. **GitHub issue**: Check if there is a GitHub issue number referenced in the conversation context or the current plan (e.g. from a URL like `github.com/.../issues/123`, a mention like `#123`, an issue body the user pasted, or an issue number in a plan/task). If found, note the issue number for use in the PR description.
 
 **Intent is "unclear" when any of these are true:**
 - The conversation history doesn't match the diff (e.g. the user discussed topic A but the changes are about topic B)
@@ -106,13 +106,13 @@ Intent is **not** unclear when the why is self-evident from the diff — e.g. fi
 
 <why and what at high level — typically 2-5 sentences, but for trivial/one-line changes a single sentence is fine>
 
-Closes #<issue_number>
-<!-- only if a GitHub issue was identified in step 3 -->
-
 ## Context
 <!-- optional — omit entirely if there is nothing to add beyond the summary -->
 
 <background, trade-offs, decisions that aren't obvious from the summary or the diff>
+
+Closes #<issue_number>
+<!-- only if a GitHub issue was identified in step 3; always place at the very end of the body -->
 ```
 
 ```bash

@@ -42,7 +42,7 @@ If the maintainer fails, log the error but continue to step 3.
 
 ### 3. Executor
 
-Spawn the executor agent: `subagent_type: "auto-improve-executor"`, `mode: "auto"`, `run_in_background: true`, `description: "auto-improve-executor"`.
+Spawn the executor agent: `subagent_type: "auto-improve-executor"`, `mode: "auto"`, **foreground** (must complete before proceeding to step 4).
 
 ### 4. Handle executor result
 
@@ -54,7 +54,7 @@ When the executor completes:
 
 ### 5. Evaluator
 
-Spawn the evaluator agent: `subagent_type: "auto-improve-evaluator"`, `mode: "auto"`, `run_in_background: true`, `description: "auto-improve-evaluator"`. Pass the executor's summary in the prompt.
+Spawn the evaluator agent: `subagent_type: "auto-improve-evaluator"`, `mode: "auto"`, **foreground** (must complete before proceeding to step 6). Pass the executor's summary in the prompt.
 
 ### 6. Handle evaluator result
 

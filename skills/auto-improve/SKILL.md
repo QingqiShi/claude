@@ -1,12 +1,12 @@
 ---
 name: auto-improve
-description: Start an autonomous improvement loop that spawns agents every 20 minutes to find and fix issues in the current project. Each agent works in an isolated worktree, finds one high-value improvement, validates it, and raises a PR. Use this skill when the user wants to run continuous autonomous improvements, background PR generation, automated code quality sweeps, or hands-free codebase maintenance. Trigger on phrases like "auto improve", "background improvements", "keep finding things to fix", "autonomous PRs", or "improvement loop".
+description: Start an autonomous improvement loop that finds and fixes issues in the current project. Each cycle has three phases — a maintainer agent keeps existing PRs healthy, an executor agent finds one improvement, and an evaluator agent reviews it before raising a PR. Cycles run with a 20-minute gap between them. Use this skill when the user wants to run continuous autonomous improvements, background PR generation, automated code quality sweeps, or hands-free codebase maintenance. Trigger on phrases like "auto improve", "background improvements", "keep finding things to fix", "autonomous PRs", or "improvement loop".
 user-invocable: true
 ---
 
 # Auto-Improve Loop
 
-When invoked, start a recurring loop that autonomously improves the current project by spawning independent agents every 20 minutes. Each agent works in an isolated git worktree so there are no conflicts.
+When invoked, start a recurring loop that autonomously improves the current project. Each cycle runs three subagents sequentially: maintainer → executor → evaluator. Cycles are separated by a 20-minute gap.
 
 ## Context
 
@@ -14,44 +14,75 @@ Project directory: !`pwd`
 
 ## Precondition
 
-This skill must be invoked from the `main` or `master` branch. If the current branch is neither, stop and tell the user to switch branches first.
+This skill must be invoked from within a **worktree**. If the working directory is not under `.claude/worktrees/`, stop and tell the user to enter a worktree first (e.g. via EnterWorktree).
 
-## Execution
+## Initial Setup
 
-1. **Pull latest** — run `git pull` to pick up recently merged PRs. If it fails, stop and tell the user — don't silently continue, since agents would be working on stale code.
-2. **Spawn the first agent** using the Agent tool (see Agent Configuration below).
-3. **Schedule recurring agents** using CronCreate with `cron: "*/20 * * * *"` and `recurring: true`.
-4. **Tell the user** what you've set up: that the first agent is running and new ones will spawn every 20 minutes. Mention they can stop it with Ctrl+C or by asking you to cancel the cron job. Note the 7-day auto-expiry.
+Before starting the loop:
 
-For the CronCreate prompt, use the following template. Before setting it up, resolve the two placeholders — use the project directory from the Context section above, and the absolute path to this skill's directory (same directory this SKILL.md lives in):
+1. Ensure the `auto-improve` label exists on the repo: `gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force` (idempotent — safe to run if it already exists).
 
-```
-Run `git pull` to pick up recently merged PRs. If it fails, report the error to the user and do NOT spawn an agent. Otherwise, read the agent prompt from <skill-dir>/references/agent-prompt.md and spawn an auto-improve worktree agent. Use the Agent tool with isolation: "worktree", mode: "auto", run_in_background: true, description: "auto-improve". Use the file contents as the prompt, prefixed with "Working directory of the project to improve: <project-dir>".
-```
+Then run the first cycle immediately.
 
-## Agent Configuration
+## Cycle
 
-Each agent is spawned with:
+Each cycle runs these steps in order:
 
-- `isolation: "worktree"` — isolated copy of the repo, no conflicts with other agents
-- `mode: "auto"` — full autonomy to make changes and create PRs without asking
-- `run_in_background: true` — don't block the session waiting for it to finish
-- `description: "auto-improve"` — identifies the agent in task listings
+### 1. Fetch latest
 
-The agent's prompt should be the contents of [references/agent-prompt.md](references/agent-prompt.md), prefixed with "Working directory of the project to improve: " followed by the project directory from the Context section.
+`git fetch && git checkout origin/main` to put the worktree on a detached HEAD at the latest main. If fetch fails, stop and tell the user.
 
-## When Agents Complete
+### 2. Maintainer (conditional)
 
-When a background agent finishes, you'll receive a notification. Handle it based on the result:
+Run `gh pr list --label auto-improve --state open --json number` to check for open auto-improve PRs. If there are none, skip to step 3.
 
-- **Agent raised a PR**: Reset the consecutive "no improvements" counter to 0. Clean up the worktree.
-- **Agent found no improvements** (look for "NO_IMPROVEMENTS_FOUND" in the result): Increment the consecutive "no improvements" counter. Clean up the worktree. If the counter reaches **3**, cancel the cron job with CronDelete and tell the user: "Three consecutive agents found no improvements — stopping the loop. The codebase looks clean."
+Otherwise, spawn the maintainer agent: `subagent_type: "auto-improve-maintainer"`, `mode: "auto"`, **foreground** (must complete before the executor starts). Pass the project directory in the prompt.
 
-## Worktree Cleanup
+If the maintainer fails, log the error but continue to step 3.
 
-After each agent completes, clean up its worktree to prevent them accumulating on disk. The agent completion notification includes `worktreePath` and `worktreeBranch`. Run:
+### 3. Executor
 
-```bash
-git worktree remove <worktreePath>
-git branch -D <worktreeBranch>
-```
+Spawn the executor agent: `subagent_type: "auto-improve-executor"`, `mode: "auto"`, `run_in_background: true`, `description: "auto-improve-executor"`.
+
+### 4. Handle executor result
+
+When the executor completes:
+
+- **`NO_IMPROVEMENTS_FOUND`** in the result → increment the consecutive empties counter. Skip to step 7.
+- **`IMPROVEMENTS_READY`** in the result → continue to step 5. Save the executor's summary text (everything before the `IMPROVEMENTS_READY` signal) for the evaluator.
+- **Neither signal present** (agent crashed or returned unexpected output) → do NOT increment consecutive empties. Log the error and skip to step 7.
+
+### 5. Evaluator
+
+Spawn the evaluator agent: `subagent_type: "auto-improve-evaluator"`, `mode: "auto"`, `run_in_background: true`, `description: "auto-improve-evaluator"`. Pass the executor's summary in the prompt.
+
+### 6. Handle evaluator result
+
+When the evaluator completes:
+
+- **`PR_RAISED`** in the result → reset consecutive empties counter to 0.
+- **`CHANGES_REJECTED`** in the result → increment consecutive empties counter.
+- **Neither signal present** (agent crashed or returned unexpected output) → do NOT increment consecutive empties. Log the error and continue to step 7.
+
+### 7. Reset worktree
+
+Run `git checkout origin/main` to discard any uncommitted changes and return to detached HEAD. This ensures a clean slate for the next cycle.
+
+### 8. Check stopping condition
+
+If the consecutive empties counter reaches **3**, stop the loop and tell the user: "Three consecutive cycles found no improvements or had changes rejected — stopping the loop."
+
+### 9. Schedule next cycle
+
+Calculate the time 20 minutes from now. Run `date "+%M %H %d %m"` to get the current time, add 20 minutes (handling hour/day rollover), and create a one-shot cron job:
+
+Use CronCreate with `recurring: false` and a pinned cron expression for the calculated time. The prompt should instruct the orchestrator to run a full cycle (steps 1-9) using the same project directory.
+
+## After First Cycle
+
+Tell the user what's been set up:
+- The first cycle has run (share the result — PR raised, rejected, or no improvements)
+- Next cycle is scheduled for ~20 minutes from now
+- Each cycle: maintainer checks existing PRs → executor finds an improvement → evaluator reviews and raises a PR
+- The loop stops after 3 consecutive empty/rejected cycles
+- They can stop it with Ctrl+C or by asking to cancel the scheduled job

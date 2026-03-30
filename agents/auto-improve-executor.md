@@ -28,6 +28,8 @@ Look for one clear, high-confidence improvement. Focus on things like:
 - Type safety (loose types that could be tightened, unnecessary type assertions)
 - Mobile/responsive issues (content overflow on small screens, touch targets too small)
 - Build/config (missing .gitignore entries, incomplete environment variable validation, missing favicon or manifest entries)
+- Framework best practices (e.g. unnecessary `useEffect`, render-time ref reads/writes, rules of hooks violations)
+- Modern web API adoption (prefer standard web APIs available across modern evergreen browsers over legacy polyfills or third-party equivalents)
 - Test coverage gaps for critical paths
 - Documentation that's out of date with the code
 

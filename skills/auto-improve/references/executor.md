@@ -13,22 +13,23 @@ Run `gh pr list --label auto-improve --state open` and `gh pr list --label auto-
 
 ## Step 3: Explore the codebase and find one improvement
 
-Look for one clear, high-confidence improvement. Focus on things like:
-- Accessibility issues (missing aria labels, poor contrast, missing alt text)
-- SEO improvements (missing meta tags, structured data gaps)
-- Performance issues (unoptimized images, missing lazy loading)
+Look for one clear, high-confidence improvement. Focus on things like (ordered by priority):
 - Bug fixes (broken links, logic errors, unused imports causing build errors)
-- UX improvements (missing loading states, error boundaries)
 - Security issues (exposed secrets, missing input sanitization, XSS vectors, insecure dependencies via `pnpm audit` or `npm audit`)
-- Dead code (unused exports, unused dependencies in package.json, commented-out code blocks, unreachable code paths)
 - Error handling gaps (empty catch blocks, unhandled promise rejections, silent failures)
-- Dependency health (known vulnerabilities, deprecated API usage that will break in future versions)
-- Type safety (loose types that could be tightened, unnecessary type assertions)
-- Mobile/responsive issues (content overflow on small screens, touch targets too small)
-- Build/config (missing .gitignore entries, incomplete environment variable validation, missing favicon or manifest entries)
+- Performance issues (unoptimized images, missing lazy loading)
+- Accessibility issues (missing aria labels, poor contrast, missing alt text)
+- UX improvements (missing loading states, error boundaries)
 - Framework best practices (e.g. unnecessary `useEffect`, render-time ref reads/writes, rules of hooks violations)
-- Modern web API adoption (prefer standard web APIs available across modern evergreen browsers over legacy polyfills or third-party equivalents)
+- Type safety (loose types that could be tightened, unnecessary type assertions)
+- Code structure (splitting large files/components into smaller focused modules, pulling state into providers, restructuring effects, extracting reusable utilities or components)
+- Dead code (unused exports, unused dependencies in package.json, commented-out code blocks, unreachable code paths)
+- Dependency health (known vulnerabilities, deprecated API usage that will break in future versions)
+- Mobile/responsive issues (content overflow on small screens, touch targets too small)
 - Test coverage gaps for critical paths
+- Modern web API adoption (prefer standard web APIs available across modern evergreen browsers over legacy polyfills or third-party equivalents)
+- Build/config (missing .gitignore entries, incomplete environment variable validation, missing favicon or manifest entries)
+- SEO improvements (missing meta tags, structured data gaps)
 - Documentation that's out of date with the code
 
 Pick something where you're confident the change is correct and valuable. Avoid speculative refactors or subjective style changes.

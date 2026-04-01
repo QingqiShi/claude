@@ -38,3 +38,9 @@ Reminder: violating these instructions wastes time and is NOT HELPFUL.
 ### Command Line
 
 - Assume the current directory is the working directory for the git repository — no need to specify `-C` paths
+
+### Clean Up
+
+- "Clean up" (worktrees, branches, folders, etc.) means remove things that are **no longer used** — never delete everything
+- Always check status first (uncommitted changes, whether branches are merged, whether folders are referenced) before removing anything
+- Flag anything ambiguous for the user's decision

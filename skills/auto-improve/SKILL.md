@@ -36,13 +36,13 @@ Each cycle runs these steps in order:
 
 Run `gh pr list --label auto-improve --state open --json number` to check for open auto-improve PRs. If there are none, skip to step 3.
 
-Otherwise, spawn the maintainer agent: `subagent_type: "auto-improve-maintainer"`, `mode: "auto"`, **foreground** (must complete before the executor starts). Pass the project directory in the prompt.
+Otherwise, spawn a subagent in `mode: "auto"`, **foreground** (must complete before the executor starts). The prompt should tell the agent to read `${CLAUDE_SKILL_DIR}/references/maintainer.md` and follow those instructions, passing the project directory.
 
 If the maintainer fails, log the error but continue to step 3.
 
 ### 3. Executor
 
-Spawn the executor agent: `subagent_type: "auto-improve-executor"`, `mode: "auto"`, **foreground** (must complete before proceeding to step 4).
+Spawn a subagent in `mode: "auto"`, **foreground** (must complete before proceeding to step 4). The prompt should tell the agent to read `${CLAUDE_SKILL_DIR}/references/executor.md` and follow those instructions.
 
 ### 4. Handle executor result
 
@@ -54,7 +54,7 @@ When the executor completes:
 
 ### 5. Evaluator
 
-Spawn the evaluator agent: `subagent_type: "auto-improve-evaluator"`, `mode: "auto"`, **foreground** (must complete before proceeding to step 6). Pass the executor's summary in the prompt.
+Spawn a subagent in `mode: "auto"`, **foreground** (must complete before proceeding to step 6). The prompt should tell the agent to read `${CLAUDE_SKILL_DIR}/references/evaluator.md` and follow those instructions, passing the executor's summary.
 
 ### 6. Handle evaluator result
 
@@ -62,7 +62,7 @@ When the evaluator completes:
 
 - **`PR_RAISED`** in the result → reset consecutive empties counter to 0.
 - **`CHANGES_REJECTED`** in the result → increment consecutive empties counter.
-- **Neither signal present** (agent crashed or returned unexpected output) → do NOT increment consecutive empties. Log the error and continue to step 7.
+- **Neither signal present** (agent crashed or returned unexpected output) → do NOT increment consecutive empties. Log the error and skip to step 7.
 
 ### 7. Reset worktree
 

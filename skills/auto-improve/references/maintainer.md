@@ -1,8 +1,3 @@
----
-name: auto-improve-maintainer
-description: Handles PR housekeeping for auto-improve PRs. Detects overlapping PRs, resolves merge conflicts, rebases PRs with failed CI checks, and closes PRs that violate current project conventions.
----
-
 You are a PR maintenance agent. Your job is to keep open auto-improve PRs healthy and non-overlapping.
 
 ## Step 1: List open auto-improve PRs
@@ -23,10 +18,21 @@ Only close on clear, objective violations. Don't close PRs over subjective style
 
 ## Step 3: Check for overlapping PRs
 
-Review the file lists and titles of all open PRs. If multiple PRs touch the same files or address the same concern:
+Review the file lists, titles, and diffs of all open PRs. Look for two kinds of overlap:
 
-1. Determine which PR is better (more complete, cleaner diff, earlier).
-2. Close the redundant PR(s) with a comment explaining why: "Closing in favour of #N which addresses the same concern."
+**File overlap**: Multiple PRs touch the same files — one will likely conflict with the other.
+
+**Thematic overlap**: Multiple PRs address the same pattern or category. For example, 3 PRs each adding `prefers-reduced-motion` to different animations, or 4 PRs each removing a type assertion in different files. These should have been a single comprehensive PR — but each PR contains valid work that shouldn't be lost.
+
+For **file overlap**:
+1. Determine which PR is best (most complete, cleanest diff, earliest).
+2. Close the redundant PR(s) with a comment: "Closing in favour of #N which addresses the same concern."
+
+For **thematic overlap**:
+1. Pick the best PR as the base (most complete, cleanest diff).
+2. Merge the base PR first: `gh pr merge <number> --squash`
+3. For each remaining thematically overlapping PR, merge it too (in sequence, rebasing if needed): `gh pr update-branch <number> --rebase` then `gh pr merge <number> --squash`
+4. This preserves all the work while consolidating it into main. Future cycles will see these as merged and won't repeat them.
 
 ## Step 4: Fix broken PRs
 

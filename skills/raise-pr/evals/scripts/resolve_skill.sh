@@ -24,7 +24,7 @@ fi
 
 # Use Python for reliable regex replacement of !`...` patterns
 python3 - "$REPO_DIR" "$SKILL_MD" <<'PYEOF'
-import re, subprocess, sys
+import os, re, subprocess, sys
 
 repo_dir = sys.argv[1]
 skill_md = sys.argv[2]
@@ -32,11 +32,14 @@ skill_md = sys.argv[2]
 with open(skill_md, 'r') as f:
     content = f.read()
 
+skill_dir = os.path.dirname(os.path.abspath(skill_md))
+env = {**os.environ, 'SKILL_DIR': skill_dir}
+
 def run_cmd(match):
     cmd = match.group(1)
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, cwd=repo_dir
+            cmd, shell=True, capture_output=True, text=True, cwd=repo_dir, env=env
         )
         output = (result.stdout + result.stderr).rstrip('\n')
         return output

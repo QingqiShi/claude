@@ -33,9 +33,19 @@ file_contains() {
   grep -qF -- "$2" "$1" 2>/dev/null
 }
 
+# Helper: check if file contains string (case-insensitive)
+file_contains_i() {
+  grep -qiF -- "$2" "$1" 2>/dev/null
+}
+
 # Helper: check transcript for string
 transcript_contains() {
   [[ -n "$TRANSCRIPT" ]] && file_contains "$TRANSCRIPT" "$1"
+}
+
+# Helper: check transcript for string (case-insensitive)
+transcript_contains_i() {
+  [[ -n "$TRANSCRIPT" ]] && file_contains_i "$TRANSCRIPT" "$1"
 }
 
 transcript_not_contains() {
@@ -121,7 +131,7 @@ case "$TEST_ID" in
     fi
     ;;
 
-  2)  # Non-main branch stop
+  2)  # Non-main branch stop — skill should call AskUserQuestion with 3 options
     cd "$REPO_DIR"
     # No new commits should have been made
     local_commits="$(git log --oneline feature/existing-work 2>/dev/null | wc -l | tr -d ' ')"
@@ -139,20 +149,36 @@ case "$TEST_ID" in
       assert "gh pr create was NOT called" "false" "capture file exists"
     fi
 
-    # Transcript should contain branch name and all three flags
-    if [[ -n "$TRANSCRIPT" ]]; then
-      if transcript_contains "feature/existing-work"; then
-        assert "Stop message mentions branch name" "true" "found feature/existing-work"
+    # Check AskUserQuestion was called via MCP shim
+    auq_capture="$CAPTURE_DIR/ask_user_question_args.json"
+    if [[ -f "$auq_capture" ]]; then
+      assert "AskUserQuestion tool was called" "true" "capture file exists"
+      auq_body="$(cat "$auq_capture")"
+      if echo "$auq_body" | grep -qi "main"; then
+        assert "Option base-from-main presented" "true" "found main reference"
       else
-        assert "Stop message mentions branch name" "false" "not found"
+        assert "Option base-from-main presented" "false" "no main reference"
       fi
-      for flag in "--base-from-main" "--stack-on-current" "--commit-to-current"; do
-        if transcript_contains "$flag"; then
-          assert "Stop message mentions $flag" "true" "found"
+      if echo "$auq_body" | grep -qi "stack"; then
+        assert "Option stack-on-current presented" "true" "found stack reference"
+      else
+        assert "Option stack-on-current presented" "false" "no stack reference"
+      fi
+      if echo "$auq_body" | grep -qi "commit"; then
+        assert "Option commit-to-current presented" "true" "found commit reference"
+      else
+        assert "Option commit-to-current presented" "false" "no commit reference"
+      fi
+    else
+      # Fallback: check transcript for text-based question
+      assert "AskUserQuestion tool was called" "false" "no capture file — checking transcript"
+      if [[ -n "$TRANSCRIPT" ]]; then
+        if transcript_contains_i "main" && transcript_contains_i "stack" && transcript_contains_i "commit"; then
+          assert "Three options presented (via text)" "true" "found in transcript"
         else
-          assert "Stop message mentions $flag" "false" "not found"
+          assert "Three options presented (via text)" "false" "not all found"
         fi
-      done
+      fi
     fi
     ;;
 
@@ -251,7 +277,7 @@ case "$TEST_ID" in
     fi
     ;;
 
-  9)  # Unclear intent — should stop
+  9)  # Unclear intent — skill should call AskUserQuestion to ask about motivation
     cd "$REPO_DIR"
     # No new commits should have been made (initial commit only)
     local_commits="$(git log --oneline main 2>/dev/null | wc -l | tr -d ' ')"
@@ -268,22 +294,25 @@ case "$TEST_ID" in
       assert "gh pr create was NOT called" "false" "capture file exists"
     fi
 
-    # Transcript should mention intent and AskUserQuestion
-    if [[ -n "$TRANSCRIPT" ]]; then
-      if transcript_contains "intent" || transcript_contains "motivation" || transcript_contains "why"; then
-        assert "Stop message mentions intent" "true" "found"
+    # Check AskUserQuestion was called via MCP shim
+    auq_capture="$CAPTURE_DIR/ask_user_question_args.json"
+    if [[ -f "$auq_capture" ]]; then
+      assert "AskUserQuestion tool was called" "true" "capture file exists"
+      auq_body="$(cat "$auq_capture")"
+      if echo "$auq_body" | grep -qi "motivation\|intent\|why\|reason"; then
+        assert "Question asks about motivation/intent" "true" "found in AskUserQuestion args"
       else
-        assert "Stop message mentions intent" "false" "not found"
+        assert "Question asks about motivation/intent" "false" "not found in AskUserQuestion args"
       fi
-      if transcript_contains "AskUserQuestion" || transcript_contains "ask the user" || transcript_contains "explain the"; then
-        assert "Stop message mentions AskUserQuestion or asks the user" "true" "found"
-      else
-        assert "Stop message mentions AskUserQuestion or asks the user" "false" "not found"
-      fi
-      if transcript_contains "re-invoke" || transcript_contains "raise-pr" || transcript_contains "/raise-pr"; then
-        assert "Stop message mentions re-invoking the skill" "true" "found"
-      else
-        assert "Stop message mentions re-invoking the skill" "false" "not found"
+    else
+      # Fallback: check transcript
+      assert "AskUserQuestion tool was called" "false" "no capture file — checking transcript"
+      if [[ -n "$TRANSCRIPT" ]]; then
+        if transcript_contains_i "motivation" || transcript_contains_i "intent" || transcript_contains_i "why"; then
+          assert "Question asks about motivation/intent (via text)" "true" "found in transcript"
+        else
+          assert "Question asks about motivation/intent (via text)" "false" "not found"
+        fi
       fi
     fi
     ;;
@@ -317,6 +346,46 @@ case "$TEST_ID" in
         assert "PR summary section is short (≤3 sentences)" "true" "sentences≈$sentence_count"
       else
         assert "PR summary section is short (≤3 sentences)" "false" "sentences≈$sentence_count"
+      fi
+    fi
+    ;;
+
+  11)  # Bare directive deletion — skill should call AskUserQuestion to ask about motivation
+    cd "$REPO_DIR"
+    # No new commits should have been made (initial commit only)
+    local_commits="$(git log --oneline main 2>/dev/null | wc -l | tr -d ' ')"
+    if [[ "$local_commits" == "1" ]]; then
+      assert "No new commits were made" "true" "commit count=$local_commits"
+    else
+      assert "No new commits were made" "false" "commit count=$local_commits"
+    fi
+
+    # No gh pr create
+    if [[ ! -f "$CAPTURE_DIR/gh_pr_create_args.json" ]]; then
+      assert "gh pr create was NOT called" "true" "no capture file"
+    else
+      assert "gh pr create was NOT called" "false" "capture file exists"
+    fi
+
+    # Check AskUserQuestion was called via MCP shim
+    auq_capture="$CAPTURE_DIR/ask_user_question_args.json"
+    if [[ -f "$auq_capture" ]]; then
+      assert "AskUserQuestion tool was called" "true" "capture file exists"
+      auq_body="$(cat "$auq_capture")"
+      if echo "$auq_body" | grep -qi "motivation\|intent\|why\|reason\|removed\|deleted"; then
+        assert "Question asks about motivation/intent" "true" "found in AskUserQuestion args"
+      else
+        assert "Question asks about motivation/intent" "false" "not found in AskUserQuestion args"
+      fi
+    else
+      # Fallback: check transcript
+      assert "AskUserQuestion tool was called" "false" "no capture file — checking transcript"
+      if [[ -n "$TRANSCRIPT" ]]; then
+        if transcript_contains_i "motivation" || transcript_contains_i "intent" || transcript_contains_i "why"; then
+          assert "Question asks about motivation/intent (via text)" "true" "found in transcript"
+        else
+          assert "Question asks about motivation/intent (via text)" "false" "not found"
+        fi
       fi
     fi
     ;;

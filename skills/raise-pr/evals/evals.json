@@ -25,15 +25,14 @@
       "prompt": "Please create a PR for my changes.",
       "fixture": "fixtures/non-main-branch.sh",
       "args": "",
-      "expected_output": "Detects non-main branch, stops immediately, returns message with branch name and all three flags.",
+      "expected_output": "Detects non-main branch, calls AskUserQuestion with three options (base-from-main, stack-on-current, commit-to-current).",
       "expectations": [
         "No new commits were made",
-        "No git add was executed",
         "gh pr create was NOT called",
-        "Stop message mentions the branch name feature/existing-work",
-        "Stop message mentions --base-from-main",
-        "Stop message mentions --stack-on-current",
-        "Stop message mentions --commit-to-current"
+        "AskUserQuestion tool was called",
+        "Option base-from-main presented",
+        "Option stack-on-current presented",
+        "Option commit-to-current presented"
       ]
     },
     {
@@ -139,13 +138,12 @@
       "prompt": "Please create a PR for my changes.",
       "fixture": "fixtures/unclear-intent.sh",
       "args": "",
-      "expected_output": "Detects that intent is unclear (mechanical restructuring with no stated motivation), stops, returns message asking main agent to query the user.",
+      "expected_output": "Detects that intent is unclear (mechanical restructuring with no stated motivation), calls AskUserQuestion to ask about motivation.",
       "expectations": [
         "No new commits were made",
         "gh pr create was NOT called",
-        "Stop message mentions intent",
-        "Stop message mentions AskUserQuestion or asks the user",
-        "Stop message mentions re-invoking the skill"
+        "AskUserQuestion tool was called",
+        "Question asks about motivation/intent"
       ]
     },
     {
@@ -164,6 +162,20 @@
         "PR body contains ## Summary",
         "PR body does NOT contain ## Context",
         "PR summary section is short (≤3 sentences)"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "bare-directive-deletion-stop",
+      "prompt": "I removed config/monitoring.yml. Please create a PR for this change.",
+      "fixture": "fixtures/bare-directive-deletion.sh",
+      "args": "",
+      "expected_output": "Detects that intent is unclear (bare directive with no motivation — user said to remove it but not why), calls AskUserQuestion to ask about motivation.",
+      "expectations": [
+        "No new commits were made",
+        "gh pr create was NOT called",
+        "AskUserQuestion tool was called",
+        "Question asks about motivation/intent"
       ]
     }
   ]

@@ -1,6 +1,7 @@
 {
   "env": {
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_NO_FLICKER": "1"
   },
   "attribution": {
     "commit": "",
@@ -131,10 +132,7 @@
       "WebFetch(domain:committees.parliament.uk)",
       "Bash(git push:*)"
     ],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)"
-    ],
+    "deny": ["Read(./.env)", "Read(./.env.*)"],
     "ask": [],
     "defaultMode": "default"
   },

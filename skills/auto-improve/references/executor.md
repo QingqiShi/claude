@@ -32,7 +32,12 @@ Look for one clear, high-confidence improvement. Focus on things like (ordered b
 - SEO improvements (missing meta tags, structured data gaps)
 - Documentation that's out of date with the code
 
-Pick something where you're confident the change is correct and valuable. Avoid speculative refactors or subjective style changes.
+Pick something where you're confident the change is both **correct** (the implementation works) and **right** (the change should be made). These are separate judgments:
+
+- **Correct**: The code does what you intend, follows patterns, passes tests.
+- **Right**: The change is the right thing to do for the project. Ask yourself: is the current behavior intentional? Could there be a reason it works this way? What are the second-order effects — does this change expose users to external content, create new trust signals, introduce security surface area, or change what users see in ways that need careful thought?
+
+If existing code has comments like "intentionally X" or a framework defaults to a behavior, don't treat that as a bug without understanding *why*. Avoid speculative refactors or subjective style changes.
 
 **Think systemically, not instance-by-instance.** When you find an issue, check whether it's a pattern that exists in multiple places. If the same fix applies to 3+ locations, fix ALL of them in one PR. A single PR titled "fix: add prefers-reduced-motion to all animations" is far more valuable than 8 separate PRs each fixing one animation. Grep the codebase for similar instances before implementing.
 
@@ -60,7 +65,8 @@ End your response with a short summary for the evaluator, followed by the signal
 ## Summary
 **What was changed**: <brief description of the change>
 **Why it's high value**: <what problem this solves or what it improves>
-**Why it's high confidence**: <why you're sure this is correct>
+**Why it's correct**: <why the implementation is right — tests, patterns, etc.>
+**Why it's the right thing to do**: <why the current behavior is wrong or suboptimal, not just different. Address: is the current behavior intentional? What are the second-order effects on users, security, trust, or UX?>
 
 IMPROVEMENTS_READY
 ```

@@ -14,3 +14,4 @@ skills/**/*.png
 .DS_Store
 !output-styles/
 !output-styles/**
+!statusline-command.sh

@@ -32,9 +32,11 @@ If the problem doesn't exist, **stop here and reject**. A well-implemented fix f
 
 ## Step 3: Evaluate the fix
 
+Before checking criteria, independently reason about the fix from the product's perspective: what is the user-facing problem? What would the ideal behavior be? What technical approach would achieve that ideal? Then compare your independent assessment against the executor's approach. If the executor resolved a code-level symptom (e.g., making two values match) without addressing the underlying product problem, or fixed the wrong side of an inconsistency, that's a failure — even if the code change is technically sound.
+
 For each criterion, the change must pass — one failure is enough to reject:
 
-- **Right thing to do**: The executor must explain not just why the implementation is correct, but why the change *should be made*. If the summary only argues "this follows the pattern" or "this is technically correct" without addressing why the current behavior is wrong, reject. Look for: does the executor acknowledge why the code might be the way it is? Does it address second-order effects on users, security, or trust? A well-implemented change that shouldn't exist is still wrong.
+- **Right thing to do**: The executor must demonstrate understanding of the product problem — the user-facing impact, not just the code-level symptom. If the summary frames the problem as a code inconsistency ("A uses X but B uses Y") without explaining the user impact and why this fix direction is correct, reject. Look for: does the executor reason from the ideal user experience? Does it address second-order effects on users, security, or trust? Does it explain why it fixed the side it did? A well-implemented fix that addresses the wrong side of a problem is still wrong.
 - **Correct**: Does the change do what it claims without introducing bugs or regressions?
 - **Proportionate**: Is this the simplest fix for the problem? Could a smaller or less invasive change achieve the same result?
 - **Net positive**: Does the change make things better, not worse? Reject if it increases complexity, hurts consistency, or degrades UX — even if the underlying problem is real.

@@ -39,6 +39,8 @@ Pick something where you're confident the change is both **correct** (the implem
 
 If existing code has comments like "intentionally X" or a framework defaults to a behavior, don't treat that as a bug without understanding *why*. Avoid speculative refactors or subjective style changes.
 
+**Think from the product's perspective.** Code inconsistencies are symptoms, not problems. Before jumping to a fix, understand the problem at the product level: what does the user actually experience? What should the ideal behavior be? Work backwards from the ideal user experience to determine the right technical approach. If two pieces of code disagree, don't assume the more complex one is correct — reason about which approach is right for the product, then fix whichever side is wrong. This also surfaces related concerns that a purely code-level lens would miss.
+
 **Think systemically, not instance-by-instance.** When you find an issue, check whether it's a pattern that exists in multiple places. If the same fix applies to 3+ locations, fix ALL of them in one PR. A single PR titled "fix: add prefers-reduced-motion to all animations" is far more valuable than 8 separate PRs each fixing one animation. Grep the codebase for similar instances before implementing.
 
 ## Step 4: Implement the improvement
@@ -64,9 +66,9 @@ End your response with a short summary for the evaluator, followed by the signal
 ```
 ## Summary
 **What was changed**: <brief description of the change>
-**Why it's high value**: <what problem this solves or what it improves>
-**Why it's correct**: <why the implementation is right — tests, patterns, etc.>
-**Why it's the right thing to do**: <why the current behavior is wrong or suboptimal, not just different. Address: is the current behavior intentional? What are the second-order effects on users, security, trust, or UX?>
+**Product problem**: <what the user experiences and why it's wrong — frame this from the user's perspective, not as a code inconsistency>
+**Why this is the right solution**: <why this technical approach is correct for the product problem. If you found a mismatch between components, explain why you fixed the side you did and what alternatives you considered. Address second-order effects on users, security, trust, or UX>
+**Why it's correct**: <why the implementation works — tests, patterns, etc.>
 
 IMPROVEMENTS_READY
 ```

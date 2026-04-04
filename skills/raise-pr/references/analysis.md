@@ -19,14 +19,22 @@ Only if CLAUDE.md has no quality check instructions, look for:
 
 If any checks fail, include the failure output in your response.
 
-## 3. Read the Changes
+## 3. Re-stage After Quality Checks
+
+Quality checks (especially formatters and auto-fixers) may modify staged files, leaving changes unstaged. Re-stage everything so the commit captures the final state:
+
+```bash
+git add -A
+```
+
+## 4. Read the Changes
 
 ```bash
 git diff --staged
 git log --oneline -5
 ```
 
-## 4. Analyze and Return
+## 5. Analyze and Return
 
 Produce a structured analysis with exactly these fields:
 

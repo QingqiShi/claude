@@ -30,6 +30,8 @@ Use the branch name from Git Context above.
 
 Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 
+> **You are analyzing staged changes in a git repository to produce a structured summary. Do not create branches, commits, or PRs.**
+>
 > Read the file at `${CLAUDE_SKILL_DIR}/references/analysis.md` and follow its instructions. The working directory is `<working_directory>`.
 >
 > Conversation context for inferring intent: <include relevant conversation history — what the user said about these changes, any issue references, the task they were working on>
@@ -64,6 +66,8 @@ Intent is typically unclear when:
 
 Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 
+> **You are creating a pull request from already-analyzed changes. Do not re-analyze the changes or modify any source files.**
+>
 > Read the files at `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and `${CLAUDE_SKILL_DIR}/references/examples.md`, then follow the instructions in pr-creation.md to create a pull request.
 >
 > Analysis:

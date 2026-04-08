@@ -28,7 +28,7 @@ Use the branch name from Git Context above.
 
 ### 2. Spawn Analysis Sub-Agent
 
-Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
+Use the `Agent` tool with `model: sonnet` and `subagent_type: "Explore"` to spawn a sub-agent. Prompt it:
 
 > **You are analyzing staged changes in a git repository to produce a structured summary. Do not create branches, commits, or PRs.**
 >

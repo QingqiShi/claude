@@ -1,0 +1,78 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import type { Theme } from '@/types';
+
+const navItems = [
+  { href: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { href: '/products', label: 'Products', icon: '📦' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
+];
+
+export function Sidebar() {
+  const [theme, setTheme] = useState<Theme>('light');
+
+  // Read theme from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('app-theme');
+      if (stored === 'light' || stored === 'dark') {
+        setTheme(stored);
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
+
+  // Sync with other components via storage event
+  useEffect(() => {
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'app-theme' && (e.newValue === 'light' || e.newValue === 'dark')) {
+        setTheme(e.newValue);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
+  const isDark = theme === 'dark';
+
+  return (
+    <aside
+      style={{
+        width: '240px',
+        height: '100vh',
+        backgroundColor: isDark ? '#16213e' : '#f8f9fa',
+        borderRight: `1px solid ${isDark ? '#2a2a4a' : '#e0e0e0'}`,
+        padding: '1rem 0',
+      }}
+    >
+      <div style={{ padding: '0 1rem', marginBottom: '2rem' }}>
+        <h2 style={{ color: isDark ? '#e0e0e0' : '#333', fontSize: '1.25rem' }}>
+          Dashboard App
+        </h2>
+      </div>
+      <nav>
+        {navItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              padding: '0.75rem 1rem',
+              color: isDark ? '#b0b0d0' : '#555',
+              textDecoration: 'none',
+              transition: 'background-color 0.15s',
+            }}
+          >
+            <span>{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  );
+}

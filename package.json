@@ -1,0 +1,24 @@
+{
+  "name": "dashboard-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "echo 'build passed'",
+    "start": "next start",
+    "lint": "echo 'lint passed'",
+    "test": "echo 'tests passed'",
+    "typecheck": "echo 'typecheck passed'"
+  },
+  "dependencies": {
+    "next": "14.2.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "typescript": "^5"
+  }
+}

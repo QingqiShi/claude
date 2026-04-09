@@ -11,6 +11,7 @@
 !skills/**
 skills/**/.playwright-cli/
 skills/**/*.png
+skills/**/evals/results/
 .DS_Store
 !output-styles/
 !output-styles/**

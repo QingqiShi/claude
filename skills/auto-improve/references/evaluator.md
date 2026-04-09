@@ -23,7 +23,6 @@ Read the executor's summary and the `git diff`. Identify:
 - **Question "inconsistency" reasoning.** If the executor's logic is "file A does X explicitly, file B doesn't, therefore B is missing X" — verify the inconsistency actually causes a problem. It may be intentional, or another mechanism may already provide the behavior to B.
 - **Reproduce the problem if possible.** Can you find evidence the bug/gap actually manifests? Check tests, build output, or runtime behavior.
 - **Evaluate second-order effects and security implications.** Does the change expose users to external content (URLs, links, embedded data)? If so, consider: URL scheme validation (blocking `javascript:`, `data:` etc.), phishing risk from attacker-controlled titles/labels, whether presenting external links creates an unearned trust signal (e.g. labeling them "Sources" implies editorial endorsement), and whether the change increases the application's attack surface. A change that is functionally correct can still be harmful if it introduces security or trust issues.
-
 - **Trace call sites and actual usage.** Don't just read the changed function in isolation — find where it's called. If the executor claims to fix how a function processes its input, check the call sites to see what inputs are actually passed. Call-site analysis often reveals that the real usage pattern is completely different from what the executor assumed by reading the function signature alone.
 
 If the problem doesn't exist, **stop here and reject**. A well-implemented fix for a non-existent problem is still wrong.
@@ -45,7 +44,11 @@ For each criterion, the change must pass — one failure is enough to reject:
 - **Conventions**: Does it follow the project's coding standards? (Read CLAUDE.md/AGENTS.md if you haven't already)
 - **Focused**: Is it one clear improvement, or does it bundle unrelated changes?
 
-## Step 4: Decide
+## Step 4: Make minor fixes (if needed)
+
+If the change is fundamentally correct but has minor issues (a typo in a comment, a missing edge case, an inconsistent naming convention), fix them yourself directly rather than rejecting. Only reject for substantive problems.
+
+## Step 5: Decide
 
 **If the evidence supports the executor's claims** — all criteria pass:
 

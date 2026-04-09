@@ -1,0 +1,115 @@
+[
+  {
+    "id": "duplicated-theme-state",
+    "scenario_number": 1,
+    "description": "Three components independently read/write theme to localStorage and sync via storage event listeners. The fix is to extract a ThemeProvider context as a single source of truth.",
+    "files": [
+      "src/components/ThemeToggle.tsx",
+      "src/components/Sidebar.tsx",
+      "src/components/Header.tsx"
+    ],
+    "diff_patterns": [
+      "createContext|ThemeContext|ThemeProvider|useTheme",
+      "contexts/"
+    ],
+    "difficulty": "medium",
+    "clean_files": [
+      "src/components/Chart.tsx",
+      "src/components/Modal.tsx",
+      "src/hooks/useLocalStorage.ts",
+      "src/hooks/useDebounce.ts",
+      "src/lib/utils.ts",
+      "src/lib/api.ts"
+    ]
+  },
+  {
+    "id": "scattered-derived-state",
+    "scenario_number": 2,
+    "description": "Three components manage independent state slices (display name, team, role) via localStorage. WelcomeBanner combines them via useEffect into a derived greeting stored as state. The fix is to lift state to a shared context/provider and compute the greeting at render time.",
+    "files": [
+      "src/components/UserSettingsPanel.tsx",
+      "src/components/TeamSelector.tsx",
+      "src/components/RoleDisplay.tsx",
+      "src/components/WelcomeBanner.tsx"
+    ],
+    "diff_patterns": [
+      "createContext|UserContext|useUserPreferences|UserPreferencesProvider",
+      "contexts/"
+    ],
+    "difficulty": "hard",
+    "clean_files": [
+      "src/components/Chart.tsx",
+      "src/components/Modal.tsx",
+      "src/hooks/useLocalStorage.ts",
+      "src/hooks/useDebounce.ts",
+      "src/lib/utils.ts",
+      "src/lib/api.ts"
+    ]
+  },
+  {
+    "id": "indirect-event-handler",
+    "scenario_number": 3,
+    "description": "ProductListPage passes filter state as props to SearchResults, which has a useEffect watching filters to fire an API call. The fix is to move the API call into event handlers or lift to the parent, eliminating the useEffect.",
+    "files": [
+      "src/components/FilterPanel.tsx",
+      "src/components/SearchResults.tsx",
+      "src/app/products/page.tsx"
+    ],
+    "diff_patterns": [
+      "onFiltersChange|handleFiltersChange|async.*filters"
+    ],
+    "difficulty": "hard",
+    "clean_files": [
+      "src/components/Chart.tsx",
+      "src/components/Modal.tsx",
+      "src/hooks/useLocalStorage.ts",
+      "src/hooks/useDebounce.ts",
+      "src/lib/utils.ts",
+      "src/lib/api.ts"
+    ]
+  },
+  {
+    "id": "monolithic-component",
+    "scenario_number": 4,
+    "description": "DataTable is a ~550-line monolithic component with inline sorting, filtering, pagination, row selection, column visibility, and CSV export all in one file. The fix is to decompose into smaller focused components or hooks.",
+    "files": [
+      "src/components/DataTable.tsx"
+    ],
+    "diff_patterns": [
+      "TableToolbar|TablePagination|useTableSort|useTableFilter|useTableSelection"
+    ],
+    "difficulty": "hard",
+    "clean_files": [
+      "src/components/Chart.tsx",
+      "src/components/Modal.tsx",
+      "src/hooks/useLocalStorage.ts",
+      "src/hooks/useDebounce.ts",
+      "src/lib/utils.ts",
+      "src/lib/api.ts"
+    ]
+  },
+  {
+    "id": "prop-drilling",
+    "scenario_number": 5,
+    "description": "Dashboard preferences (dateRange, onDateRangeChange, currency, locale) are drilled through 4 levels: DashboardPage → AnalyticsPanel → MetricsGrid → MetricCard. Middle components just forward props. The fix is to use a DashboardContext provider.",
+    "files": [
+      "src/app/dashboard/page.tsx",
+      "src/components/AnalyticsPanel.tsx",
+      "src/components/MetricsGrid.tsx",
+      "src/components/MetricCard.tsx"
+    ],
+    "diff_patterns": [
+      "createContext|DashboardContext|useDashboard|DashboardProvider",
+      "contexts/"
+    ],
+    "difficulty": "hard",
+    "clean_files": [
+      "src/components/Chart.tsx",
+      "src/components/Modal.tsx",
+      "src/hooks/useLocalStorage.ts",
+      "src/hooks/useDebounce.ts",
+      "src/lib/utils.ts",
+      "src/lib/api.ts"
+    ]
+  }
+]

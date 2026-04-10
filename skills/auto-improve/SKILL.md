@@ -6,7 +6,7 @@ user-invocable: true
 
 # Auto-Improve
 
-When invoked, start an autonomous improvement loop using an agent team.
+Start an autonomous improvement loop using an agent team.
 
 ## Context
 
@@ -14,135 +14,75 @@ Project directory: !`pwd`
 
 ## Precondition
 
-This skill must be invoked from within a **worktree**. If the working directory is not under `.claude/worktrees/`, stop and tell the user to enter a worktree first (e.g. via EnterWorktree).
+Must be invoked from within a **worktree** (working directory under `.claude/worktrees/`). If not, tell the user to enter one first.
 
 ## Parse Input
 
-Check the user's prompt for a cycle count (e.g. `/auto-improve 5`, `/auto-improve 3 cycles`). Default to **1** cycle if not specified. This is the maximum number of PRs to raise before stopping.
+Check for a cycle count (e.g. `/auto-improve 5`). Default: **1** cycle.
 
-## Initial Setup
+## Setup
 
-1. Ensure the `auto-improve` label exists: `gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force`
+Ensure the label exists: `gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force`
 
 ## Create Team
 
-Create a team with **two long-lived agents**: Explorer and Planner.
-
-**IMPORTANT: Do NOT read the reference files yourself.** Pass the file paths to the agents and let them read their own instructions. This saves your context window.
+Create a team with **four agents**. **Do NOT read the reference files yourself.**
 
 ### Explorer
-
-Spawn as a team agent with `mode: "auto"`. Use this exact prompt (fill in the variables):
-
+Team agent, `mode: "auto"`:
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/explorer.md and follow those instructions exactly.
-
 Project directory: <project_dir>
-
 Team name: <team_name>
 ```
 
 ### Planner
-
-Spawn as a team agent with `mode: "auto"`. Use this exact prompt (fill in the variables):
-
+Team agent, `mode: "auto"`:
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/planner.md and follow those instructions exactly.
-
 Project directory: <project_dir>
 Target cycle count: <cycles>
-
 Team name: <team_name>
 ```
 
-## Your Role as Lead
-
-**You are the monitor and executor-spawner.** After creating the team, your ONLY job is to:
-1. Watch for messages from the Planner
-2. When the Planner sends `EXECUTE:`, spawn the Executor and Evaluator
-3. Report results back to the Planner
-4. Track cycle count and stop when done
-
-**Do NOT exit or finish until** the target cycle count is reached or 3 consecutive cycles produce no PR. You must remain active and responsive to team messages throughout the entire run.
-
-**IMPORTANT**: The Explorer needs time to scan the codebase (this can take several minutes). Do NOT treat teammate idle notifications as completion. If the Planner goes idle before sending `EXECUTE:`, message it: `"The Explorer is still scanning. Stay active and wait for findings."` If the Explorer goes idle, message it: `"Continue exploring, the Planner needs more findings."` Only treat the run as complete when you have reached the target cycle count or hit the consecutive empties limit.
-
-## Cycle Loop
-
-After creating the team, enter the cycle loop. Each cycle:
-
-### 1. Monitor for Planner signal
-
-Send a message to the Planner: `"Ready for next improvement. Send EXECUTE: when you have one prioritized."`
-
-Then wait. The Planner will send a message containing `EXECUTE:` followed by the improvement brief. The brief includes: what to change, which files, why it's high value, and the approach.
-
-If the Planner has not responded and appears idle, send another message: `"Status check — do you have improvements ready to execute?"`
-
-### 2. Prepare executor worktree
-
-Once you receive the `EXECUTE:` signal, create a fresh worktree for the executor:
-
-```
-git fetch
-git worktree add ~/.claude/worktrees/auto-improve-executor-<timestamp> origin/main
-```
-
-### 3. Spawn Executor
-
-Spawn a **subagent** (not a team agent) in `mode: "auto"`, **foreground**. Use this prompt template (fill in the variables):
-
+### Executor
+Team agent, `mode: "auto"`:
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/executor.md and follow those instructions exactly.
-
-Work in this directory: <executor_worktree_path>
-
-The improvement has already been identified and validated. Skip exploration, go straight to implementation.
-
-Improvement brief:
-<planner_brief>
+Project directory: <project_dir>
+Team name: <team_name>
 ```
 
-Wait for the executor to complete. Check for `IMPROVEMENTS_READY` or `NO_IMPROVEMENTS_FOUND` in the result.
-
-### 4. Spawn Evaluator
-
-If the executor signals `IMPROVEMENTS_READY`, spawn a **subagent** (not a team agent) in `mode: "auto"`, **foreground**. Use this prompt template:
-
+### Evaluator
+Team agent, `mode: "auto"`:
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/evaluator.md and follow those instructions exactly.
-
-Work in this directory: <executor_worktree_path>
-
-Executor summary:
-<executor_summary>
+Project directory: <project_dir>
+Team name: <team_name>
 ```
 
-Wait for the evaluator to complete. Check for `PR_RAISED` or `CHANGES_REJECTED`.
+## Your Role
 
-### 5. Clean up executor worktree
+You are the **worktree manager and cycle tracker**. After creating the team:
 
-Remove the executor worktree: `git worktree remove --force ~/.claude/worktrees/auto-improve-executor-<timestamp>`
+1. Wait for `EXECUTE:` from the Planner
+2. Create an executor worktree: `git fetch && git worktree add ~/.claude/worktrees/auto-improve-executor-<timestamp> origin/main`
+3. Message the Explorer: `"Send code context for [improvement] to the Executor. Worktree path: <path>"`
+4. Message the Executor: `"Implement the improvement in <worktree_path>. The Explorer will send you the code context."`
+5. Wait for `CYCLE_COMPLETE` from the Evaluator
+6. Clean up: `git worktree remove --force <worktree_path>`
+7. Track result and check stopping condition
 
-### 6. Handle result
+**Stay active** until done. Teammate idle notifications are NOT completion — the Explorer needs time to scan. If the Planner idles before `EXECUTE:`, message: `"The Explorer is still scanning. Stay active."` If the Explorer idles, message: `"Continue exploring."`
 
-- **`PR_RAISED`**: Reset consecutive empties to 0. Increment PR count. Tell the Planner: `CYCLE_COMPLETE: PR raised. <cycle_count>/<target> cycles done.`
-- **`CHANGES_REJECTED`**: Increment consecutive empties. Tell the Planner: `CYCLE_COMPLETE: Changes rejected. Reason: <reason>. Pick a different improvement.`
-- **`NO_IMPROVEMENTS_FOUND`** or executor error: Increment consecutive empties. Tell the Planner: `CYCLE_COMPLETE: Executor failed to implement. Pick a different improvement.`
+## Tracking Cycles
 
-### 7. Check stopping condition
+On `CYCLE_COMPLETE: PR_RAISED`:
+- Reset consecutive empties to 0, increment PR count
+- Message Planner: `"PR raised. <count>/<target> cycles done."`
 
-Stop the loop if:
-- PR count has reached the target cycle count, OR
-- Consecutive empties reaches **3**
+On `CYCLE_COMPLETE: CHANGES_REJECTED`:
+- Increment consecutive empties
+- Message Planner: `"Changes rejected. Reason: <reason>. Pick a different improvement."`
 
-If stopping, tell the Planner and Explorer to shut down, clean up the team, and report the final summary to the user.
-
-If continuing, go back to step 1.
-
-## Final Report
-
-After all cycles complete (or early stop), report to the user:
-- How many PRs were raised (with URLs)
-- How many cycles were rejected or empty
-- Total cycles run
+**Stop** when PR count = target OR consecutive empties = 3. Shut down team and report summary to user.

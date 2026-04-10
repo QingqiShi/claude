@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-eval.sh — Orchestrate auto-improve eval runs.
+# run-eval.sh — Orchestrate auto-improve eval runs via interactive tmux sessions.
 #
 # Modes:
 #   Combined:       run-eval.sh [--runs N] [--model MODEL] [--output-dir DIR]
@@ -61,8 +61,9 @@ run_batch() {
     local run_dir="$parent_dir/run-$i"
     mkdir -p "$run_dir"
     echo "--- Run $i/$RUNS against $branch ---"
-    "$SCRIPT_DIR/run-single.sh" \
+    "$SCRIPT_DIR/run-loop.sh" \
       --branch "$branch" \
+      --cycles 1 \
       --model "$MODEL" \
       --output-dir "$run_dir"
     echo ""

@@ -6,4 +6,4 @@ build/
 .env.local
 .env.*.local
 *.tsbuildinfo
-skills/
+.claude/

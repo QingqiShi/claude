@@ -1,32 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useUser } from '@/contexts/UserContext';
 
-interface UserSettingsPanelProps {
-  onDisplayNameChange?: (name: string) => void;
-}
-
-export function UserSettingsPanel({ onDisplayNameChange }: UserSettingsPanelProps) {
-  const [displayName, setDisplayName] = useState('');
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('user-display-name');
-      if (saved) setDisplayName(saved);
-    } catch {
-      // Ignore storage errors
-    }
-  }, []);
+export function UserSettingsPanel() {
+  const { displayName, setDisplayName } = useUser();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const name = e.target.value;
-    setDisplayName(name);
-    try {
-      localStorage.setItem('user-display-name', name);
-    } catch {
-      // Gracefully degrade in private browsing
-    }
-    onDisplayNameChange?.(name);
+    setDisplayName(e.target.value);
   };
 
   return (

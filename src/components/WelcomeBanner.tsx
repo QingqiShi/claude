@@ -1,18 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useUser } from '@/contexts/UserContext';
 
-interface WelcomeBannerProps {
-  displayName: string;
-  team: string;
-  role: string;
-}
-
-export function WelcomeBanner({ displayName, team, role }: WelcomeBannerProps) {
-  const [greeting, setGreeting] = useState('');
+export function WelcomeBanner() {
+  const { displayName, team, role } = useUser();
   const [timeOfDay, setTimeOfDay] = useState('');
 
-  // Derive time-of-day greeting
+  // Derive time-of-day greeting on the client only, to avoid hydration
+  // mismatches for the server-rendered markup.
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) {
@@ -24,15 +20,12 @@ export function WelcomeBanner({ displayName, team, role }: WelcomeBannerProps) {
     }
   }, []);
 
-  // Build the full greeting string from all the scattered pieces
-  useEffect(() => {
-    const name = displayName || 'User';
-    const teamPart = team ? ` from ${team}` : '';
-    const rolePart = role ? ` (${role})` : '';
-    setGreeting(`${timeOfDay}, ${name}${teamPart}${rolePart}!`);
-  }, [displayName, team, role, timeOfDay]);
+  if (!timeOfDay) return null;
 
-  if (!greeting) return null;
+  const name = displayName || 'User';
+  const teamPart = team ? ` from ${team}` : '';
+  const rolePart = role ? ` (${role})` : '';
+  const greeting = `${timeOfDay}, ${name}${teamPart}${rolePart}!`;
 
   return (
     <div

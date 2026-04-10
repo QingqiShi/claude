@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { UserProvider } from '@/contexts/UserContext';
 import { Header } from '@/components/Header';
 import { Sidebar } from '@/components/Sidebar';
 
@@ -17,13 +18,15 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <ThemeProvider>
-          <div style={{ display: 'flex', minHeight: '100vh' }}>
-            <Sidebar />
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-              <Header userName="User" />
-              <main style={{ flex: 1 }}>{children}</main>
+          <UserProvider>
+            <div style={{ display: 'flex', minHeight: '100vh' }}>
+              <Sidebar />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <Header />
+                <main style={{ flex: 1 }}>{children}</main>
+              </div>
             </div>
-          </div>
+          </UserProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -2,14 +2,13 @@
 
 import { ThemeToggle } from './ThemeToggle';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useUser } from '@/contexts/UserContext';
 
-interface HeaderProps {
-  userName: string;
-}
-
-export function Header({ userName }: HeaderProps) {
+export function Header() {
   const { theme } = useTheme();
+  const { displayName } = useUser();
   const isDark = theme === 'dark';
+  const name = displayName || 'User';
 
   return (
     <header
@@ -26,7 +25,7 @@ export function Header({ userName }: HeaderProps) {
         Welcome back
       </h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <span style={{ color: isDark ? '#b0b0d0' : '#666' }}>{userName}</span>
+        <span style={{ color: isDark ? '#b0b0d0' : '#666' }}>{name}</span>
         <ThemeToggle />
       </div>
     </header>

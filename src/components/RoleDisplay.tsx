@@ -1,37 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useUser } from '@/contexts/UserContext';
 
 const ROLES = ['admin', 'editor', 'viewer'] as const;
 type Role = (typeof ROLES)[number];
 
-interface RoleDisplayProps {
-  onRoleChange?: (role: string) => void;
+function isRole(value: string): value is Role {
+  return (ROLES as readonly string[]).includes(value);
 }
 
-export function RoleDisplay({ onRoleChange }: RoleDisplayProps) {
-  const [role, setRole] = useState<Role>('viewer');
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('user-role') as Role | null;
-      if (saved && ROLES.includes(saved)) {
-        setRole(saved);
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, []);
-
-  const handleRoleChange = (newRole: Role) => {
-    setRole(newRole);
-    try {
-      localStorage.setItem('user-role', newRole);
-    } catch {
-      // Gracefully degrade in private browsing
-    }
-    onRoleChange?.(newRole);
-  };
+export function RoleDisplay() {
+  const { role, setRole } = useUser();
+  const currentRole: Role = isRole(role) ? role : 'viewer';
 
   const roleLabels: Record<Role, { label: string; color: string }> = {
     admin: { label: 'Administrator', color: '#dc2626' },
@@ -46,15 +26,15 @@ export function RoleDisplay({ onRoleChange }: RoleDisplayProps) {
         {ROLES.map((r) => (
           <button
             key={r}
-            onClick={() => handleRoleChange(r)}
+            onClick={() => setRole(r)}
             style={{
               padding: '0.5rem 1rem',
               borderRadius: '6px',
-              border: role === r ? `2px solid ${roleLabels[r].color}` : '1px solid #ddd',
-              backgroundColor: role === r ? `${roleLabels[r].color}15` : '#fff',
+              border: currentRole === r ? `2px solid ${roleLabels[r].color}` : '1px solid #ddd',
+              backgroundColor: currentRole === r ? `${roleLabels[r].color}15` : '#fff',
               color: roleLabels[r].color,
               cursor: 'pointer',
-              fontWeight: role === r ? 600 : 400,
+              fontWeight: currentRole === r ? 600 : 400,
             }}
           >
             {roleLabels[r].label}

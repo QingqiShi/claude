@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import type { Team } from '@/types';
+import { useUser } from '@/contexts/UserContext';
 
 const TEAMS: Team[] = [
   { id: '1', name: 'Engineering', memberCount: 24 },
@@ -10,31 +10,8 @@ const TEAMS: Team[] = [
   { id: '4', name: 'Marketing', memberCount: 15 },
 ];
 
-interface TeamSelectorProps {
-  onTeamChange?: (team: string) => void;
-}
-
-export function TeamSelector({ onTeamChange }: TeamSelectorProps) {
-  const [selectedTeam, setSelectedTeam] = useState('');
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem('user-team');
-      if (saved) setSelectedTeam(saved);
-    } catch {
-      // Ignore storage errors
-    }
-  }, []);
-
-  const handleSelect = (teamName: string) => {
-    setSelectedTeam(teamName);
-    try {
-      localStorage.setItem('user-team', teamName);
-    } catch {
-      // Gracefully degrade in private browsing
-    }
-    onTeamChange?.(teamName);
-  };
+export function TeamSelector() {
+  const { team: selectedTeam, setTeam } = useUser();
 
   return (
     <div style={{ padding: '1rem', border: '1px solid #e0e0e0', borderRadius: '8px' }}>
@@ -43,7 +20,7 @@ export function TeamSelector({ onTeamChange }: TeamSelectorProps) {
         {TEAMS.map((team) => (
           <button
             key={team.id}
-            onClick={() => handleSelect(team.name)}
+            onClick={() => setTeam(team.name)}
             style={{
               padding: '0.5rem 1rem',
               borderRadius: '20px',

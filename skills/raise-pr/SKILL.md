@@ -75,6 +75,7 @@ Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 > - Context: <any background, trade-offs, or decisions from the conversation that aren't obvious from the summary or the diff — omit if there's nothing to add>
 > - Issue: <GitHub issue number if referenced in conversation context, otherwise "none">
 > - Worktree: <true/false>
+> - Base from main: <true/false>
 > - Commit to current branch: <true/false>
 > - Stack on: <branch name, or "none">
 

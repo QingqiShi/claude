@@ -161,7 +161,7 @@ fi
 
 # --- File-based assertions ---
 # The current 3-agent protocol doesn't emit explicit IMPROVEMENTS_READY /
-# NO_IMPROVEMENTS_FOUND markers — it uses EXECUTE / CYCLE_COMPLETE / STOP.
+# NO_IMPROVEMENTS_FOUND markers — it uses EXECUTE / PR_RAISED / CHANGES_REJECTED / STOP.
 # Grade purely on what the run actually changed.
 if [[ -n "$changed_files" ]]; then
   check_scenario_files

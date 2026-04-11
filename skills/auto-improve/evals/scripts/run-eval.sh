@@ -12,7 +12,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- Defaults ---
 RUNS=1
-MODEL="sonnet"
+# Opus is the faithful-instruction baseline — skill iteration should be measured
+# against it. Use --model sonnet for the paraphrase-robustness check.
+MODEL="opus"
 OUTPUT_DIR=""
 SCENARIO=""
 ALL_SCENARIOS=false
@@ -29,6 +31,8 @@ while [[ $# -gt 0 ]]; do
       echo "Usage: run-eval.sh [--runs N] [--model MODEL] [--output-dir DIR]"
       echo "       run-eval.sh --scenario N [--runs N] [--model MODEL] [--output-dir DIR]"
       echo "       run-eval.sh --all-scenarios [--runs N] [--model MODEL] [--output-dir DIR]"
+      echo ""
+      echo "  --model MODEL    Default: opus (faithful-instruction baseline). Use sonnet for paraphrase-robustness tests."
       exit 0
       ;;
     *)

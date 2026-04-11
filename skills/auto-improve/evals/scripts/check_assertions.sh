@@ -3,11 +3,15 @@
 #
 # Usage: check_assertions.sh <scenario_id_or_branch> <worktree_dir> <capture_dir> [transcript_file] [changed_files_override]
 #
+# The transcript_file positional arg is accepted for backwards compatibility
+# with existing callers (run-loop.sh) but is currently unused: the 3-agent
+# protocol doesn't emit explicit IMPROVEMENTS_READY / NO_IMPROVEMENTS_FOUND
+# markers, so grading is purely file-based.
+#
 # Reads scenarios.json to look up scenario info, then checks:
-#   1. Signal (IMPROVEMENTS_READY / NO_IMPROVEMENTS_FOUND)
-#   2. Scenario detection (which scenario's files were changed)
-#   3. Changed file check (expected scenario files modified)
-#   4. Clean file check (negative controls untouched)
+#   1. Scenario detection (which scenario's files were changed)
+#   2. Changed file check (expected scenario files modified)
+#   3. Clean file check (negative controls untouched)
 #
 # If changed_files_override is provided (path to a file), its contents are used
 # instead of inspecting the worktree. This is needed for run-loop.sh where the
@@ -20,8 +24,9 @@ set -euo pipefail
 SCENARIO_ARG="$1"
 WORKTREE_DIR="$2"
 CAPTURE_DIR="$3"
-TRANSCRIPT="${4:-}"
+TRANSCRIPT="${4:-}"  # accepted for backwards compatibility; unused
 CHANGED_FILES_OVERRIDE="${5:-}"
+: "${TRANSCRIPT}"  # silence unused-variable lint
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SCENARIOS_JSON="$SCRIPT_DIR/../scenarios.json"
@@ -40,11 +45,6 @@ assert() {
   else
     ((failed_count++)) || true
   fi
-}
-
-# Helper: check if file contains string
-file_contains() {
-  grep -qF -- "$2" "$1" 2>/dev/null
 }
 
 # Helper: run scenario file checks (detection, expected files, clean files)
@@ -159,35 +159,15 @@ else
   scenario_id="$SCENARIO_ARG"
 fi
 
-# --- Signal check and file assertions ---
-has_improvements_ready=false
-has_no_improvements=false
-
-if [[ -n "$TRANSCRIPT" ]] && [[ -f "$TRANSCRIPT" ]]; then
-  if file_contains "$TRANSCRIPT" "IMPROVEMENTS_READY"; then
-    has_improvements_ready=true
-  fi
-  if file_contains "$TRANSCRIPT" "NO_IMPROVEMENTS_FOUND"; then
-    has_no_improvements=true
-  fi
-fi
-
-if [[ "$has_no_improvements" == "true" ]]; then
-  assert "Signal: NO_IMPROVEMENTS_FOUND" "true" "Found NO_IMPROVEMENTS_FOUND in transcript"
-  detected_scenario="none"
-
-elif [[ "$has_improvements_ready" == "true" ]]; then
-  assert "Signal: IMPROVEMENTS_READY" "true" "Found IMPROVEMENTS_READY in transcript"
+# --- File-based assertions ---
+# The current 3-agent protocol doesn't emit explicit IMPROVEMENTS_READY /
+# NO_IMPROVEMENTS_FOUND markers — it uses EXECUTE / CYCLE_COMPLETE / STOP.
+# Grade purely on what the run actually changed.
+if [[ -n "$changed_files" ]]; then
   check_scenario_files
-
 else
-  if [[ -n "$changed_files" ]]; then
-    assert "Signal: IMPROVEMENTS_READY (inferred)" "true" "No signal in transcript but changed files exist"
-    check_scenario_files
-  else
-    assert "Signal: IMPROVEMENTS_READY" "false" "No signal found in transcript"
-    assert "Signal: NO_IMPROVEMENTS_FOUND" "false" "No signal found in transcript"
-  fi
+  assert "No changes made" "true" "Run produced no diff (NO_IMPROVEMENTS_FOUND equivalent)"
+  detected_scenario="none"
 fi
 
 # --- Output results as JSON ---

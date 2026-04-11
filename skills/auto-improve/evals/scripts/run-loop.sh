@@ -204,7 +204,7 @@ $TMUX_BIN set-option -t "$SESSION_NAME" history-limit 50000
 #
 # ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6[1m] forces the `opus` alias to
 # resolve to the 1M-context variant for the parent session AND all spawned
-# team/sub-agents. Without this, team agents (Planner/Executor/Evaluator)
+# team/sub-agents. Without this, team agents (Planner/Builder/Evaluator)
 # default to the 200K Opus variant even when the parent session is on 1M,
 # because Agent Teams don't yet inherit model variant from the lead
 # (anthropics/claude-code#32368). The Planner in particular benefits from

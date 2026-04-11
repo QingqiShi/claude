@@ -33,9 +33,10 @@ The PR branch has merge conflicts with `origin/<default_branch>`. Rebase locally
    - Run `git rebase --abort`
    - Post a PR comment: `gh pr comment <pr_number> --body "auto-improve couldn't rebase this PR — conflicts required human judgment. Please rebase manually."`
    - Report `IRRECONCILABLE: <short reason>` as your final line
-5. Run the project's quality checks locally (lint, typecheck, test — infer the commands from `CLAUDE.md` / `AGENTS.md` / `package.json`). Fix any fallout from the rebase.
-6. Push with `git push --force-with-lease`. Never plain `--force`.
-7. Report `FIXED` as your final line.
+5. Run the project's quality checks locally (lint, typecheck, test — infer the commands from `CLAUDE.md` / `AGENTS.md` / `package.json`). Fix any fallout from the rebase by editing the relevant files.
+6. If step 5 required any file edits to fix fallout, commit them: `git add <files> && git commit --amend --no-edit` if the fix logically belongs in the last commit, otherwise a new commit on top. If step 5 required no edits, skip to step 7.
+7. Push with `git push --force-with-lease`. Never plain `--force`.
+8. Report `FIXED` as your final line.
 
 ### If `<failure_mode>` is `CI_FAILING`
 

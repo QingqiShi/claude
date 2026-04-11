@@ -72,6 +72,7 @@ Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 >
 > Analysis:
 > - Summary: <SUMMARY from analysis, refined with your conversation context>
+> - Change type: <CHANGE_TYPE from analysis>
 > - Context: <any background, trade-offs, or decisions from the conversation that aren't obvious from the summary or the diff — omit if there's nothing to add>
 > - Issue: <GitHub issue number if referenced in conversation context, otherwise "none">
 > - Worktree: <true/false>

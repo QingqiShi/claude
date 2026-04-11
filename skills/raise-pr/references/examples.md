@@ -4,16 +4,17 @@ Examples demonstrating the complete flow from staged diff analysis to final PR.
 
 ## Example 1: Feature Addition (with Context section)
 
-**Analysis from staged diff:**
+**Analysis passed to the PR-creation sub-agent:**
 
 ```
-What Changed: Added JWT authentication system with token generation, validation middleware, /login and /logout endpoints
-
-Why: Implement authentication to secure the API, which currently allows unrestricted access
-
-Change Type: feat
-
-Key Details: JWT for stateless auth, middleware for selective route protection
+Summary: Implement authentication to secure the API, which currently allows unrestricted access — adds JWT token generation, validation middleware, and /login and /logout endpoints.
+Change type: feat
+Context: Uses stateless JWT tokens so we don't need session storage. The middleware pattern allows routes to opt-in to authentication, so public endpoints remain accessible.
+Issue: none
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
 ```
 
 **Output** - Construct:
@@ -36,18 +37,16 @@ Uses stateless JWT tokens so we don't need session storage. The middleware patte
 
 ## Example 2: Bug Fix (no Context section, linked to GitHub issue)
 
-**Analysis from staged diff:**
+**Analysis passed to the PR-creation sub-agent:**
 
 ```
-What Changed: Modified parser to clean up event listeners in destructor and dispose method
-
-Why: Fix memory leak where listeners were never removed after disposal, causing unbounded memory growth in long-running processes
-
-Change Type: fix
-
-Key Details: Particularly problematic in server environments, follows standard dispose pattern
-
-GitHub Issue: #42
+Summary: Fix a memory leak in the parser where event listeners were never removed after disposal, causing unbounded memory growth in long-running processes. Particularly problematic in server environments where the parser is instantiated frequently.
+Change type: fix
+Issue: 42
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
 ```
 
 **Output** - Construct:
@@ -68,16 +67,17 @@ Closes #42
 
 ## Example 3: Refactoring (with Context section)
 
-**Analysis from staged diff:**
+**Analysis passed to the PR-creation sub-agent:**
 
 ```
-What Changed: Migrated from Redux to React Context API - removed Redux (~500 lines), created Context providers and hooks (~200 lines), updated components
-
-Why: Simplify state management as Redux is over-engineered for this application's simple state needs
-
-Change Type: refactor
-
-Key Details: ~60% code reduction, no functional changes, atomic migration
+Summary: Simplify state management by replacing Redux with the React Context API. Redux was over-engineered for this app's simple state needs — only a handful of global values and no complex async flows. Reduces state management code by ~60%.
+Change type: refactor
+Context: No functional changes to the application. The migration was done atomically to avoid any broken intermediate states.
+Issue: none
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
 ```
 
 **Output** - Construct:
@@ -100,14 +100,16 @@ No functional changes to the application. The migration was done atomically to a
 
 ## Example 4: Trivial fix (single-sentence summary, no Context)
 
-**Analysis from staged diff:**
+**Analysis passed to the PR-creation sub-agent:**
 
 ```
-What Changed: Fixed typo in error message — "conncetion" → "connection"
-
-Why: Correct a typo
-
-Change Type: fix
+Summary: Fixes a typo in the connection error message ("conncetion" → "connection").
+Change type: fix
+Issue: none
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
 ```
 
 **Output** - Construct:
@@ -128,16 +130,17 @@ Fixes a typo in the connection error message ("conncetion" → "connection").
 
 Use this format when the analysis describes 3+ distinct changes, 2+ independent subsystems, or a multi-step design process. Note the grouped subheadings in Summary and the numbered iteration list in Context.
 
-**Analysis from staged diff:**
+**Analysis passed to the PR-creation sub-agent:**
 
 ```
-What Changed: Six improvements to the auto-improve skill: (1) Planner eager-execute on validated HIGH findings, (2) cross-run dedupe via gh pr list at Planner startup, (3) hermetic skill snapshots for in-flight evals, (4) compute-usage.py for cost/token capture across recursive sub-agent sessions, (5) eval-shim-hook.sh PreToolUse hook intercepting mutating Bash, (6) report.html auto-open and new evals/README.md
-
-Why: Batch was held pending eval re-runs and is being shipped together
-
-Change Type: feat
-
-Key Details: Dedupe design went through three iterations (Lead-fetch → Explorer-fetch → Planner-fetch) before landing. Forced a clarification of the "Planner has no tools" rule — was conflating "don't read source code" (kept) with "no external queries at all" (dropped). Planner now has read-only gh access but keeps the "no source code, no working-tree mutation" invariant.
+Summary: Bundles six auto-improve improvements held pending eval re-runs: Planner eager-execute on validated HIGH findings, cross-run dedupe via gh pr list at Planner startup, hermetic skill snapshots for in-flight evals, compute-usage.py for cost/token capture across recursive sub-agent sessions, eval-shim-hook.sh PreToolUse hook intercepting mutating Bash, and report.html auto-open plus new evals/README.md.
+Change type: feat
+Context: Dedupe design went through three iterations (Lead-fetch → Explorer-fetch → Planner-fetch) before landing. Forced a clarification of the "Planner has no tools" rule — was conflating "don't read source code" (kept) with "no external queries at all" (dropped). Planner now has read-only gh access but keeps the "no source code, no working-tree mutation" invariant.
+Issue: none
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
 ```
 
 **Output** — Construct:

@@ -13,6 +13,7 @@ Wait for `IMPLEMENTATION_DONE` from the Builder. Do nothing else until it arrive
 When you receive the Builder's summary:
 
 1. **Verify a diff exists.** Before delegating, run `git status --porcelain` yourself. If it is empty, do NOT proceed with review — the Builder reported DONE but no changes are staged or unstaged. Report to the Lead:
+
    ```
    CHANGES_REJECTED
    **Reason**: Builder reported IMPLEMENTATION_DONE but git status is empty — no actual changes to review.
@@ -38,11 +39,12 @@ When you receive the Builder's summary:
 ### If fixable issues found
 
 Message the **Builder** directly with specific feedback. This can be any of:
+
 - **Line-level fixes** ("You missed `ThemeContext.tsx:42`, same pattern")
 - **A direction to redesign** ("The `useEffect`-based fix causes a hydration mismatch; try passing the value from the layout via a server-only prop instead")
 - Both combined
 
-The Builder owns the redesign; you own the "this isn't the right shape" judgment. Be specific about *why* the current shape is wrong and what class of alternative to try — don't just say "try something else."
+The Builder owns the redesign; you own the "this isn't the right shape" judgment. Be specific about _why_ the current shape is wrong and what class of alternative to try — don't just say "try something else."
 
 ```
 FIX_NEEDED:
@@ -53,7 +55,8 @@ Wait for the Builder's `FIX_APPLIED` response, then spawn a new sub-agent to re-
 
 ### If all criteria pass
 
-Spawn a sub-agent to raise the PR. Use whichever PR-raising skill is available in the current environment to create a branch, commit the uncommitted changes, push, and open the PR. Your invocation must communicate these constraints to that skill:
+Spawn a sub-agent to raise the PR. Instruct the subagent to use the user's preferred PR-raising skill available in the current environment. Your invocation must communicate these constraints to that skill:
+
 - **Non-interactive**: this is an automated improvement loop with no user present. The skill must not prompt the user or wait for input.
 - **Worktree-aware**: run from the current worktree; do not switch directories or create new worktrees.
 - **Auto-improve label**: after the PR is created, add the `auto-improve` label to it via `gh pr edit <number> --add-label auto-improve`.

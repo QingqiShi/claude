@@ -10,7 +10,10 @@
   },
   "permissions": {
     "allow": [],
-    "deny": ["Read(./.env)", "Read(./.env.*)"],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ],
     "ask": [],
     "defaultMode": "bypassPermissions"
   },
@@ -27,6 +30,7 @@
   "effortLevel": "high",
   "voiceEnabled": true,
   "autoDreamEnabled": true,
+  "showThinkingSummaries": true,
   "skipDangerousModePermissionPrompt": true,
-  "showThinkingSummaries": true
+  "model": "opus[1m]"
 }

@@ -19,8 +19,6 @@ Must be invoked from within a **worktree** (working directory under `.claude/wor
 
 Everything in this skill happens in the **current worktree**. Do NOT create additional worktrees. Do not cd out of the current directory. All three agents share the same working tree.
 
-**Recommended environment**: the Planner benefits from the 1M-context Opus variant for multi-cycle runs. Due to [anthropics/claude-code#32368](https://github.com/anthropics/claude-code/issues/32368), spawned team agents do not inherit the parent session's model variant — they fall back to the 200K Opus default. To put the whole team on 1M, set `ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6[1m]` in your shell before launching `claude`. Not required for single-cycle runs; matters more the more cycles you target.
-
 ## Parse Input
 
 Check for a cycle count (e.g. `/auto-improve 5`). **Default: 10 cycles**, early-stop on 3 consecutive empties (see stop criteria below). The user may also pass `infinity` to mean "no cap".
@@ -30,6 +28,7 @@ Check for a cycle count (e.g. `/auto-improve 5`). **Default: 10 cycles**, early-
 Ensure the label exists: `gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force`
 
 Capture the default branch name into a shell variable you will reuse:
+
 ```
 DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)
 ```
@@ -37,6 +36,8 @@ DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null |
 ## Create Team
 
 Create a team with **three long-lived agents**. **Do NOT read the reference files yourself** — each agent reads its own.
+
+Don't override a model of teammate.
 
 ### Critical: all three must be team agents
 
@@ -47,7 +48,9 @@ Your own communication with teammates is always via `SendMessage`. **Never** spa
 Team agents themselves are free to spawn their own ephemeral sub-agents via `Agent` (e.g. `subagent_type: "Explore"` for batch reads) to keep their context lean — that's a different pattern from team-agent `SendMessage` and does not collapse the team.
 
 ### Planner
+
 Team agent, `mode: "auto"`:
+
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/planner.md and follow those instructions exactly.
 Project directory: <project_dir>
@@ -56,7 +59,9 @@ Team name: <team_name>
 ```
 
 ### Builder
+
 Team agent, `mode: "auto"`:
+
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/builder.md and follow those instructions exactly.
 Project directory: <project_dir>
@@ -64,7 +69,9 @@ Team name: <team_name>
 ```
 
 ### Evaluator
+
 Team agent, `mode: "auto"`:
+
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/evaluator.md and follow those instructions exactly.
 Project directory: <project_dir>
@@ -81,6 +88,7 @@ You are the **cycle coordinator, state guard, and PR maintainer**. After creatin
 Before every cycle (including cycle 1), check whether any open auto-improve PRs need rebasing or CI fixes. This runs before the pre-cycle reset so that maintenance work (which involves checking out PR branches) can happen safely in the shared worktree. The Planner is idle by design during maintenance — it never reads files or explores unless you've explicitly sent it a start-cycle signal for the current cycle, so you don't need to pause it.
 
 1. **List open auto-improve PRs**:
+
    ```
    gh pr list --label auto-improve --state open --limit 50 \
      --json number,title,mergeable,statusCheckRollup,labels,files,updatedAt,reviewDecision,reviewRequests,headRefName
@@ -93,9 +101,11 @@ Before every cycle (including cycle 1), check whether any open auto-improve PRs 
    - `updatedAt` is within the last ~10 minutes (something may be in-progress elsewhere)
 
 3. **Detect duplicates** among remaining PRs. Pairwise compare on touched-file overlap + title/category similarity. If two PRs clearly duplicate each other, close the older/smaller one:
+
    ```
    gh pr close <older_number> --comment "Superseded by #<kept_number> — auto-improve detected overlap."
    ```
+
    Do NOT attempt to merge branches together — just close the dup, its content is almost certainly already in the kept PR.
 
 4. **Classify** each remaining non-duplicate:
@@ -123,9 +133,11 @@ Before every cycle (including cycle 1), check whether any open auto-improve PRs 
 ### Pre-cycle reset
 
 Verify the worktree is clean before proceeding:
+
 ```
 git status --porcelain
 ```
+
 The output MUST be empty. If it is not empty, **stop the run and report to the user**. Do not `git clean`, `git reset --hard`, or otherwise mutate unknown state — the user's in-progress work may be in the worktree. The `git fetch` + `git checkout origin/$DEFAULT_BRANCH` that would normally live here is already done at the end of the maintenance step above.
 
 ### Send the identify-improvement signal
@@ -133,16 +145,19 @@ The output MUST be empty. If it is not empty, **stop the run and report to the u
 Send the Planner an identify-improvement signal. It has been idle since the previous cycle ended (or since team creation, for cycle 1) — it will not explore until you signal. The Planner sends its brief **directly to the Builder**, not through you; you don't see the brief and you don't forward anything.
 
 For cycle 1:
+
 ```
 "Send the next improvement to Builder."
 ```
 
 For cycle N (N > 1), include the previous cycle's outcome so the Planner can update its skip list:
+
 ```
 "Previous cycle: <outcome>. Send the next improvement to Builder."
 ```
 
 Where `<outcome>` is one of:
+
 - `PR raised: <url>` — Planner should add the executed finding to its skip list.
 - `Changes rejected: <reason>` — Planner should add the rejected finding to its skip list and pick a different improvement.
 - `Execution failed: <reason>` — same as rejected.
@@ -168,26 +183,32 @@ An `IMPLEMENTATION_FAILED` that mentions blocked tool calls, missing paths, or h
 When a cycle ends, update your internal counters and remember the outcome — you'll deliver it to the Planner as part of the next cycle's start-cycle signal (see "Start the cycle" above). **Do not message the Planner immediately after a cycle ends** — it's idle waiting for the next signal, and the outcome is part of that signal.
 
 On `PR_RAISED <url>` from the Evaluator:
+
 - Reset consecutive empties to 0, increment PR count.
 - Remember outcome: `PR raised: <url>`.
 
 On `CHANGES_REJECTED` from the Evaluator:
+
 - Increment consecutive empties.
 - Remember outcome: `Changes rejected: <reason>`.
 
 On non-infrastructure `IMPLEMENTATION_FAILED: <reason>` from the Builder (reason does NOT mention blocked tool calls, missing paths, or hook rejections — e.g. "brief was wrong", "pattern doesn't exist in the code", "files listed don't contain what the Planner claimed"):
+
 - Treat as equivalent to `CHANGES_REJECTED`.
 - Increment consecutive empties.
 - Remember outcome: `Execution failed: <reason>`.
 - Do NOT stop the run — the brief was wrong, the skill is working as intended.
 
 On `INFRASTRUCTURE_BLOCKED` from the Evaluator, or `IMPLEMENTATION_FAILED` from the Builder citing a blocked tool call, missing path, or hook rejection (infra flavor only — disambiguate by message wording, since builder.md requires the Builder to say so explicitly):
+
 - **Stop the run immediately.** This is the escalation case. Shut down the team, report to the user with the specific block reason, and ask how to proceed.
 
 On `STOP: ALL_AREAS_EXHAUSTED` from the Planner:
+
 - Stop the run cleanly. Shut down the team and report summary.
 
 **Stop** when any of:
+
 - PR count = target (unless `infinity`)
 - Consecutive empties = 3
 - Planner reports `STOP: ALL_AREAS_EXHAUSTED`

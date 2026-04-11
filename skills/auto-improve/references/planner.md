@@ -24,7 +24,7 @@ Expect to find **multiple improvement opportunities in a single pass**. Collect 
 
 **Use direct tools for targeted work** — read a specific file, grep for a pattern signature, walk a directory. These are fast and cheap when you know what you're looking for.
 
-**Spawn an `Explore` sub-agent when you want to offload a batch read.** Good examples: *"read these 10 components and tell me how they manage state"* or *"grep across `src/` for places that call `localStorage` and report what each one does."* Call the `Agent` tool with `subagent_type: "Explore"` and a clear prompt describing scope, what to report, and any skip-list context. The `Explore` subagent is read-only by construction — no need to police it.
+**Spawn an `Explore` sub-agent when you want to offload a batch read.** Good examples: _"read these 10 components and tell me how they manage state"_ or _"grep across `src/` for places that call `localStorage` and report what each one does."_ Call the `Agent` tool with `subagent_type: "Explore"` and a clear prompt describing scope, what to report, and any skip-list context. The `Explore` subagent is read-only by construction — no need to police it.
 
 You decide the boundary between direct reads and sub-agent delegation. Trust your judgment; there's no magic file count.
 
@@ -46,10 +46,10 @@ Rank findings within a single exploration pass using this order. The top-ranked 
 
 - **Correctness** — is there an actual bug? Unhandled null on a reachable path, a race between async writes, a swallowed error, an off-by-one at the empty/single/last-page boundary, a resource opened without cleanup. Ask: "what input haven't I thought about?"
 - **Security** — can this be abused? Untrusted input flowing into SQL/shell/HTML without escaping, secrets in source, endpoints missing authz checks, PII in logs. Trace the trust boundary: where does untrusted data enter, and what does it touch?
-- **UX** *(if there's a user interface)* — does this feel broken to a human? Missing loading/error/empty states, destructive actions without confirm, forms that only validate on submit. Run the feature in your head: slow network, empty list, failed request — what does the user see?
-- **Accessibility** *(if there's a user interface)* — can a keyboard-only or screen-reader user actually use this? Icon buttons without labels, non-semantic markup, focus that doesn't move into opened surfaces, async updates that aren't announced.
+- **UX** _(if there's a user interface)_ — does this feel broken to a human? Missing loading/error/empty states, destructive actions without confirm, forms that only validate on submit. Run the feature in your head: slow network, empty list, failed request — what does the user see?
+- **Accessibility** _(if there's a user interface)_ — can a keyboard-only or screen-reader user actually use this? Icon buttons without labels, non-semantic markup, focus that doesn't move into opened surfaces, async updates that aren't announced.
 - **Performance** — is work being done that shouldn't be? N+1 queries, waterfall requests, expensive recomputes on stable inputs, blocking work on the main thread. Performance matters when there's a user-felt impact — speculative micro-optimization doesn't count.
-- **SEO** *(public web surfaces only)* — can search engines see what users see? Missing titles/meta/OG on indexable pages, content that only appears after hydration, unoptimized images.
+- **SEO** _(public web surfaces only)_ — can search engines see what users see? Missing titles/meta/OG on indexable pages, content that only appears after hydration, unoptimized images.
 - **Framework conventions** — does the code break widely-accepted rules for its stack? The Rules of React and stale-closure effects, unhandled promise rejections in Node, unchecked errors in Go, string-concatenated SQL. Detect the stack, then apply rules its community considers load-bearing — don't invent house rules the project hasn't adopted.
 - **Structure** — is the code shaped wrong for what it's doing? Shared state with no owner, logic duplicated across call sites, a unit mixing unrelated concerns, data threaded through layers that don't use it. Only promote if it's causing real friction — refactoring for its own sake is the lowest-priority finding.
 

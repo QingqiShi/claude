@@ -24,6 +24,7 @@ IMPLEMENTATION_DONE
 ### When to report failure instead
 
 Report `IMPLEMENTATION_FAILED: <reason>` to the Lead only when:
+
 - The problem described in the brief isn't actually present in the code.
 - Every reasonable approach regresses something more important than the bug.
 - A tool call, path, or hook blocked the work. **If it's an infra blocker, say so explicitly** — the Lead needs that wording to escalate correctly.

@@ -46,10 +46,10 @@ Wait for the Executor's `FIX_APPLIED` response, then spawn a new sub-agent to re
 
 ### If all criteria pass
 
-Spawn a sub-agent to raise the PR:
-- Use the `raise-pr` skill. Context: automated improvement loop, no user present, don't ask for clarification.
-- Run from the current worktree. The `raise-pr` skill creates a branch, commits, pushes, and opens the PR.
-- After PR is created, add label: `gh pr edit <number> --add-label auto-improve`
+Spawn a sub-agent to raise the PR. Use whichever PR-raising skill is available in the current environment to create a branch, commit the uncommitted changes, push, and open the PR. Your invocation must communicate these constraints to that skill:
+- **Non-interactive**: this is an automated improvement loop with no user present. The skill must not prompt the user or wait for input.
+- **Worktree-aware**: run from the current worktree; do not switch directories or create new worktrees.
+- **Auto-improve label**: after the PR is created, add the `auto-improve` label to it via `gh pr edit <number> --add-label auto-improve`.
 
 Then notify the **Lead**:
 

@@ -123,3 +123,53 @@ PR Description:
 
 Fixes a typo in the connection error message ("conncetion" → "connection").
 ```
+
+## Example 5: Bundled multi-change PR (list format with grouping)
+
+Use this format when the analysis describes 3+ distinct changes, 2+ independent subsystems, or a multi-step design process. Note the grouped subheadings in Summary and the numbered iteration list in Context.
+
+**Analysis from staged diff:**
+
+```
+What Changed: Six improvements to the auto-improve skill: (1) Planner eager-execute on validated HIGH findings, (2) cross-run dedupe via gh pr list at Planner startup, (3) hermetic skill snapshots for in-flight evals, (4) compute-usage.py for cost/token capture across recursive sub-agent sessions, (5) eval-shim-hook.sh PreToolUse hook intercepting mutating Bash, (6) report.html auto-open and new evals/README.md
+
+Why: Batch was held pending eval re-runs and is being shipped together
+
+Change Type: feat
+
+Key Details: Dedupe design went through three iterations (Lead-fetch → Explorer-fetch → Planner-fetch) before landing. Forced a clarification of the "Planner has no tools" rule — was conflating "don't read source code" (kept) with "no external queries at all" (dropped). Planner now has read-only gh access but keeps the "no source code, no working-tree mutation" invariant.
+```
+
+**Output** — Construct:
+
+Branch: `feat/auto-improve-batch-improvements`
+
+PR Title / Commit: `feat: bundle auto-improve eager-execute, hermetic evals, and dedupe`
+
+PR Description:
+
+```markdown
+## Summary
+
+Six auto-improve improvements held pending eval re-runs, shipped together.
+
+**Planner gets smarter**
+- **Eager-execute** — sends EXECUTE on a validated HIGH finding instead of buffering
+- **Cross-run dedupe** — fetches `gh pr list --label auto-improve` at startup and challenges the Explorer on findings that resemble prior PRs
+
+**Eval infrastructure**
+- **Hermetic skill snapshots** — in-flight evals immune to mid-run global skill edits
+- **Cost capture** — new `compute-usage.py` walks recursive sub-agent sessions
+- **Network shim hook** — `eval-shim-hook.sh` PreToolUse hook intercepts mutating Bash at every agent depth
+- **Operator polish** — `report.html` auto-opens at end of run; new `evals/README.md`
+
+## Context
+
+Dedupe landed on the Planner after two rejected designs:
+
+1. **Lead fetches, passes via Explorer brief** — rejected as unnecessary indirection.
+2. **Explorer fetches directly** — rejected: biasing detection risks filtering adjacent-but-distinct issues.
+3. **Planner fetches** — dedupe is triage, not detection.
+
+This forced a rule clarification: "Planner has no tools" was conflating *don't read source code* (load-bearing — enforces explore/triage separation) with *no tools at all* (overreach). Planner now has read-only `gh` access; the "no source code, no working-tree mutation" invariant stays.
+```

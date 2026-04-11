@@ -36,16 +36,52 @@ Use this template:
 ```markdown
 ## Summary
 
-<why and what at high level — typically 2-5 sentences, but for trivial/one-line changes a single sentence is fine>
+<short prose (2-5 sentences) for typical PRs; single sentence for trivial changes. For bundled multi-change PRs, use a one-sentence scope line followed by bulleted items — see "Length and structure" below.>
 
 ## Context
 
 <!-- optional — only include if a Context field was provided in the analysis input. Omit this entire section otherwise. -->
 
-<Context from the analysis input, if provided>
+<Context from the analysis input. For multi-step design discussions, use a numbered list of iterations followed by a short takeaway paragraph.>
 ```
 
 The Summary section must explain **why** the change was made, not just what files changed. Reviewers can see the diff — tell them what the diff can't show.
+
+### Length and structure
+
+The default is short prose (2-5 sentences). Use prose for any PR with a single coherent purpose, even if it touches multiple files or adds multiple related rules.
+
+**Switch to list format only when the PR genuinely bundles independent changes.** Apply this test before counting items:
+
+> Could each item have plausibly shipped as its own PR with its own description?
+
+If yes for 3+ items, use list format. If no, it's one change — use prose. A PR that adds rule A, rule B, and an example demonstrating both is **one change** with three components, not three changes. A PR that adds dedupe to the Planner *and* cost capture to the eval infra *and* an unrelated operator polish is **three changes** — each could ship alone.
+
+Concrete signals the items are genuinely independent:
+
+- They affect different subsystems with no shared motivation
+- They were held pending separate validation and shipped together for convenience, not because they belong together
+- The Summary would naturally read as "X, and also Y, and also Z" rather than "X (which requires Y and is demonstrated by Z)"
+
+Also use list format when the Context narrates a **multi-step design process** (iterations, rejected alternatives, rule changes) — even if the Summary stays prose.
+
+When using list format:
+
+- **Summary**: open with one sentence stating the scope ("Bundles N improvements to X, held pending Y."), then a bulleted list. Each bullet starts with a **bold label** naming the change, followed by an em-dash and one sentence. If the changes naturally cluster (by component, layer, or concern), group them under bold subheadings — otherwise flat bullets.
+- **Context**: if the section narrates an iterative design discussion, use a **numbered list** for the iterations (one line each), then a short paragraph for the takeaway. Do not retell the conversation blow-by-blow.
+
+A Summary listing 3+ genuinely independent items as prose is not allowed — convert to bullets. But never bullet a Summary just because the diff touches three files or adds three related rules — that's still one change. See Example 5 in `examples.md` for the genuine bundled case.
+
+### Context content
+
+The Context section is optional. When included, every sentence must add information a reviewer can act on — trade-offs, constraints, why this approach over the alternative, non-obvious design insights, or load-bearing decisions not visible in the diff.
+
+Two hard prohibitions:
+
+- **No process narrative.** Do not recount the conversation that produced the PR ("X was suggested", "we discussed", "Option B was chosen", "the user asked"). A reviewer wasn't in the conversation and cannot evaluate it. Passive voice ("X was selected", "three options were presented") is the smell.
+- **No restating the Summary.** If a Context sentence could be deleted without the reviewer losing anything, delete it. Context exists to add what Summary cannot — not to repeat it in different words.
+
+If neither applies, omit the Context section entirely.
 
 ## GitHub Issue Closing
 

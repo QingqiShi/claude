@@ -173,7 +173,13 @@ On `CYCLE_COMPLETE: CHANGES_REJECTED` from the Evaluator:
 - Increment consecutive empties.
 - Message Planner: `"Changes rejected. Reason: <reason>. Pick a different improvement."`
 
-On `CYCLE_COMPLETE: INFRASTRUCTURE_BLOCKED` from the Evaluator, or `IMPLEMENTATION_FAILED` from the Executor citing a blocked tool call:
+On non-infrastructure `IMPLEMENTATION_FAILED: <reason>` from the Executor (reason does NOT mention blocked tool calls, missing paths, or hook rejections — e.g. "brief was wrong", "pattern doesn't exist in the code", "files listed don't contain what the Planner claimed"):
+- Treat as equivalent to `CYCLE_COMPLETE: CHANGES_REJECTED`.
+- Increment consecutive empties.
+- Message Planner: `"Execution failed. Reason: <reason>. Pick a different improvement."`
+- Do NOT stop the run — the brief was wrong, the skill is working as intended.
+
+On `CYCLE_COMPLETE: INFRASTRUCTURE_BLOCKED` from the Evaluator, or `IMPLEMENTATION_FAILED` from the Executor citing a blocked tool call, missing path, or hook rejection (infra flavor only — disambiguate by message wording, since executor.md requires the Executor to say so explicitly):
 - **Stop the run immediately.** This is the escalation case. Shut down the team, report to the user with the specific block reason, and ask how to proceed.
 
 On `STOP: ALL_AREAS_EXHAUSTED` from the Planner:

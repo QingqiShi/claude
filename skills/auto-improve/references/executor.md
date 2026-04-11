@@ -43,6 +43,8 @@ IMPLEMENTATION_FAILED: <reason>
 
 **If the failure is due to a blocked tool call, missing path, or hook rejection, say so explicitly.** The Lead is instructed to stop and escalate on infrastructure failures — it cannot do that if you describe a tool-block as "brief was wrong".
 
+For non-infrastructure failures (brief was wrong, problem doesn't exist), the Lead treats this as equivalent to `CHANGES_REJECTED`: it increments consecutive empties and routes a "pick a different improvement" message to the Planner, without stopping the run.
+
 ## Handling fix requests from the Evaluator
 
 The Evaluator may message you with specific fixes needed (e.g., "You missed ThemeContext.tsx — it has the same pattern"). When this happens:

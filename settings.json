@@ -1,7 +1,8 @@
 {
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_CODE_NO_FLICKER": "1"
+    "CLAUDE_CODE_NO_FLICKER": "1",
+    "CLAUDE_CODE_DISABLE_ADAPTIVE_THINKING": "1"
   },
   "attribution": {
     "commit": "",
@@ -15,7 +16,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "bash /Users/qingqishi/.claude/statusline-command.sh",
+    "command": "bash ~/.claude/statusline-command.sh",
     "padding": 0
   },
   "enabledPlugins": {
@@ -26,5 +27,6 @@
   "effortLevel": "high",
   "voiceEnabled": true,
   "autoDreamEnabled": true,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "showThinkingSummaries": true
 }

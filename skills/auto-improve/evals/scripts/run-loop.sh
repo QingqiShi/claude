@@ -18,6 +18,9 @@ TMUX_BIN="$(command -v tmux || echo /opt/homebrew/bin/tmux)"
 # --- Defaults ---
 # Opus is the faithful-instruction baseline — skill iteration should be measured
 # against it. Use --model sonnet for the paraphrase-robustness check.
+# Note: $MODEL here is the *subject* model (the skill under test). The LLM
+# judge in judge.sh has its own fixed model and is not plumbed from here —
+# that keeps judge scores comparable across subject-model changes.
 BRANCH="eval/auto-improve-harness"
 CYCLES=1
 MODEL="opus"
@@ -342,7 +345,7 @@ for marker in "$OUTPUT_DIR"/pr-raised-*; do
 
     DETECTED="$(python3 -c 'import json; print(json.load(open("'"$pr_grading"'")).get("detected_scenario","none"))' 2>/dev/null || echo "none")"
 
-    "$SCRIPT_DIR/judge.sh" "$DETECTED" "$pr_diff" "$OUTPUT_DIR/transcript.txt" "$pr_judge" --model "$MODEL" 2>/dev/null || \
+    "$SCRIPT_DIR/judge.sh" "$DETECTED" "$pr_diff" "$OUTPUT_DIR/transcript.txt" "$pr_judge" 2>/dev/null || \
       echo '{"score":null,"summary":"Judge failed","feedback":""}' > "$pr_judge"
 
     GRADED_ANY=true

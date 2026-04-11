@@ -41,6 +41,8 @@ Produce a structured analysis with exactly these fields:
 ```
 SUMMARY: <why and what at high level — typically 2-5 sentences, but for trivial/one-line changes a single sentence is fine. Do NOT list individual files.>
 
+CHANGE_TYPE: <one of: feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert>
+
 QUALITY: <pass or fail — if fail, include the error output>
 ```
 
@@ -50,4 +52,5 @@ Important:
 - If you cannot confidently infer the motivation, write "UNCLEAR" as the first word of SUMMARY, followed by a factual description of what changed. Do not fabricate a rationale.
 - If the purpose is self-evident from the nature of the work (e.g. "fixing a typo", "adding authentication"), state it concisely.
 - Never list individual files — describe the change conceptually.
+- CHANGE_TYPE must be one of the eleven types listed above (these are the valid types for branch name, commit message, and PR title). Pick the single type that best describes the dominant intent; if the PR genuinely bundles mixed types, use the most user-visible one (`feat` > `fix` > `refactor` > `chore`).
 - Keep the entire response under 200 words.

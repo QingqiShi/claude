@@ -1,6 +1,6 @@
 # PR Creation Conventions
 
-You are creating a pull request. You will be given an analysis containing: what changed, why, change type, and optionally a GitHub issue number. Follow these conventions exactly.
+You are creating a pull request. You will be given an analysis containing: a summary (why and what), change type, optional context, optional GitHub issue number, and branch-mode flags (worktree, base_from_main, commit_to_current, stack_on). Follow these conventions exactly.
 
 ## Change Types
 

@@ -128,6 +128,47 @@ if [[ "${1:-}" == "pr" && "${2:-}" == "list" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "pr" && "${2:-}" == "view" ]]; then
+  # Stub: return an empty object. The eval harness doesn't track per-PR
+  # metadata (mergeable, CI status, etc.) — if the Planner queries pr view
+  # during an eval run it should see "nothing useful" rather than real
+  # GitHub state leaking through.
+  echo "{}"
+  exit 0
+fi
+
+if [[ "${1:-}" == "pr" && "${2:-}" == "checkout" ]]; then
+  # Stub: no-op. Normal eval runs return an empty PR list from `gh pr list`,
+  # so the Lead's maintenance step finds nothing to check out and this branch
+  # is unreachable in practice. Defense in depth in case stateful PR tracking
+  # is ever populated and the Lead tries to check out a PR.
+  exit 0
+fi
+
+if [[ "${1:-}" == "pr" && "${2:-}" == "close" ]]; then
+  # Stub: record the close attempt for later inspection, return 0.
+  shift 2
+  pr_num="${1:-?}"
+  printf '{"pr": "%s", "args": "%s"}\n' "$pr_num" "$*" >> "$CAPTURE_DIR/pr_close_attempts.jsonl"
+  exit 0
+fi
+
+if [[ "${1:-}" == "pr" && "${2:-}" == "comment" ]]; then
+  # Stub: record the comment attempt for later inspection, return 0.
+  shift 2
+  pr_num="${1:-?}"
+  printf '{"pr": "%s", "args": "%s"}\n' "$pr_num" "$*" >> "$CAPTURE_DIR/pr_comment_attempts.jsonl"
+  exit 0
+fi
+
+if [[ "${1:-}" == "pr" && "${2:-}" == "merge" ]]; then
+  # Stub: auto-improve should never merge PRs itself, but intercept anyway.
+  shift 2
+  pr_num="${1:-?}"
+  printf '{"pr": "%s", "args": "%s"}\n' "$pr_num" "$*" >> "$CAPTURE_DIR/pr_merge_attempts.jsonl"
+  exit 0
+fi
+
 if [[ "${1:-}" == "label" && "${2:-}" == "create" ]]; then
   exit 0
 fi

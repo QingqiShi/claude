@@ -1,61 +1,36 @@
-# Auto-Improve Eval Framework — Progress
+# Auto-Improve — Open Work
 
-## Skill Architecture
+## Up next
 
-All 4 agents are long-lived team members communicating via SendMessage. Each delegates heavy work to sub-agents to manage context.
+1. **Re-run scenarios 1 and 2** to validate the post-scenario-2-failure fixes:
+   - **Harness fix**: `eval-shim-hook.sh` now intercepts `gh pr list/view/checkout/close/comment/merge` (previously only mutations were routed through the shim, so real GitHub state was bleeding into eval runs). `gh-shim.sh` has stubs for all of these.
+   - **Skill fix**: `planner.md` now ignores CLOSED (without merge) PRs in the dedupe skip list — closed PRs are too ambiguous to drive skip decisions. Only OPEN and MERGED count.
+   - **New feature**: pre-cycle PR maintenance landed (see below).
+   - Scenario 1 baseline to preserve: 8m 40s, $9.07, judge 5/5.
+   - Scenario 2 failed last run (1/5 judge) due to the `gh pr list` leak surfacing a historical closed PR #33 that the Planner then over-aggressively skipped, pivoting to a wrong-direction feature addition. Both fixes should unblock it.
 
-- **Explorer** — scans codebase via sub-agents, sends findings to Planner, sends code context directly to Executor when requested
-- **Planner** — pure decision-maker, challenges Explorer, manages priority buffer, signals EXECUTE to Lead
-- **Executor** — receives code from Explorer, delegates implementation to sub-agent, handles fix requests from Evaluator
-- **Evaluator** — delegates review to sub-agent, talks to Executor for fixable issues (up to 3 rounds), raises PR via sub-agent, notifies Lead with CYCLE_COMPLETE
-- **Lead** — creates team, manages worktree lifecycle, tracks cycle count
+2. **Validate the new pre-cycle PR maintenance step** (also just landed). In eval mode the shim returns an empty PR list so the maintenance path is a no-op — the feature only gets real exercise against a live repo with at least one problematic open auto-improve PR. Worth a manual test against shiqingqi.com or similar once scenarios 1 and 2 are green.
 
-Reference files: `explorer.md`, `planner.md`, `executor.md`, `evaluator.md`.
+3. **Scenarios 3–5 baselines** once 1–2 confirm the refactor and fixes hold.
 
-## Harness Branches (6 orphan branches on GitHub)
+2. **Scenarios 3–5 baselines** once 1–2 confirm the refactor holds up.
 
-Each branch contains a realistic Next.js 14 project with planted structural issues. `skills/` is in `.gitignore` so eval scripts can copy skill files at runtime.
+3. **Full matrix run** once 1–2 pass. Real baseline cost / quality / false-positive numbers across all 5 scenarios on the new architecture.
 
-- `eval/auto-improve-harness` — all 5 scenarios planted (for multi-cycle prioritization testing)
-- `eval/auto-improve-scenario/1` through `/5` — one scenario each (for targeted detection testing)
+## Open ideas / things to revisit
 
-Branches 2-5 and the combined harness have ThemeProvider + navigation already wired into layout.tsx to avoid distracting the skill with unplanted high-severity bugs.
+- **Monitor Planner context pressure.** Planner holds `Read`/`Glob`/`Grep`/`Bash` plus prior PRs plus per-cycle findings. If sessions start stopping after only 2–3 PR cycles because the Planner is out of context, the delegation boundary needs a nudge in `planner.md` — currently the Planner decides for itself when to offload a batch read to an `Explore` sub-agent.
 
-### 5 Planted Scenarios
+- **Scenario-1 validated at 8m 40s / $9.07 / judge 5/5** (loop-20260411-020855), beating the 4-agent baseline of 9m 12s / $9.97 / judge 5/5. Scenario 2 still needs to be run under the new architecture.
 
-| # | ID | Issue | Difficulty |
-|---|---|---|---|
-| 1 | `duplicated-theme-state` | 3 components independently manage theme via localStorage + storage events. Fix: ThemeProvider context. | Medium |
-| 2 | `scattered-derived-state` | 3 components + WelcomeBanner manage user prefs via scattered localStorage. Fix: UserContext provider. | Hard |
-| 3 | `indirect-event-handler` | SearchResults uses useEffect watching filter props to fire API calls. Fix: move API calls to event handlers. | Hard |
-| 4 | `monolithic-component` | DataTable is ~550 lines with inline sorting, filtering, pagination, selection, export. Fix: decompose. | Hard |
-| 5 | `prop-drilling` | Dashboard prefs drilled through 4 levels. Middle components just forward props. Fix: DashboardContext. | Hard |
+- **Explore sub-agent path untested by scenario 1.** In the 020855 run the Planner did all exploration via direct tools (14 Reads, 4 Greps, 2 Globs) and never spawned an `Explore` sub-agent — correct for a small app, but means scenario 2 or a larger project is needed to exercise the delegation path.
 
-## Eval Scripts (`skills/auto-improve/evals/scripts/`)
+- **Speculative sub-agent spawning.** Optimization deferred during planning: overlapping the next `Explore` sub-agent with the Executor cycle using `git show origin/main:<path>` to avoid the half-modified-tree problem. Only worth revisiting if eval wall clock regresses on multi-cycle runs.
 
-| File | Purpose |
-|---|---|
-| `scenarios.json` | Scenario definitions (files, diff_patterns, difficulty) |
-| `gh-shim.sh` | Intercepts `gh` commands, captures PR args and diff at creation time, stateful PR tracking |
-| `git-shim.sh` | No-ops fetch/push/pull so origin/main stays at the harness commit |
-| `check_assertions.sh` | Deterministic grading: signal detection, scenario matching, clean file checks |
-| `judge-prompt.md` | System prompt for LLM judge (1-5 scoring rubric) |
-| `judge.sh` | Runs `claude -p` with judge prompt for LLM scoring |
-| `run-loop.sh` | Full auto-improve eval via tmux interactive session. Creates worktree, sets up shims, launches claude, polls for PR markers, captures JSONL transcripts, grades per-PR |
-| `run-eval.sh` | Orchestrates multiple `run-loop.sh` runs (combined, per-scenario, or full matrix) |
-| `aggregate.sh` | Generates `report.html` (with inline diff viewer) and `benchmark.json` from results |
+- **Deterministic grader false positive on clean-file checks.** `check_assertions.sh` flags any modification to a non-scenario file, which can't distinguish thoughtful utility extensions (e.g. 235634's `useLocalStorage` extension, praised by the judge) from real scope creep. Options: only flag if not transitively referenced by the primary edit, or only flag if the judge also flags it.
 
-## Key Learnings
+- **Fingerprint-based dedupe.** Current dedupe matches on file paths + pattern category, which relies on the Planner's judgment. A grep-signature fingerprint stored in PR bodies (written by `raise-pr`, read by Planner) would be more robust. Adds writer-side complexity.
 
-1. **Agent teams don't work in `claude -p`** — the lead exits before teammates finish. tmux is the workaround.
-2. **Harness needs to be very clean** — the executor consistently finds low-hanging fruit (a11y, missing providers) before structural issues. Fix unplanted bugs on scenario branches.
-3. **Planted components must be rendered** — components that exist as files but aren't imported/rendered in any page are dead code. The evaluator correctly rejects fixes to dead code.
-4. **`origin/main` shimming** — the skill does `git checkout origin/main` to reset. We set this ref to the harness commit and no-op `git fetch`.
-5. **Diff capture timing** — the skill resets the worktree after each cycle. Must capture diff at `gh pr create` time inside the gh-shim.
-6. **Transcript capture** — tmux screen scraping is unreliable. Use Claude Code's JSONL session files at `~/.claude/projects/<slug>/<session_id>.jsonl`.
-7. **Project dir slug** — Claude Code replaces `/` and `.` with `-` in project dir names.
+- **Closed-without-merge handling.** Planner currently treats closed-without-merge PRs as "user rejected, skip." Could be wrong — the PR might have been superseded or closed for unrelated reasons. Worth revisiting after a few real runs to see how often this misfires.
 
-## Next Steps
-
-1. **Run full matrix via run-loop.sh** — all 5 scenarios to establish baseline scores with the 4-agent team architecture
-2. **Multi-cycle combined harness test** — run against `eval/auto-improve-harness` with cycles=5 to test scenario coverage across cycles
+- **Where do the durable learnings live?** The previous PROGRESS.md had a "Key Learnings" section with empirical gotchas (sub-agent Bash PATH bypass, sub-agent JSONL location, linked-worktree exclude behavior, project-local skill discovery path). Most are now reflected in the implementation, but if any get re-discovered the hard way, consider extracting them into a `LEARNINGS.md` or memory entries before this file is deleted entirely.

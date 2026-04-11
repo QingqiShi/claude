@@ -16,11 +16,13 @@ REPO_ROOT="$HOME/.claude"
 TMUX_BIN="$(command -v tmux || echo /opt/homebrew/bin/tmux)"
 
 # --- Defaults ---
+# Opus is the faithful-instruction baseline — skill iteration should be measured
+# against it. Use --model sonnet for the paraphrase-robustness check.
 BRANCH="eval/auto-improve-harness"
 CYCLES=1
-MODEL="sonnet"
+MODEL="opus"
 OUTPUT_DIR=""
-TIMEOUT=600  # 10 minutes default
+TIMEOUT=1800  # 30 minutes — one cycle of the 3-agent team can take 15+ min
 
 # --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
@@ -50,10 +52,18 @@ WORKTREE="$HOME/.claude/worktrees/eval-auto-improve-$$"
 SESSION_NAME="eval-auto-improve-$$"
 
 # --- Cleanup trap ---
+# Fires on normal exit AND on kill signals (INT/TERM/HUP). If the script is
+# killed outright (SIGKILL, tmux kill-window with no shutdown chance), the trap
+# cannot fire — that's what the orphan sweep below handles on the next run.
+CLEANED_UP=0
 cleanup() {
+  [[ "$CLEANED_UP" == "1" ]] && return
+  CLEANED_UP=1
   echo "Cleaning up..."
-  $TMUX_BIN kill-session -t "$SESSION_NAME" 2>/dev/null || true
-  if [[ -d "$WORKTREE" ]]; then
+  if [[ -n "${SESSION_NAME:-}" ]]; then
+    $TMUX_BIN kill-session -t "$SESSION_NAME" 2>/dev/null || true
+  fi
+  if [[ -n "${WORKTREE:-}" && -d "$WORKTREE" ]]; then
     git -C "$REPO_ROOT" worktree remove --force "$WORKTREE" 2>/dev/null || true
   fi
   if [[ -n "${SHIM_DIR:-}" && -d "${SHIM_DIR:-}" ]]; then
@@ -61,6 +71,39 @@ cleanup() {
   fi
 }
 trap cleanup EXIT
+trap 'cleanup; exit 130' INT
+trap 'cleanup; exit 143' TERM
+trap 'cleanup; exit 129' HUP
+
+# --- Orphan sweep ---
+# Prior runs that were SIGKILLed leave behind tmux sessions and worktrees with
+# names like eval-auto-improve-<pid>. A PID whose process is gone is an orphan
+# we can safely reap. Skip anything whose PID is still live — that's a parallel
+# run, not ours to clean.
+sweep_orphans() {
+  # tmux sessions
+  local sessions
+  sessions="$($TMUX_BIN ls -F '#{session_name}' 2>/dev/null | grep '^eval-auto-improve-' || true)"
+  for s in $sessions; do
+    local pid="${s##eval-auto-improve-}"
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+      echo "Reaping orphan tmux session: $s"
+      $TMUX_BIN kill-session -t "$s" 2>/dev/null || true
+    fi
+  done
+
+  # worktrees
+  local wt
+  for wt in "$HOME/.claude/worktrees"/eval-auto-improve-*; do
+    [[ -d "$wt" ]] || continue
+    local pid="${wt##*eval-auto-improve-}"
+    if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
+      echo "Reaping orphan worktree: $wt"
+      git -C "$REPO_ROOT" worktree remove --force "$wt" 2>/dev/null || rm -rf "$wt"
+    fi
+  done
+}
+sweep_orphans
 
 # --- Create worktree ---
 echo "Fetching branch: $BRANCH"
@@ -85,10 +128,55 @@ chmod +x "$SHIM_DIR/git"
 cp "$SCRIPT_DIR/gh-shim.sh" "$SHIM_DIR/gh"
 chmod +x "$SHIM_DIR/gh"
 
-# --- Copy skills into worktree (gitignored on harness branches) ---
-mkdir -p "$WORKTREE/skills"
-cp -R "$SKILL_DIR" "$WORKTREE/skills/auto-improve"
-cp -R "$REPO_ROOT/skills/raise-pr" "$WORKTREE/skills/raise-pr"
+# --- Install PreToolUse hook into the worktree ---
+# PATH shimming alone is unreliable: sub-agent Bash calls don't inherit the
+# parent session's shell-snapshot PATH, so they bypass the shims and hit real
+# gh/git. A project-level hook runs in the main claude process and sees every
+# Bash call from every agent depth, so it's the reliable interception layer.
+# The hook rewrites matching commands to prepend `export PATH=<shim>:$PATH`
+# inside the command itself, which the real bash subprocess respects regardless
+# of how it was spawned.
+mkdir -p "$WORKTREE/.claude/hooks"
+cp "$SCRIPT_DIR/eval-shim-hook.sh" "$WORKTREE/.claude/hooks/eval-shim-hook.sh"
+chmod +x "$WORKTREE/.claude/hooks/eval-shim-hook.sh"
+
+cat > "$WORKTREE/.claude/settings.json" <<SETEOF
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": "$WORKTREE/.claude/hooks/eval-shim-hook.sh"}
+        ]
+      }
+    ]
+  }
+}
+SETEOF
+
+# Sidecar read by the hook (env vars from tmux don't reliably reach sub-agents)
+cat > "$WORKTREE/.claude/eval-context.json" <<CTXEOF
+{
+  "shim_dir": "$SHIM_DIR",
+  "output_dir": "$OUTPUT_DIR",
+  "pr_state": "$OUTPUT_DIR/pr_state.json",
+  "real_git": "$REAL_GIT"
+}
+CTXEOF
+
+# --- Snapshot skills into worktree at the Claude Code project-local location ---
+# Copying into $WORKTREE/.claude/skills/ makes the snapshot discoverable as a
+# project-local skill: Claude Code's project-local discovery finds it and
+# CLAUDE_SKILL_DIR resolves to this path, taking precedence over the global
+# skill at ~/.claude/skills/. That makes the eval hermetic — editing the
+# global skill mid-run does not affect an in-flight evaluation.
+#
+# Previous layout ($WORKTREE/skills/<name>/) was not a discovery location, so
+# the copy was inert and the agent silently read from global state.
+mkdir -p "$WORKTREE/.claude/skills"
+cp -R "$SKILL_DIR" "$WORKTREE/.claude/skills/auto-improve"
+cp -R "$REPO_ROOT/skills/raise-pr" "$WORKTREE/.claude/skills/raise-pr"
 
 # --- Launch claude in tmux ---
 echo ""
@@ -104,9 +192,17 @@ $TMUX_BIN kill-session -t "$SESSION_NAME" 2>/dev/null || true
 $TMUX_BIN new-session -d -s "$SESSION_NAME" -x 200 -y 50
 $TMUX_BIN set-option -t "$SESSION_NAME" history-limit 50000
 
-# Set up environment and launch claude
+# Set up environment and launch claude.
+#
+# ANTHROPIC_DEFAULT_OPUS_MODEL=claude-opus-4-6[1m] forces the `opus` alias to
+# resolve to the 1M-context variant for the parent session AND all spawned
+# team/sub-agents. Without this, team agents (Planner/Executor/Evaluator)
+# default to the 200K Opus variant even when the parent session is on 1M,
+# because Agent Teams don't yet inherit model variant from the lead
+# (anthropics/claude-code#32368). The Planner in particular benefits from
+# 1M across multi-cycle runs.
 $TMUX_BIN send-keys -t "$SESSION_NAME" \
-  "export PATH=\"$SHIM_DIR:\$PATH\" REAL_GIT=\"$REAL_GIT\" GH_SHIM_CAPTURE_DIR=\"$OUTPUT_DIR\" GH_SHIM_PR_STATE=\"$OUTPUT_DIR/pr_state.json\" && echo '[]' > \"$OUTPUT_DIR/pr_state.json\" && cd \"$WORKTREE\" && claude --permission-mode bypassPermissions --model $MODEL" Enter
+  "export PATH=\"$SHIM_DIR:\$PATH\" REAL_GIT=\"$REAL_GIT\" GH_SHIM_CAPTURE_DIR=\"$OUTPUT_DIR\" GH_SHIM_PR_STATE=\"$OUTPUT_DIR/pr_state.json\" ANTHROPIC_DEFAULT_OPUS_MODEL='claude-opus-4-6[1m]' && echo '[]' > \"$OUTPUT_DIR/pr_state.json\" && cd \"$WORKTREE\" && claude --permission-mode bypassPermissions --model $MODEL" Enter
 
 # Wait for claude to start
 echo "Waiting for claude to start..."
@@ -158,9 +254,26 @@ WORKTREE_SLUG="$(echo "$WORKTREE" | sed 's|[/.]|-|g; s|^-||')"
 PROJECT_DIR="$HOME/.claude/projects/-${WORKTREE_SLUG}"
 
 if [[ -d "$PROJECT_DIR" ]]; then
-  # Copy all JSONL files (lead + subagent sessions)
+  # Copy all JSONL files (lead + subagent sessions). Sub-agent sessions live
+  # under `<session_id>/subagents/*.jsonl`, so we need a recursive copy, not a
+  # glob of the top level. Using rsync with the *.jsonl filter preserves the
+  # directory structure so compute-usage.py's rglob sees everything.
   mkdir -p "$OUTPUT_DIR/sessions"
-  cp "$PROJECT_DIR"/*.jsonl "$OUTPUT_DIR/sessions/" 2>/dev/null || true
+  if command -v rsync >/dev/null 2>&1; then
+    rsync -a --include='*/' --include='*.jsonl' --exclude='*' "$PROJECT_DIR/" "$OUTPUT_DIR/sessions/"
+  else
+    # Fallback for minimal environments: find+cp preserving the relative tree
+    (cd "$PROJECT_DIR" && find . -name '*.jsonl' -print0 | while IFS= read -r -d '' f; do
+      mkdir -p "$OUTPUT_DIR/sessions/$(dirname "$f")"
+      cp "$f" "$OUTPUT_DIR/sessions/$f"
+    done)
+  fi
+
+  # Compute usage.json (tokens + cost by model) from the copied session files.
+  # aggregate.sh reads usage.json out of OUTPUT_DIR; without this step the
+  # cost/token columns stay at $0.
+  python3 "$SCRIPT_DIR/compute-usage.py" "$OUTPUT_DIR/sessions" "$OUTPUT_DIR/usage.json" || \
+    echo "Warning: compute-usage.py failed"
 
   # Extract assistant text and user messages from all sessions into a single transcript
   python3 - "$PROJECT_DIR" "$OUTPUT_DIR/transcript.txt" <<'PYEOF'
@@ -279,3 +392,19 @@ try:
 except:
     print("  None")
 PYEOF
+
+# --- Open the HTML report ---
+# The report is the canonical human-readable output. Always surface it — agents
+# running this script should NOT paraphrase numbers from benchmark.json when
+# this file exists; point the user at the report instead.
+REPORT="$OUTPUT_DIR/report.html"
+if [[ -f "$REPORT" ]]; then
+  echo ""
+  echo "=== Report ==="
+  echo "  $REPORT"
+  # Best-effort auto-open on macOS; silently skipped if `open` is unavailable
+  # (headless / CI / non-macOS).
+  if command -v open >/dev/null 2>&1; then
+    open "$REPORT" 2>/dev/null || true
+  fi
+fi

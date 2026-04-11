@@ -47,7 +47,7 @@ Wait for the Executor's `FIX_APPLIED` response, then spawn a new sub-agent to re
 ### If all criteria pass
 
 Spawn a sub-agent to raise the PR:
-- Use the `raise-pr` skill. Context: automated improvement loop, no user present, don't ask for clarification.
+- Use the `raise-pr` skill in **non-interactive mode** (automated improvement loop, no user present). See raise-pr's SKILL.md "Non-interactive mode" section — it must not call `AskUserQuestion`. On an UNCLEAR analysis summary, raise-pr will rewrite it as `"Mechanical change: <factual description>"` and proceed without blocking.
 - Run from the current worktree. The `raise-pr` skill creates a branch, commits, pushes, and opens the PR.
 - After PR is created, add label: `gh pr edit <number> --add-label auto-improve`
 

@@ -13,13 +13,26 @@ Working directory: !`pwd`
 
 ---
 
+## Non-interactive mode
+
+If the invoking context states "no user present", "automated", "unattended", "non-interactive mode", or equivalent (e.g. the auto-improve loop), the skill runs in **non-interactive mode**. In this mode:
+
+- **Never call `AskUserQuestion`. Ever.** There is no human to answer.
+- **On UNCLEAR summary (step 3):** do not ask — instead, rewrite the SUMMARY by prepending `"Mechanical change: "` to the factual description the analysis sub-agent returned after the `UNCLEAR` marker, and proceed to step 4. The PR is created with a non-fabricated, descriptive summary even if the motivation is ambiguous.
+- **On non-main branch (step 1):** default to `base_from_main: true` without asking, and proceed to step 2.
+- **If quality checks fail (step 3):** still stop — that's a hard failure regardless of mode.
+
+Non-interactive mode is signalled by prose in the invocation context, not a flag or parameter. The default (no such signal) is interactive mode, where `AskUserQuestion` is used as documented in the steps below.
+
+---
+
 ### 1. Check Branch Safety
 
 Use the branch name from Git Context above.
 
 - **On main/master or detached HEAD**: Proceed to step 2.
 - **In a worktree** (working directory is under `.claude/worktrees/`): Proceed to step 2. Note `worktree: true` for step 4.
-- **On another branch**: The choice affects PR topology — the user must decide. Use `AskUserQuestion` to present these options:
+- **On another branch**: The choice affects PR topology — the user must decide. Use `AskUserQuestion` to present these options (**unless running in non-interactive mode** — see the "Non-interactive mode" section above; in that case, default to `base_from_main: true` without asking and proceed to step 2):
   - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there
   - **Stack on current branch** — create a new branch based on the current branch
   - **Commit into current branch** — commit and push directly to this branch
@@ -47,9 +60,9 @@ The analysis sub-agent sees the **full diff**, but your conversation history may
 2. **Combine intent.** Merge what you know from the conversation (the user's stated goals) with the sub-agent's inferred motivation. Your conversation context takes priority where they overlap, but the sub-agent may have identified additional changes or a broader scope.
 **If quality checks failed**: Show the failures to the user and stop.
 
-**If the combined motivation is still unclear** — you can't determine it from your conversation context AND the sub-agent's SUMMARY starts with "UNCLEAR" — use `AskUserQuestion` to ask the user to explain. Once they respond, update the summary and proceed to step 4.
+**If the combined motivation is still unclear** — you can't determine it from your conversation context AND the sub-agent's SUMMARY starts with "UNCLEAR" — use `AskUserQuestion` to ask the user to explain, **unless running in non-interactive mode** (see the "Non-interactive mode" section near the top of this file). In non-interactive mode, prepend `"Mechanical change: "` to the factual description the analysis sub-agent returned after the `UNCLEAR` marker and proceed to step 4 without asking. Once the user responds (interactive mode only), update the summary and proceed to step 4.
 
-**If the WHY seems fabricated or generic** (e.g. "improves code quality", "reduces maintenance overhead", "better organization" without specifics): Treat as unclear and ask the user.
+**If the WHY seems fabricated or generic** (e.g. "improves code quality", "reduces maintenance overhead", "better organization" without specifics): Treat as unclear and ask the user (or, in non-interactive mode, follow the same "Mechanical change: " rewrite and proceed).
 
 **If the WHY is specific and plausible**: Proceed to step 4.
 

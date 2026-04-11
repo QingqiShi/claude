@@ -175,11 +175,16 @@ CTXEOF
 # skill at ~/.claude/skills/. That makes the eval hermetic — editing the
 # global skill mid-run does not affect an in-flight evaluation.
 #
-# Previous layout ($WORKTREE/skills/<name>/) was not a discovery location, so
-# the copy was inert and the agent silently read from global state.
-mkdir -p "$WORKTREE/.claude/skills"
-cp -R "$SKILL_DIR" "$WORKTREE/.claude/skills/auto-improve"
-cp -R "$REPO_ROOT/skills/raise-pr" "$WORKTREE/.claude/skills/raise-pr"
+# We snapshot the entire $REPO_ROOT/skills/ tree so every skill auto-improve
+# might reach for (PR-raising, browser automation, whatever the user has
+# installed) is frozen at run start — not just auto-improve itself. Then we
+# overlay $SKILL_DIR on top so the specific auto-improve under test wins over
+# whatever copy came from $REPO_ROOT (important when running the eval from a
+# worktree of auto-improve — $SKILL_DIR points at the worktree copy, which is
+# the version we actually want to evaluate).
+mkdir -p "$WORKTREE/.claude/skills/auto-improve"
+cp -R "$REPO_ROOT/skills/." "$WORKTREE/.claude/skills/"
+cp -R "$SKILL_DIR/." "$WORKTREE/.claude/skills/auto-improve/"
 
 # --- Launch claude in tmux ---
 echo ""

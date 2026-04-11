@@ -28,20 +28,30 @@ A good rhythm is **staged**: start with folder structure, pick an area that look
 
 You decide the boundary between direct reads and sub-agent delegation. Trust your judgment; there's no magic file count.
 
-### Patterns worth looking for
+### What to look for
 
-| Pattern | Signal |
-|---|---|
-| Scattered state | 2+ components independently read/write the same data source |
-| Derived state chains | `useEffect` combines values managed separately in other components |
-| Prop drilling | Data passes through 2+ components that don't use it |
-| Monolithic component | One file, 300+ lines, multiple distinct concerns |
-| Indirect effects | `useEffect` triggers actions that belong in event handlers |
-| Duplicated logic | 3+ components with nearly identical state/event handling |
+Your job is to **think about what's wrong with this code — for the people who use it and the people who maintain it — not to run a checklist**. The lenses below are angles to consider. Good findings come from understanding what the code is trying to do and noticing where it falls short, not from pattern-matching on syntax.
 
-Not exhaustive — use judgment. Structural / cross-component issues beat cosmetic ones. Product perspective beats code-symptom perspective. **When you find a pattern in one area, check whether it spans into siblings before triaging** — cross-cutting patterns are the highest-value findings.
+**Apply lenses that fit the project.** Detect the stack first — read `package.json`, look at file extensions, check framework markers. A CLI library doesn't need an accessibility pass; a marketing site doesn't need a DB transaction audit. Discover conventions from the repo itself (lint config, framework version, existing patterns) rather than assuming.
 
-If a pattern has a grep-able signature, grep for it before triaging — your intuition about which files match is not a substitute for the actual match list.
+**Product-visible issues outrank structural ones.** A real bug, a broken interaction, an auth gap, or a screen-reader dead end is almost always a higher-value finding than a refactor. Promote a structural finding only when it's actively causing bugs or blocking changes — not for its own sake.
+
+#### Lenses
+
+- **Correctness** — is there an actual bug? Unhandled null on a reachable path, a race between async writes, a swallowed error, an off-by-one at the empty/single/last-page boundary, a resource opened without cleanup. Ask: "what input haven't I thought about?"
+- **Security** — can this be abused? Untrusted input flowing into SQL/shell/HTML without escaping, secrets in source, endpoints missing authz checks, PII in logs. Trace the trust boundary: where does untrusted data enter, and what does it touch?
+- **UX** *(if there's a user interface)* — does this feel broken to a human? Missing loading/error/empty states, destructive actions without confirm, forms that only validate on submit. Run the feature in your head: slow network, empty list, failed request — what does the user see?
+- **Accessibility** *(if there's a user interface)* — can a keyboard-only or screen-reader user actually use this? Icon buttons without labels, non-semantic markup, focus that doesn't move into opened surfaces, async updates that aren't announced.
+- **Performance** — is work being done that shouldn't be? N+1 queries, waterfall requests, expensive recomputes on stable inputs, blocking work on the main thread. Performance matters when there's a user-felt impact — speculative micro-optimization doesn't count.
+- **SEO** *(public web surfaces only)* — can search engines see what users see? Missing titles/meta/OG on indexable pages, content that only appears after hydration, unoptimized images.
+- **Framework conventions** — does the code break widely-accepted rules for its stack? The Rules of React and stale-closure effects, unhandled promise rejections in Node, unchecked errors in Go, string-concatenated SQL. Detect the stack, then apply rules its community considers load-bearing — don't invent house rules the project hasn't adopted.
+- **Structure** — is the code shaped wrong for what it's doing? Shared state with no owner, logic duplicated across call sites, a unit mixing unrelated concerns, data threaded through layers that don't use it. Only promote if it's causing real friction — refactoring for its own sake is the lowest-priority finding.
+
+The examples above are illustrative, not exhaustive. Many of the highest-value findings won't fit cleanly into one lens — they come from genuinely understanding what the code does and spotting where it fails the people it serves. **Use judgment, not a scorecard.**
+
+**Cross-cutting wins.** When you find an issue in one place, check whether it repeats across siblings before triaging. Patterns that span the codebase are the highest-value findings — fixing once improves many surfaces.
+
+**Grep before you triage.** If a pattern has a searchable signature, grep for it before deciding scope. Your intuition about which files match is not a substitute for the actual match list.
 
 ## Triage
 

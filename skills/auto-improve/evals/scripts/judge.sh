@@ -13,7 +13,7 @@ usage() {
   echo "  diff_file        Path to the diff file from the executor run"
   echo "  transcript_file  Path to the transcript file from the executor run"
   echo "  output_file      Path to write the JSON judge result"
-  echo "  --model MODEL    Model to use for judging (default: sonnet)"
+  echo "  --model MODEL    Model to use for judging (default: opus — stable grader, independent of subject)"
   exit 1
 }
 
@@ -25,7 +25,7 @@ SCENARIO_ID="$1"
 DIFF_FILE="$2"
 TRANSCRIPT_FILE="$3"
 OUTPUT_FILE="$4"
-MODEL="sonnet"
+MODEL="opus"
 
 shift 4
 while [[ $# -gt 0 ]]; do

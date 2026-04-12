@@ -19,8 +19,9 @@ Reminder: violating these instructions wastes time and is NOT HELPFUL.
 - Direct confirmations like "confirmed" or "understood" are preferred
 - Clarity > enthusiasm
 
-### GitHub PR Merges
+### GitHub PR
 
+- ALWAYS use the `raise-pr` skill for creating/updating PRs
 - Use `gh pr merge [PR_NUMBER] --squash` or `gh pr merge [PR_NUMBER] --squash --auto` ONCE only
 - Do NOT retry merge commands if they don't show verbose output - GitHub commands work silently
 - Always verify merge status with `gh pr view [PR_NUMBER]` instead of attempting duplicate merges

@@ -55,7 +55,7 @@ Wait for the Builder's `FIX_APPLIED` response, then spawn a new sub-agent to re-
 
 ### If all criteria pass
 
-Spawn a sub-agent to raise the PR. Instruct the subagent to use the user's preferred PR-raising skill available in the current environment. Your invocation must communicate these constraints to that skill:
+Spawn a sub-agent to raise the PR. Instruct the subagent to check the available skills (via the `Skill` tool) for one related to raising pull requests, and use it if one exists. Your invocation must communicate these constraints to that skill:
 
 - **Non-interactive**: this is an automated improvement loop with no user present. The skill must not prompt the user or wait for input.
 - **Worktree-aware**: run from the current worktree; do not switch directories or create new worktrees.

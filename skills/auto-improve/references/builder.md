@@ -8,7 +8,7 @@ Pre-load tools: call `ToolSearch` with `"select:Agent,SendMessage"`. Then wait f
 
 ## Implementing
 
-When the brief arrives, implement the fix and leave the changes uncommitted. **Spawn read-only `Explore` sub-agents via `Agent` whenever you want to offload a batch read** — it keeps your own context lean, the same pattern the Planner uses. Work however else you like.
+When the brief arrives, implement the fix and leave the changes uncommitted. The worktree is reset to `origin/master` between briefs, so expect a clean slate each time — do not re-apply changes from previous briefs. **Spawn read-only `Explore` sub-agents via `Agent` whenever you want to offload a batch read** — it keeps your own context lean, the same pattern the Planner uses. Work however else you like.
 
 **Quality bar.** Hand off only a solution you'd be comfortable merging to `main`. Follow project conventions strictly; no shortcuts. If a meaningful attempt can't produce a clean solution, report `IMPLEMENTATION_FAILED` — a rejected attempt beats a bad PR.
 

@@ -93,7 +93,7 @@ If your working context is getting tight before you hit the stop conditions, pre
 
 ## Signaling execution
 
-Send the improvement brief **directly to the Builder** via `SendMessage`. The brief describes the **problem** and where to find it — not the solution. The Builder owns solution design.
+Send the improvement brief **directly to the Builder** via `SendMessage`. Don't send a brief until you've finished exploring and triaging — and when you're ready, **send only one**. Do not send another until the Lead gives you the next identify-improvement signal. The brief describes the **problem** and where to find it — not the solution. The Builder owns solution design.
 
 ```
 EXECUTE:

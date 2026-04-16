@@ -1,12 +1,13 @@
 ---
 name: auto-improve
-description: Start an autonomous improvement loop that finds and fixes issues in the current project. Uses a persistent three-agent team — Planner explores the codebase and decides what to fix (spawning ephemeral Explore sub-agents when it wants to offload a batch read), Builder implements fixes, Evaluator reviews and raises PRs. Use this skill when the user wants to run continuous autonomous improvements, background PR generation, automated code quality sweeps, or hands-free codebase maintenance. Trigger on phrases like "auto improve", "background improvements", "keep finding things to fix", "autonomous PRs", or "improvement loop".
+description: An agent loop workflow that auto improves a repository.
 user-invocable: true
+disable-model-invocation: true
 ---
 
 # Auto-Improve
 
-Start an autonomous improvement loop using an agent team.
+Autonomous improvement loop. Three long-lived agents — Planner, Builder, Evaluator — plus you, the cycle coordinator.
 
 ## Context
 
@@ -15,37 +16,48 @@ Default branch: !`git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null 
 
 ## Precondition
 
-Must be invoked from within a **worktree** (working directory under `.claude/worktrees/`). If not, tell the user to enter one first.
+Must run inside a worktree (working directory under `.claude/worktrees/`). If not, tell the user to enter one first.
 
-Everything in this skill happens in the **current worktree**. Do NOT create additional worktrees. Do not cd out of the current directory. All three agents share the same working tree.
+Everything happens in the current worktree — all three agents share it. No cd, no new worktrees.
 
-## Parse Input
+## Parse input
 
-Check for a cycle count (e.g. `/auto-improve 5`). **Default: 10 cycles**, early-stop on 3 consecutive empties (see stop criteria below). The user may also pass `infinity` to mean "no cap".
+The argument (if any) is free-form natural language, not a flag. Read it, extract whatever's there:
+
+- _"focus on the auth module"_ → pass as a Focus hint to the Planner.
+- _"5 cycles"_, _"just do 3"_, _"run 20 times"_ → cycle target.
+- _"keep going until you run out of ideas"_, _"no cap"_, _"infinity"_ → uncapped; relies on the Planner's `ALL_AREAS_EXHAUSTED` to stop.
+- _"maintenance only"_, _"0"_, _"don't raise new PRs, just clean up what's there"_ → maintenance-only mode.
+- Combinations are fine: _"5 cycles focused on the API layer"_.
+- Nothing at all → defaults.
+
+**Defaults**: 10 cycles, early-stop on 3 consecutive empties.
+
+**Maintenance-only mode**: skip team creation and cycles, run pre-cycle PR maintenance once, exit. Used by the hourly scheduled follow-up (see the last section).
+
+If the argument is ambiguous, go with your best interpretation and mention it in your opening update. Don't interrupt the user to clarify.
 
 ## Setup
 
-Ensure the label exists: `gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force`
+Make sure the label exists:
 
-Capture the default branch name into a shell variable you will reuse:
+```
+gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force
+```
+
+Capture the default branch name:
 
 ```
 DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)
 ```
 
-## Create Team
+## Create the team
 
-Create a team with **three long-lived agents**. **Do NOT read the reference files yourself** — each agent reads its own.
+Three long-lived agents. **Don't read their reference files yourself** — each agent reads its own. Don't override teammate models.
 
-Don't override a model of teammate.
+**Critical: all three are team agents.** Use `TeamCreate`, then three `Agent` calls each passing both `team_name` and `name` (Planner, Builder, Evaluator). The only `SendMessage` you send goes to the Planner (identify-improvement signals). The Planner sends briefs directly to the Builder; the Builder sends summaries to the Evaluator; the Evaluator reports results back to you. Don't intercept, don't mirror.
 
-### Critical: all three must be team agents
-
-Use `TeamCreate`, then three `Agent` tool calls that each pass **both** `team_name` and `name` (Planner, Builder, Evaluator). All three are long-lived teammates for the entire run.
-
-Your own communication with teammates is always via `SendMessage`. **Never** spawn a fresh `Agent` call with `subagent_type` or with a null `team_name` to do team-role work (identifying improvements, building, evaluating) yourself — that creates an ephemeral sub-agent, bypasses the team channel, and the team model collapses. You only send to the Planner (identify-improvement signals); the Planner sends directly to the Builder, the Builder to the Evaluator, and the Evaluator back to you with the review result (`PR_RAISED`, `CHANGES_REJECTED`, or `INFRASTRUCTURE_BLOCKED`). Don't intercept or mirror those messages.
-
-Team agents themselves are free to spawn their own ephemeral sub-agents via `Agent` (e.g. `subagent_type: "Explore"` for batch reads) to keep their context lean — that's a different pattern from team-agent `SendMessage` and does not collapse the team.
+**Never** spawn a fresh `Agent` call with `subagent_type` or `team_name: null` to do team-role work yourself — that creates an ephemeral sub-agent, bypasses the team channel, and the team model collapses. Team agents spawning their own ephemeral sub-agents for batch reads (e.g. `Explore`) is a different pattern and is fine.
 
 ### Planner
 
@@ -56,6 +68,7 @@ Read the file at ${CLAUDE_SKILL_DIR}/references/planner.md and follow those inst
 Project directory: <project_dir>
 Target cycle count: <cycles>
 Team name: <team_name>
+Focus hint (optional): <focus_hint_or_empty>
 ```
 
 ### Builder
@@ -79,78 +92,74 @@ Default branch: <DEFAULT_BRANCH>
 Team name: <team_name>
 ```
 
-## Your Role
+## Your role
 
-You are the **cycle coordinator, state guard, and PR maintainer**. After creating the team:
+You're the cycle coordinator, state guard, and PR maintainer.
 
 ### Pre-cycle PR maintenance
 
-Before every cycle (including cycle 1), check whether any open auto-improve PRs need rebasing or CI fixes. This runs before the pre-cycle reset so that maintenance work (which involves checking out PR branches) can happen safely in the shared worktree. The Planner is idle by design during maintenance — it never reads files or explores unless you've explicitly sent it a start-cycle signal for the current cycle, so you don't need to pause it.
+Before every cycle (cycle 1 included), check whether open auto-improve PRs need rebases, CI fixes, or comment responses. This runs **before** the pre-cycle reset — maintenance checks out PR branches, which has to happen on a clean tree. The Planner is idle during maintenance by design; you don't need to pause it.
 
-1. **List open auto-improve PRs**:
-
-   ```
-   gh pr list --label auto-improve --state open --limit 50 \
-     --json number,title,mergeable,statusCheckRollup,labels,files,updatedAt,reviewDecision,reviewRequests,headRefName
-   ```
-
-2. **Apply guards** — drop any PR that matches any of:
-   - Has `ready-for-review` label
-   - `reviewDecision == "APPROVED"`
-   - `reviewRequests` is non-empty (a reviewer is assigned)
-   - `updatedAt` is within the last ~10 minutes (something may be in-progress elsewhere)
-
-3. **Detect duplicates** among remaining PRs. Pairwise compare on touched-file overlap + title/category similarity. If two PRs clearly duplicate each other, close the older/smaller one:
-
-   ```
-   gh pr close <older_number> --comment "Superseded by #<kept_number> — auto-improve detected overlap."
-   ```
-
-   Do NOT attempt to merge branches together — just close the dup, its content is almost certainly already in the kept PR.
-
-4. **Classify** each remaining non-duplicate:
-   - `mergeable: "CONFLICTING"` → needs rebase
-   - Any `statusCheckRollup[].conclusion == "FAILURE"` → needs CI fix
-   - Otherwise → skip, nothing to do
-
-5. **Cap at 3 maintenance candidates per cycle** (bounded work — don't let maintenance dominate the cycle).
-
-6. **For each candidate**:
-   - `gh pr checkout <n>` — check out the PR branch locally
-   - Spawn an ephemeral sub-agent via `Agent` (no `team_name`, `mode: "auto"`) with the prompt constructed from `${CLAUDE_SKILL_DIR}/references/pr-maintenance.md`, filling in `<pr_number>`, `<pr_title>`, `<failure_mode>`, `<failure_details>`, `<pr_files>`, `<default_branch>` placeholders
-   - Wait for the sub-agent's final-line status: `FIXED`, `IRRECONCILABLE`, `FAILED`, or `BLOCKED`
-   - Up to 2 attempts per PR (if the first sub-agent reports `FAILED`, you may spawn a second with the same brief; after the second `FAILED`, move on)
-   - On `IRRECONCILABLE`: the sub-agent has already posted a PR comment. Move on.
-   - On `BLOCKED`: **stop the run immediately and escalate to the user** — this is an infrastructure failure, not a bad brief
-
-7. **Restore the worktree** to a clean state after all maintenance (or if no maintenance was needed):
-   ```
-   git fetch origin
-   git checkout origin/$DEFAULT_BRANCH
-   git status --porcelain
-   ```
-
-### Pre-cycle reset
-
-Verify the worktree is clean before proceeding:
+**1. List open PRs:**
 
 ```
+gh pr list --label auto-improve --state open --limit 50 \
+  --json number,title,mergeable,statusCheckRollup,labels,files,updatedAt,reviewDecision,reviewRequests,headRefName,comments
+```
+
+**2. Skip any PR that:** has the `ready-for-review` label, is APPROVED, has a reviewer assigned, or was touched in the last ~10 minutes (something else may be working on it).
+
+**3. Close duplicates.** Pairwise compare on touched-file overlap + title/category similarity. If two clearly overlap, close the older/smaller:
+
+```
+gh pr close <older> --comment "Superseded by #<kept> — auto-improve detected overlap."
+```
+
+Don't try to merge branches together.
+
+**4. Classify** each non-duplicate. A PR can have multiple classifications — process them in this order, one sub-agent per failure mode:
+
+- `mergeable: "CONFLICTING"` → `CONFLICTING`
+- Any `statusCheckRollup[].conclusion == "FAILURE"` → `CI_FAILING`
+- Any comment whose body lacks the marker `<!-- auto-improve-response -->` → `COMMENT_UNADDRESSED`
+- Otherwise → skip.
+
+Detecting unaddressed comments: the bot pushes as the user's git identity, so comment authorship doesn't distinguish user from bot. Look for the marker `<!-- auto-improve-response -->` in the body instead — no marker means not yet processed. Fetch review comments with `gh api repos/{owner}/{repo}/pulls/{pr}/comments`; PR-level comments are already in the list result.
+
+**5. Cap at 3 maintenance candidates per cycle** — don't let maintenance eat the whole cycle. A PR with two failure modes counts as two.
+
+**6. For each candidate:**
+
+- `gh pr checkout <n>` (skip if already on that branch).
+- Spawn an ephemeral sub-agent (`Agent`, no `team_name`, `mode: "auto"`) with a prompt built from `${CLAUDE_SKILL_DIR}/references/pr-maintenance.md`, filling in `<pr_number>`, `<pr_title>`, `<failure_mode>`, `<failure_details>`, `<pr_files>`, `<default_branch>`. For `COMMENT_UNADDRESSED`, `<failure_details>` must include the comment ID, body verbatim, and REST API URL so the sub-agent can PATCH it.
+- Wait for the final-line status: `FIXED`, `IRRECONCILABLE`, `FAILED`, or `BLOCKED`.
+- Up to 2 attempts per PR (one retry after `FAILED`; after the second, move on).
+- `IRRECONCILABLE`: the sub-agent already commented on the PR; move on.
+- `BLOCKED`: **stop the run and escalate to the user.** This is infrastructure, not a bad brief.
+
+**7. Restore the worktree** once maintenance is done (or if nothing needed doing):
+
+```
+git fetch origin
+git checkout origin/$DEFAULT_BRANCH
 git status --porcelain
 ```
 
-The output MUST be empty. If it is not empty, **stop the run and report to the user**. Do not `git clean`, `git reset --hard`, or otherwise mutate unknown state — the user's in-progress work may be in the worktree. The `git fetch` + `git checkout origin/$DEFAULT_BRANCH` that would normally live here is already done at the end of the maintenance step above.
+### Pre-cycle reset
 
-### Send the identify-improvement signal
+`git status --porcelain` must be empty. If it's not, **stop and report to the user** — don't `git clean`, `git reset --hard`, or otherwise touch unknown state. The user may have in-progress work. The fetch + checkout that would normally live here already ran at the end of maintenance.
 
-Send the Planner an identify-improvement signal. It has been idle since the previous cycle ended (or since team creation, for cycle 1) — it will not explore until you signal. The Planner sends its brief **directly to the Builder**, not through you; you don't see the brief and you don't forward anything.
+### Identify-improvement signal
 
-For cycle 1:
+The Planner stays idle until you signal. It sends briefs directly to the Builder — not through you. You don't see the brief; you don't forward anything.
+
+Cycle 1:
 
 ```
 "Send the next improvement to Builder."
 ```
 
-For cycle N (N > 1), include the previous cycle's outcome so the Planner can update its skip list:
+Cycle N (N > 1), carry the previous outcome so the Planner can update its skip list:
 
 ```
 "Previous cycle: <outcome>. Send the next improvement to Builder."
@@ -158,60 +167,53 @@ For cycle N (N > 1), include the previous cycle's outcome so the Planner can upd
 
 Where `<outcome>` is one of:
 
-- `PR raised: <url>` — Planner should add the executed finding to its skip list.
-- `Changes rejected: <reason>` — Planner should add the rejected finding to its skip list and pick a different improvement.
-- `Execution failed: <reason>` — same as rejected.
+- `PR raised: <url>`
+- `Changes rejected: <reason>`
+- `Execution failed: <reason>`
 
 ### Cycle flow
 
-1. After the identify-improvement signal, wait for the Evaluator's review result (`PR_RAISED`, `CHANGES_REJECTED`, or `INFRASTRUCTURE_BLOCKED`). You are not in the message path between Planner and Builder — the Planner sends the brief directly to the Builder, the Builder implements, the Evaluator reviews, and only then does the result come back to you.
-2. Update counters (see "Tracking Cycles" below).
-3. Loop back to pre-cycle PR maintenance for the next cycle.
+After sending the signal, wait for the Evaluator's result: `PR_RAISED`, `CHANGES_REJECTED`, or `INFRASTRUCTURE_BLOCKED`. Update counters. Loop back to pre-cycle maintenance.
 
-The Evaluator owns PR creation; you do not run `gh pr create` yourself.
+The Evaluator owns PR creation. Don't run `gh pr create` yourself.
 
-**Stay active** until done. A teammate idle notification is NOT completion. After you've sent the Planner its identify-improvement signal, it should be actively exploring or the brief should already be with the Builder — if the whole team reports idle before you receive the review result, nudge whichever agent is stuck: if the Planner hasn't sent, prompt it to keep exploring; if the Builder or Evaluator is stuck, check whether they received the previous message.
+**Stay active.** A teammate idle notification is not completion. After you've sent the signal, the Planner should be exploring or the brief should already be with the Builder. If the whole team reports idle before you see a result, nudge whoever's stuck.
 
-### Escalate infrastructure blockers — never route around
+### Infrastructure blockers — never route around
 
-If any tool call is blocked, a path is unreachable, a hook rejects work, a team agent can't receive `SendMessage`, or any other unanticipated permission error surfaces, **stop the run immediately**. Don't spawn a replacement sub-agent, invent an alternative flow (e.g. running `gh pr create` yourself instead of via the Evaluator), skip the step, or retry with different args. Report to the user verbatim: what was blocked, which agent, what cycle, and ask how to proceed.
+If a tool call is blocked, a path is unreachable, a hook rejects work, or a `SendMessage` can't deliver — **stop the run immediately and escalate to the user.** Don't spawn a replacement sub-agent, don't invent an alternative flow (e.g. running `gh pr create` yourself instead of via the Evaluator), don't skip the step, don't retry with different args. Report verbatim what was blocked, which agent, which cycle.
 
-An `IMPLEMENTATION_FAILED` that mentions blocked tool calls, missing paths, or hook rejections is an infrastructure failure, not a bad brief. Same for any `SendMessage` that can't be delivered. This is the single most important rule in this skill.
+An `IMPLEMENTATION_FAILED` that mentions blocked tool calls, missing paths, or hook rejections is infrastructure, not a bad brief. Same for any `SendMessage` that won't deliver. This is the single most important rule in this skill.
 
-## Tracking Cycles
+## Tracking cycles
 
-When a cycle ends, update your internal counters and remember the outcome — you'll deliver it to the Planner as part of the next cycle's start-cycle signal (see "Start the cycle" above). **Do not message the Planner immediately after a cycle ends** — it's idle waiting for the next signal, and the outcome is part of that signal.
+When a cycle ends, remember the outcome — you'll deliver it to the Planner as part of the next cycle's signal. **Don't message the Planner between cycles** — it's idle, the outcome rides with the next signal.
 
-On `PR_RAISED <url>` from the Evaluator:
-
-- Reset consecutive empties to 0, increment PR count.
-- Remember outcome: `PR raised: <url>`.
-
-On `CHANGES_REJECTED` from the Evaluator:
-
-- Increment consecutive empties.
-- Remember outcome: `Changes rejected: <reason>`.
-
-On non-infrastructure `IMPLEMENTATION_FAILED: <reason>` from the Builder (reason does NOT mention blocked tool calls, missing paths, or hook rejections — e.g. "brief was wrong", "pattern doesn't exist in the code", "files listed don't contain what the Planner claimed"):
-
-- Treat as equivalent to `CHANGES_REJECTED`.
-- Increment consecutive empties.
-- Remember outcome: `Execution failed: <reason>`.
-- Do NOT stop the run — the brief was wrong, the skill is working as intended.
-
-On `INFRASTRUCTURE_BLOCKED` from the Evaluator, or `IMPLEMENTATION_FAILED` from the Builder citing a blocked tool call, missing path, or hook rejection (infra flavor only — disambiguate by message wording, since builder.md requires the Builder to say so explicitly):
-
-- **Stop the run immediately.** This is the escalation case. Shut down the team, report to the user with the specific block reason, and ask how to proceed.
-
-On `STOP: ALL_AREAS_EXHAUSTED` from the Planner:
-
-- Stop the run cleanly. Shut down the team and report summary.
+- `PR_RAISED <url>` → reset consecutive empties to 0, bump PR count. Outcome: `PR raised: <url>`.
+- `CHANGES_REJECTED` → bump consecutive empties. Outcome: `Changes rejected: <reason>`.
+- Non-infrastructure `IMPLEMENTATION_FAILED` from the Builder (wording does **not** mention blocked tools, missing paths, or hook rejections — things like "brief was wrong" or "pattern not in the code") → treat as `CHANGES_REJECTED`, outcome `Execution failed: <reason>`. **Don't stop the run** — the brief was wrong, the skill is working as intended.
+- `INFRASTRUCTURE_BLOCKED` from the Evaluator, or `IMPLEMENTATION_FAILED` from the Builder citing blocked tools/paths/hooks (infra flavor — disambiguate by wording, since builder.md requires explicit mention) → **stop the run immediately.** Shut down the team, report the block to the user, ask how to proceed.
+- `STOP: ALL_AREAS_EXHAUSTED` from the Planner → stop cleanly, shut down the team, report summary.
 
 **Stop** when any of:
 
-- PR count = target (unless `infinity`)
-- Consecutive empties = 3
-- Planner reports `STOP: ALL_AREAS_EXHAUSTED`
-- Any infrastructure block (escalation case above)
+- PR count hits target (unless uncapped)
+- Consecutive empties hits 3
+- Planner says `STOP: ALL_AREAS_EXHAUSTED`
+- Any infrastructure block
 
-Shut down team and report summary to user: PRs raised, cycles attempted, reason for stopping.
+Then shut down the team and report the summary: PRs raised, cycles attempted, reason for stopping.
+
+## Schedule follow-up maintenance
+
+After the run ends normally (target hit, empties exhausted, or `ALL_AREAS_EXHAUSTED`) and you raised at least one PR, schedule an hourly maintenance-only pass. That way review comments, rebases, and CI fixes get picked up without the user re-running the skill. Skip on infrastructure blocks — those need user attention first.
+
+Do this autonomously. The whole point of auto-improve is walk-away operation; asking for confirmation here defeats it. The scheduled task is maintenance-only, bounded, idempotent.
+
+1. Check what scheduling tools you have (`CronCreate`, the `schedule` skill, the `loop` skill, anything that runs on a cron). If nothing's available, tell the user in the summary: "No scheduling tool available — run `/auto-improve maintenance only` anytime to process follow-up comments and rebases."
+
+2. Check whether a maintenance cron for this project already exists (`CronList` or the equivalent). If so, don't duplicate it; mention the existing one in the summary.
+
+3. Create the cron: hourly (`0 * * * *` or equivalent), runs `/auto-improve maintenance only` in this same worktree, named something like `auto-improve-maintenance-<project-basename>` so the user can find and delete it later. Include the name and cancel command in the summary.
+
+If the current invocation is already in maintenance-only mode (i.e. this is a scheduled run, not a full run), skip all of this. A scheduled run doesn't re-schedule itself.

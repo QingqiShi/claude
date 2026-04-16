@@ -30,37 +30,48 @@ Use the branch name from Git Context above.
 
 Use the `Agent` tool with `model: sonnet` and `subagent_type: "Explore"` to spawn a sub-agent. Prompt it:
 
-> **You are analyzing staged changes in a git repository to produce a structured summary. Do not create branches, commits, or PRs.**
+> **You are analyzing staged changes in a git repository to produce a structured factual description of the diff. Do not create branches, commits, or PRs. Do not speculate about why the change was made — only describe what it does.**
 >
 > Read the file at `${CLAUDE_SKILL_DIR}/references/analysis.md` and follow its instructions. The working directory is `<working_directory>`.
->
-> Conversation context for inferring intent: <include relevant conversation history — what the user said about these changes, any issue references, the task they were working on>
 
-The sub-agent will stage files, run quality checks, read the diff, and return a structured analysis with SUMMARY and QUALITY fields.
+Do **not** pass conversation context to the sub-agent. The sub-agent's job is to report what the diff does, factually — the WHY comes from you (step 3). Giving it conversation context tempts it to launder your hypotheses back to you as if it had verified them.
+
+The sub-agent will stage files, run quality checks, read the diff, and return a structured analysis with WHAT, CHANGE_TYPE, and QUALITY fields.
 
 
-### 3. Review Intent and Reconcile
+### 3. Determine the WHY
 
-The analysis sub-agent sees the **full diff**, but your conversation history may only cover a subset of the changes — the user might have worked across multiple sessions or hit context compaction before raising the PR. You need to reconcile both sources:
+The analysis sub-agent reports **what** the diff does. **You** are responsible for the **why** — the motivation, which only the conversation can supply. Reviewers can read the diff to see what changed; the PR description exists to tell them what the diff cannot show.
 
-1. **Compare the analysis SUMMARY against your conversation context.** The diff may include changes you have no conversation context for. That's normal — trust the sub-agent's description of those changes.
-2. **Combine intent.** Merge what you know from the conversation (the user's stated goals) with the sub-agent's inferred motivation. Your conversation context takes priority where they overlap, but the sub-agent may have identified additional changes or a broader scope.
 **If quality checks failed**: Show the failures to the user and stop.
 
-**If the combined motivation is still unclear** — you can't determine it from your conversation context AND the sub-agent's SUMMARY starts with "UNCLEAR" — use `AskUserQuestion` to ask the user to explain. Once they respond, update the summary and proceed to step 4.
+#### Where the WHY must come from
 
-**If the WHY seems fabricated or generic** (e.g. "improves code quality", "reduces maintenance overhead", "better organization" without specifics): Treat as unclear and ask the user.
+Exactly two valid sources:
 
-**If the WHY is specific and plausible**: Proceed to step 4.
+1. **The user stated it** in this conversation (or an earlier one you have context for). Direct quotes or clear paraphrases of their stated reason.
+2. **It is genuinely self-evident from the diff itself** — a literal typo fix, a null guard for an obvious crash, a dependency version bump. "Self-evident" means a reasonable engineer reading only the diff would arrive at the same single reason. If multiple plausible reasons exist, it is NOT self-evident — even if one of them feels likely.
 
-Intent is typically clear when:
-- The change is self-evident (fixing a typo, adding a null check for a crash)
-- The user described what they built and the purpose is obvious (e.g. "I added JWT auth" — purpose: securing the API)
+That's it. There is no third source. You do not get to invent a WHY because one sounds plausible, because the change "obviously" cleans something up, or because the sub-agent's WHAT description suggests a motivation. If you find yourself reaching for phrases like "keeps the codebase clean", "improves maintainability", "removes ad-hoc/legacy code", "follows best practices", or "no place in source control" — stop. Those are template rationalizations that fill the gap when you don't actually know. The right move is to ask.
 
-Intent is typically unclear when:
-- The conversation only had a bare directive ("remove X", "delete Y") with no explanation
-- The change is mechanical (rename, restructure, migration) with no stated motivation
-- The WHAT is clear but the WHY could be any of several reasons
+#### Decision
+
+- **WHY came from the user OR is genuinely self-evident** → proceed to step 4.
+- **Otherwise** → use `AskUserQuestion` to ask the user for the reason. State the WHAT (from the sub-agent) so they know what you're describing, and ask why they made the change. Once they respond, use their answer as the WHY and proceed to step 4.
+
+The default when in doubt is to ask. A 10-second clarifying question is far cheaper than a PR description that misrepresents the user's intent.
+
+#### Bare directives ALWAYS require asking
+
+If the user's request was a bare directive with no stated reason, you must ask. Examples:
+
+- "remove X" / "delete Y" / "drop Z" — could be cleanup, perf, conflict resolution, tooling friction, etc.
+- "rename X to Y" — could be clarity, convention, conflict, refactor.
+- "move X into Y" — could be organization, dependency direction, reuse.
+- "switch from X to Y" — could be perf, cost, deprecation, ergonomics.
+- "add X" without context — could be a feature ask, a workaround, a debugging aid.
+
+The fact that the change executed cleanly does not tell you the WHY. Ask.
 
 ### 4. Spawn PR Creation Sub-Agent
 
@@ -71,7 +82,7 @@ Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 > Read the files at `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and `${CLAUDE_SKILL_DIR}/references/examples.md`, then follow the instructions in pr-creation.md to create a pull request.
 >
 > Analysis:
-> - Summary: <SUMMARY from analysis, refined with your conversation context>
+> - Summary: <compose by combining the WHY (from step 3 — user-stated reason or self-evident motivation) with the WHAT (from the sub-agent's analysis). Lead with the WHY. Do not paste the sub-agent's WHAT verbatim if it lacks the WHY — you must add it.>
 > - Change type: <CHANGE_TYPE from analysis>
 > - Context: <any background, trade-offs, or decisions from the conversation that aren't obvious from the summary or the diff — omit if there's nothing to add>
 > - Issue: <GitHub issue number if referenced in conversation context, otherwise "none">

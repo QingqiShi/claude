@@ -39,7 +39,7 @@ git log --oneline -5
 Produce a structured analysis with exactly these fields:
 
 ```
-SUMMARY: <why and what at high level — typically 2-5 sentences, but for trivial/one-line changes a single sentence is fine. Do NOT list individual files.>
+WHAT: <factual high-level description of the change — typically 2-5 sentences, but for trivial/one-line changes a single sentence is fine. Do NOT list individual files.>
 
 CHANGE_TYPE: <one of: feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert>
 
@@ -48,9 +48,10 @@ QUALITY: <pass or fail — if fail, include the error output>
 
 Important:
 
-- SUMMARY must lead with the **motivation** (why), then describe the change at a high level (what). "Added null checks to two functions" is too mechanical — "Prevent crashes when called with null users by adding guard clauses" explains the why and what together.
-- If you cannot confidently infer the motivation, write "UNCLEAR" as the first word of SUMMARY, followed by a factual description of what changed. Do not fabricate a rationale.
-- If the purpose is self-evident from the nature of the work (e.g. "fixing a typo", "adding authentication"), state it concisely.
+- **WHAT describes what the diff does, factually. Do not speculate about motivation.** You do not have access to the conversation that produced this change, so you cannot know why it was made — only what it does. The orchestrator will source the WHY separately.
+- Forbidden phrases — these are speculation about intent: "to improve", "to keep clean", "to remove ad-hoc", "to follow best practices", "to reduce", "to enable", "in order to", "so that". If you find yourself writing one, rewrite the sentence as a factual description instead.
+- "Removed the X script tag from the root layout" is correct. "Removed the X script tag to keep the codebase clean" is forbidden — you don't know that.
+- If the purpose is genuinely self-evident from the diff itself (a literal typo fix, a null guard for an obvious crash), you may state it as a fact ("Fixes typo in error message"). Otherwise stay descriptive.
 - Never list individual files — describe the change conceptually.
-- CHANGE_TYPE must be one of the eleven types listed above (these are the valid types for branch name, commit message, and PR title). Pick the single type that best describes the dominant intent; if the PR genuinely bundles mixed types, use the most user-visible one (`feat` > `fix` > `refactor` > `chore`).
+- CHANGE_TYPE must be one of the eleven types listed above (these are the valid types for branch name, commit message, and PR title). Pick the single type that best describes the dominant nature of the change; if the PR genuinely bundles mixed types, use the most user-visible one (`feat` > `fix` > `refactor` > `chore`).
 - Keep the entire response under 200 words.

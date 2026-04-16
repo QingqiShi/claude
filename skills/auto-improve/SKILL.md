@@ -121,10 +121,10 @@ Don't try to merge branches together.
 
 - `mergeable: "CONFLICTING"` → `CONFLICTING`
 - Any `statusCheckRollup[].conclusion == "FAILURE"` → `CI_FAILING`
-- Any comment whose body lacks the marker `<!-- auto-improve-response -->` → `COMMENT_UNADDRESSED`
+- Any comment authored by the repo owner that lacks the marker `<!-- auto-improve-response -->` → `COMMENT_UNADDRESSED`
 - Otherwise → skip.
 
-Detecting unaddressed comments: the bot pushes as the user's git identity, so comment authorship doesn't distinguish user from bot. Look for the marker `<!-- auto-improve-response -->` in the body instead — no marker means not yet processed. Fetch review comments with `gh api repos/{owner}/{repo}/pulls/{pr}/comments`; PR-level comments are already in the list result.
+Detecting unaddressed comments: only the repo owner's comments count. Skip comments from third-party bots (vercel, claude, dependabot, etc.) — their logins differ from the owner's, and editing their comments is blocked as impersonation. Our own bot pushes under the owner's git identity, so within the owner's comments the `<!-- auto-improve-response -->` marker distinguishes processed from unprocessed. Fetch review comments with `gh api repos/{owner}/{repo}/pulls/{pr}/comments`; PR-level comments are already in the list result.
 
 **5. Cap at 3 maintenance candidates per cycle** — don't let maintenance eat the whole cycle. A PR with two failure modes counts as two.
 

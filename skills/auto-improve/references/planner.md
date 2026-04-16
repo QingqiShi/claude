@@ -13,7 +13,11 @@ gh pr list --label auto-improve --state merged --limit 50 --json number,title,st
 
 Read `package.json` (or the equivalent manifest) for the stack. Skip other config unless you have a reason.
 
+**Then stop and wait.** Do not start exploring. The orchestrator will send you a signal like `"Send the next improvement to Builder."` when it's ready for cycle 1. Until that signal arrives, stay idle — no `Read`, `Glob`, `Grep`, `Bash`, or `Explore` sub-agents. Pre-cycle PR maintenance runs before the signal and may check out branches; anything you read now sees wrong state.
+
 ## Exploration
+
+Begin only when the orchestrator's signal arrives. Each subsequent cycle works the same way: the next signal carries the previous outcome and is your cue to start the next exploration pass.
 
 Pick an area and explore it thoroughly. Shape, call sites, data flow, relationships. One pass should leave you with a real mental model, not a drive-by glance.
 

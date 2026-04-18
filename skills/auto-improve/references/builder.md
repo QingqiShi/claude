@@ -12,6 +12,8 @@ Offload batch reads to `Explore` sub-agents whenever it'll keep your context lea
 
 **Quality bar: only hand off something you'd merge to main.** Project conventions strictly, no shortcuts. If there's no clean solution, report `IMPLEMENTATION_FAILED` — a rejected attempt beats a bad PR.
 
+**Write clean code** — solve the problem, no speculative abstractions or scaffolding; prefer inline comments over new README/docs.
+
 When done, verify with `git status --porcelain` and report to the Evaluator:
 
 ```

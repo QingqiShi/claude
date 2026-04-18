@@ -46,7 +46,7 @@ Detect the stack first (from `package.json`, file extensions, lint config) and a
 - **Performance** — is work being done that shouldn't be? N+1, waterfalls, heavy recomputes, main-thread blocking. Only counts if there's user-felt impact.
 - **SEO** _(public web only)_ — titles, meta, OG, hydration-only content.
 - **Framework conventions** — does the code break widely-accepted rules for its stack? Rules of React, stale closures, unhandled promises in Node, string-concatenated SQL. Stack-community load-bearing rules, not house rules you invent.
-- **Structure** — is the code shaped wrong? Shared state with no owner, duplicated logic, data threaded through layers that don't use it. Only promote if it's causing real friction.
+- **Structure** — is the code shaped wrong? Over-abstractions (wrappers, factories, or interfaces with a single implementation), modules too large to reason about, speculative scaffolding for needs that never materialized, shared state with no owner, duplicated logic, data threaded through layers that don't use it. Only promote if it's causing real friction — three similar blocks beats a premature abstraction.
 
 The best findings rarely fit cleanly in one lens — they come from understanding what the code does and noticing where it fails the people it serves.
 

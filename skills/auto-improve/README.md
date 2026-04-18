@@ -54,6 +54,6 @@ README.md                       This file
 references/planner.md           Planner agent instructions
 references/builder.md           Builder agent instructions
 references/evaluator.md         Evaluator agent instructions
-references/pr-maintenance.md    Ephemeral sub-agent prompt for PR rebase/CI-fix
+references/pr-maintenance.md    Ephemeral sub-agent prompt for per-PR maintenance
 evals/                          Scenario-based evaluation harness
 ```

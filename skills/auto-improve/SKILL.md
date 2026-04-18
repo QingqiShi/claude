@@ -33,7 +33,7 @@ The argument (if any) is free-form natural language, not a flag. Read it, extrac
 
 **Defaults**: 10 cycles, early-stop on 3 consecutive empties.
 
-**Maintenance-only mode**: skip team creation and cycles, run pre-cycle PR maintenance once, exit. Used by the hourly scheduled follow-up (see the last section).
+**Maintenance-only mode**: skip team creation and cycles, run pre-cycle PR maintenance once, exit.
 
 If the argument is ambiguous, go with your best interpretation and mention it in your opening update. Don't interrupt the user to clarify.
 
@@ -98,46 +98,18 @@ You're the cycle coordinator, state guard, and PR maintainer.
 
 ### Pre-cycle PR maintenance
 
-Before every cycle (cycle 1 included), check whether open auto-improve PRs need rebases, CI fixes, or comment responses. This runs **before** the pre-cycle reset — maintenance checks out PR branches, which has to happen on a clean tree. The Planner is idle during maintenance by design; you don't need to pause it.
+Before every cycle (cycle 1 included), check whether open auto-improve PRs need attention. This runs **before** the pre-cycle reset — maintenance checks out PR branches, which has to happen on a clean tree. The Planner is idle during maintenance by design; you don't need to pause it.
 
-**1. List open PRs:**
+Maintenance is heavy (branch checkouts, local builds to reproduce CI failures, diff reading, comment threads). **Delegate the whole maintenance pass to a single ephemeral sub-agent** each cycle so the coordinator's context stays lean — you only see the terminal status. The sub-agent lists the PRs, loops through them, and handles the three cases itself.
 
-```
-gh pr list --label auto-improve --state open --limit 50 \
-  --json number,title,mergeable,statusCheckRollup,labels,files,updatedAt,reviewDecision,reviewRequests,headRefName,comments
-```
+**1. Spawn** one ephemeral sub-agent (`Agent`, no `team_name`, `mode: "auto"`) with a prompt built from `${CLAUDE_SKILL_DIR}/references/pr-maintenance.md`, filling in `<default_branch>`.
 
-**2. Skip any PR that:** has the `ready-for-review` label, is APPROVED, has a reviewer assigned, or was touched in the last ~10 minutes (something else may be working on it).
+**2. Wait** for the final-line terminal status:
 
-**3. Close duplicates.** Pairwise compare on touched-file overlap + title/category similarity. If two clearly overlap, close the older/smaller:
+- `DONE` — maintenance pass completed. Individual PRs may have been handled, skipped, or had nothing to do; the sub-agent summarizes in its final message.
+- `BLOCKED: <reason>` — infrastructure block (tool call rejected, path unreachable, hook failure, push denied for non-conflict reasons). **Stop the run and escalate to the user.**
 
-```
-gh pr close <older> --comment "Superseded by #<kept> — auto-improve detected overlap."
-```
-
-Don't try to merge branches together.
-
-**4. Classify** each non-duplicate. A PR can have multiple classifications — process them in this order, one sub-agent per failure mode:
-
-- `mergeable: "CONFLICTING"` → `CONFLICTING`
-- Any `statusCheckRollup[].conclusion == "FAILURE"` → `CI_FAILING`
-- Any comment authored by the user running the skill (the authenticated `gh` user, from `gh api user --jq .login`) that lacks the marker `<!-- auto-improve-response -->` → `COMMENT_UNADDRESSED`
-- Otherwise → skip.
-
-Detecting unaddressed comments: only the authenticated `gh` user's own comments count. Skip everything else (third-party bots like vercel, claude, dependabot, and any other collaborator) — editing another author's comment is blocked as impersonation. Our own bot pushes under that same identity, so within those comments the `<!-- auto-improve-response -->` marker distinguishes processed from unprocessed. Fetch review comments with `gh api repos/{owner}/{repo}/pulls/{pr}/comments`; PR-level comments are already in the list result.
-
-**5. Cap at 3 maintenance candidates per cycle** — don't let maintenance eat the whole cycle. A PR with two failure modes counts as two.
-
-**6. For each candidate:**
-
-- `gh pr checkout <n>` (skip if already on that branch).
-- Spawn an ephemeral sub-agent (`Agent`, no `team_name`, `mode: "auto"`) with a prompt built from `${CLAUDE_SKILL_DIR}/references/pr-maintenance.md`, filling in `<pr_number>`, `<pr_title>`, `<failure_mode>`, `<failure_details>`, `<pr_files>`, `<default_branch>`. For `COMMENT_UNADDRESSED`, `<failure_details>` must include the comment ID, body verbatim, and REST API URL so the sub-agent can PATCH it.
-- Wait for the final-line status: `FIXED`, `IRRECONCILABLE`, `FAILED`, or `BLOCKED`.
-- Up to 2 attempts per PR (one retry after `FAILED`; after the second, move on).
-- `IRRECONCILABLE`: the sub-agent already commented on the PR; move on.
-- `BLOCKED`: **stop the run and escalate to the user.** This is infrastructure, not a bad brief.
-
-**7. Restore the worktree** once maintenance is done (or if nothing needed doing):
+**3. Restore the worktree** once maintenance is done:
 
 ```
 git fetch origin
@@ -203,17 +175,3 @@ When a cycle ends, remember the outcome — you'll deliver it to the Planner as 
 - Any infrastructure block
 
 Then shut down the team and report the summary: PRs raised, cycles attempted, reason for stopping.
-
-## Schedule follow-up maintenance
-
-After the run ends normally (target hit, empties exhausted, or `ALL_AREAS_EXHAUSTED`) and you raised at least one PR, schedule an hourly maintenance-only pass. That way review comments, rebases, and CI fixes get picked up without the user re-running the skill. Skip on infrastructure blocks — those need user attention first.
-
-Do this autonomously. The whole point of auto-improve is walk-away operation; asking for confirmation here defeats it. The scheduled task is maintenance-only, bounded, idempotent.
-
-1. Check what scheduling tools you have (`CronCreate`, the `schedule` skill, the `loop` skill, anything that runs on a cron). If nothing's available, tell the user in the summary: "No scheduling tool available — run `/auto-improve maintenance only` anytime to process follow-up comments and rebases."
-
-2. Check whether a maintenance cron for this project already exists (`CronList` or the equivalent). If so, don't duplicate it; mention the existing one in the summary.
-
-3. Create the cron: hourly (`0 * * * *` or equivalent), runs `/auto-improve maintenance only` in this same worktree, named something like `auto-improve-maintenance-<project-basename>` so the user can find and delete it later. Include the name and cancel command in the summary.
-
-If the current invocation is already in maintenance-only mode (i.e. this is a scheduled run, not a full run), skip all of this. A scheduled run doesn't re-schedule itself.

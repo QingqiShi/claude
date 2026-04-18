@@ -81,15 +81,23 @@ Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 >
 > Read the files at `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and `${CLAUDE_SKILL_DIR}/references/examples.md`, then follow the instructions in pr-creation.md to create a pull request.
 >
-> Analysis:
-> - Summary: <compose by combining the WHY (from step 3 — user-stated reason or self-evident motivation) with the WHAT (from the sub-agent's analysis). Lead with the WHY. Do not paste the sub-agent's WHAT verbatim if it lacks the WHY — you must add it.>
+> Analysis (the content fields depend on change type — see pr-creation.md for templates):
 > - Change type: <CHANGE_TYPE from analysis>
-> - Context: <any background, trade-offs, or decisions from the conversation that aren't obvious from the summary or the diff — omit if there's nothing to add>
 > - Issue: <GitHub issue number if referenced in conversation context, otherwise "none">
 > - Worktree: <true/false>
 > - Base from main: <true/false>
 > - Commit to current branch: <true/false>
 > - Stack on: <branch name, or "none">
+>
+> **For non-trivial `fix` PRs (Fix template):**
+> - Bug: <what was broken — the mechanic, brief enough for the reviewer to understand severity and follow the fix. Include the WHY (from step 3) for why this is a bug worth fixing if not self-evident.>
+> - Fix: <what changed and why this approach over alternatives>
+>
+> **For all other types, and for trivial fixes (Summary template):**
+> - Summary: <compose by combining the WHY (from step 3 — user-stated reason or self-evident motivation) with the WHAT (from the sub-agent's analysis). Lead with the WHY. Do not paste the sub-agent's WHAT verbatim if it lacks the WHY — you must add it.>
+>
+> **Optional for any template:**
+> - Notes: <trade-offs, rejected alternatives, test utilities, or non-obvious decisions from the conversation that aren't in the diff — omit if there's nothing to add>
 
 The sub-agent will create the branch, commit, push, and open the PR following the conventions in the reference files. Present its result to the user in this format:
 

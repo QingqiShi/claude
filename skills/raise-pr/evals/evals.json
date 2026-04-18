@@ -15,7 +15,7 @@
         "Branch is pushed to remote",
         "gh pr create is called via shim",
         "PR title is lowercase, ≤72 chars, starts with feat:",
-        "PR body contains ## Summary",
+        "PR body uses a valid template (## Summary or ## The bug)",
         "PR description explains why (securing the API), not just what files changed"
       ]
     },
@@ -48,7 +48,7 @@
         "Commit message starts with refactor:",
         "Branch is pushed to remote",
         "PR title starts with refactor:",
-        "PR body contains ## Summary",
+        "PR body uses a valid template (## Summary or ## The bug)",
         "Analysis mentions reader.js, transformer.js, writer.js, and pipeline.js",
         "PR description explains why (simplifying from callbacks to async/await)"
       ]
@@ -66,7 +66,7 @@
         "Branch is pushed to remote",
         "Branch is based on main (main is ancestor of HEAD)",
         "gh pr create is called",
-        "PR body contains ## Summary"
+        "PR body uses a valid template (## Summary or ## The bug)"
       ]
     },
     {
@@ -83,7 +83,7 @@
         "New branch created (not still on feature/existing-work)",
         "Branch is based on feature/existing-work (it is an ancestor)",
         "gh pr create is called",
-        "PR body contains ## Summary"
+        "PR body uses a valid template (## Summary or ## The bug)"
       ]
     },
     {
@@ -98,7 +98,7 @@
         "Commit message starts with <type>:",
         "Branch is pushed to remote",
         "gh pr create is called",
-        "PR body contains ## Summary"
+        "PR body uses a valid template (## Summary or ## The bug)"
       ]
     },
     {
@@ -119,7 +119,7 @@
       "prompt": "getUserDisplayName and formatUserEmail are crashing when called with null users — see https://github.com/acme/user-service/issues/87. Please create a PR for the fix.",
       "fixture": "fixtures/bugfix-with-issue.sh",
       "args": "",
-      "expected_output": "Creates a fix/ branch, conventional commit, PR with ## Summary and Closes #87. No ## Context section needed.",
+      "expected_output": "Creates a fix/ branch, conventional commit, PR using the Fix template (## The bug, ## The fix) and Closes #87. No ## Notes section needed.",
       "expectations": [
         "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
         "Branch type is fix/",
@@ -127,9 +127,10 @@
         "Branch is pushed to remote",
         "gh pr create is called",
         "PR title starts with fix:",
-        "PR body contains ## Summary",
+        "PR body contains ## The bug",
+        "PR body contains ## The fix",
         "PR body contains Closes #87",
-        "PR body does NOT contain ## Context"
+        "PR body does NOT contain ## Notes"
       ]
     },
     {
@@ -152,15 +153,15 @@
       "prompt": "I fixed a typo in the connection error message — 'databse conncetion' should be 'database connection'. Please create a PR.",
       "fixture": "fixtures/trivial-typo.sh",
       "args": "",
-      "expected_output": "Creates a fix/ branch, short single-sentence summary, no ## Context section.",
+      "expected_output": "Creates a fix/ branch, short single-sentence summary using the Summary template (trivial carve-out), no ## Notes section.",
       "expectations": [
         "Branch name matches <type>/<kebab-case> format and is ≤50 chars",
         "Branch type is fix/",
         "Commit message starts with fix:",
         "Branch is pushed to remote",
         "gh pr create is called",
-        "PR body contains ## Summary",
-        "PR body does NOT contain ## Context",
+        "PR body uses a valid template (## Summary or ## The bug)",
+        "PR body does NOT contain ## Notes",
         "PR summary section is short (≤3 sentences)"
       ]
     },

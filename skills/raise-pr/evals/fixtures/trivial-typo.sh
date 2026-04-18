@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fixture: trivial-typo
 # Creates a repo on main with a single-character typo fix in an error message.
-# Tests that the skill produces a short summary and omits the Context section.
+# Tests that the skill produces a short summary (trivial carve-out) and omits the Notes section.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"

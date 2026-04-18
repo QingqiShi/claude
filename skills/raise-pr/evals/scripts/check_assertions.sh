@@ -103,13 +103,13 @@ check_pr_created() {
     assert "PR title: lowercase, ≤72 chars, starts with <type>:" "false" "title=$title"
   fi
 
-  # Check PR body contains ## Summary
+  # Check PR body uses one of the valid opening sections (## Summary or ## The bug)
   local body
   body="$(python3 -c "import json; d=json.load(open('$CAPTURE_DIR/gh_pr_create_args.json')); print(d['body'])" 2>/dev/null || echo '')"
-  if echo "$body" | grep -q '## Summary'; then
-    assert "PR body contains ## Summary" "true" "found in body"
+  if echo "$body" | grep -qE '^## (Summary|The bug)'; then
+    assert "PR body uses a valid template (## Summary or ## The bug)" "true" "found valid opening section"
   else
-    assert "PR body contains ## Summary" "false" "not found in body"
+    assert "PR body uses a valid template (## Summary or ## The bug)" "false" "neither ## Summary nor ## The bug found"
   fi
 }
 
@@ -269,10 +269,20 @@ case "$TEST_ID" in
       else
         assert "PR body contains Closes #87" "false" "not found in body"
       fi
-      if echo "$body" | grep -q '## Context'; then
-        assert "PR body does NOT contain ## Context" "false" "found ## Context"
+      if echo "$body" | grep -q '## The bug'; then
+        assert "PR body contains ## The bug" "true" "found ## The bug"
       else
-        assert "PR body does NOT contain ## Context" "true" "no ## Context found"
+        assert "PR body contains ## The bug" "false" "no ## The bug found"
+      fi
+      if echo "$body" | grep -q '## The fix'; then
+        assert "PR body contains ## The fix" "true" "found ## The fix"
+      else
+        assert "PR body contains ## The fix" "false" "no ## The fix found"
+      fi
+      if echo "$body" | grep -q '## Notes'; then
+        assert "PR body does NOT contain ## Notes" "false" "found ## Notes"
+      else
+        assert "PR body does NOT contain ## Notes" "true" "no ## Notes found"
       fi
     fi
     ;;
@@ -330,13 +340,13 @@ case "$TEST_ID" in
     else
       assert "Branch type is fix/" "false" "branch=$branch"
     fi
-    # PR body should NOT contain ## Context
+    # PR body should NOT contain ## Notes (trivial fix)
     if [[ -f "$CAPTURE_DIR/gh_pr_create_args.json" ]]; then
       body="$(python3 -c "import json; d=json.load(open('$CAPTURE_DIR/gh_pr_create_args.json')); print(d['body'])" 2>/dev/null || echo '')"
-      if echo "$body" | grep -q '## Context'; then
-        assert "PR body does NOT contain ## Context" "false" "found ## Context"
+      if echo "$body" | grep -q '## Notes'; then
+        assert "PR body does NOT contain ## Notes" "false" "found ## Notes"
       else
-        assert "PR body does NOT contain ## Context" "true" "no ## Context found"
+        assert "PR body does NOT contain ## Notes" "true" "no ## Notes found"
       fi
       # Summary should be short — extract text between ## Summary and next ## or end
       summary_text="$(echo "$body" | sed -n '/## Summary/,/^##\|^$/p' | grep -v '##' | tr -d '\n' | xargs)"

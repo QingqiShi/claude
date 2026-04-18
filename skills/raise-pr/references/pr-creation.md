@@ -72,6 +72,20 @@ When using list format:
 
 A Summary listing 3+ genuinely independent items as prose is not allowed — convert to bullets. But never bullet a Summary just because the diff touches three files or adds three related rules — that's still one change. See Example 5 in `examples.md` for the genuine bundled case.
 
+### Diagrams for complex flows
+
+When the Summary or Context would otherwise need dense technical prose to describe a race, a multi-step sequence across components, a state transition, or a before/after structural change — use a Mermaid diagram. GitHub renders Mermaid natively in PR bodies (` ```mermaid ` fenced blocks).
+
+Keep the surrounding prose tight: one sentence leading in, at most one sentence after. The diagram is the explanation, not a supplement to it. If two sentences of prose already convey the mechanics, do not reach for a diagram — diagrams have a parsing cost that only pays off when the mechanics are genuinely flow-shaped.
+
+Signals you should switch to a diagram:
+
+- The prose uses words like "meanwhile", "concurrently", "while the await is in flight", "between step N and step N+1".
+- You find yourself numbering actors or steps inline to keep them straight.
+- The Summary is creeping past 5 sentences purely to describe mechanics (not to cover multiple changes).
+
+See Example 6 in `examples.md`.
+
 ### Context content
 
 The Context section is optional. When included, every sentence must add information a reviewer can act on — trade-offs, constraints, why this approach over the alternative, non-obvious design insights, or load-bearing decisions not visible in the diff.

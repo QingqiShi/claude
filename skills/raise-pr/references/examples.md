@@ -176,3 +176,51 @@ Dedupe landed on the Planner after two rejected designs:
 
 This forced a rule clarification: "Planner has no tools" was conflating *don't read source code* (load-bearing — enforces explore/triage separation) with *no tools at all* (overreach). Planner now has read-only `gh` access; the "no source code, no working-tree mutation" invariant stays.
 ```
+
+## Example 6: Complex flow fix with a Mermaid diagram
+
+Use this format when the mechanics are genuinely flow-shaped — a race, a sequence across components, a state transition — and prose would force the reader to mentally simulate the interleaving. The diagram replaces the dense paragraph; it is not an extra.
+
+**Analysis passed to the PR-creation sub-agent:**
+
+```
+Summary: Fix a race in AppState.createInstance/removeInstance where a cached projectIndex went stale across the `git worktree` await, so a concurrent "Remove project" landed writes on the wrong slot or trapped. Both methods now capture the project id, await, then re-resolve by id.
+Change type: fix
+Context: On createInstance, if the project vanished mid-await the orphaned worktree is surfaced via an error banner with its path for manual cleanup — auto-rollback via gitService.removeInstance was rejected because destructive follow-on without user confirmation compounds failure modes. On removeInstance, the parent-project mutation is skipped silently when the parent is gone, because the user already asked for the project to go away.
+Issue: none
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
+```
+
+**Output** — Construct:
+
+Branch: `fix/re-resolve-project-after-await`
+
+PR Title / Commit: `fix: re-resolve project by id after git await`
+
+PR Description:
+
+````markdown
+## Summary
+
+Fixes a race in `AppState.createInstance` / `removeInstance`: both cached `projectIndex` before awaiting `git worktree`, then wrote through the cached index after the await returned. If the user hit "Remove project" during the await, the cached index pointed at the wrong slot (silent misattribution) or past the end (trap). Both methods now capture the project id, await, then re-resolve by id.
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant A as AppState
+    participant G as gitService
+    U->>A: createInstance(in: project)
+    A->>A: cache projectIndex = 2
+    A->>G: await git worktree add
+    Note over U,A: User triggers Remove project<br/>projects[2] now belongs to a different project
+    G-->>A: done
+    A--xA: write config.projects[2] (wrong slot / trap)
+```
+
+## Context
+
+On `createInstance`, if the project vanishes mid-await the orphaned worktree is surfaced via an error banner with its path for manual cleanup — auto-rollback via `gitService.removeInstance` was rejected because destructive follow-on without user confirmation compounds failure modes. On `removeInstance`, the parent-project mutation is skipped silently when the parent is gone, because the user already asked for the project to go away.
+````

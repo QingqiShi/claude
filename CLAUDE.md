@@ -26,12 +26,6 @@ Reminder: violating these instructions wastes time and is NOT HELPFUL.
 - Do NOT retry merge commands if they don't show verbose output - GitHub commands work silently
 - Always verify merge status with `gh pr view [PR_NUMBER]` instead of attempting duplicate merges
 
-### Unrecognized Files and Directories
-
-- **NEVER delete, revert, or checkout files/directories you didn't create** — they are someone else's in-progress work
-  - This includes: `rm -rf`, `git checkout -- .`, `git clean`, `git restore`, or any other destructive action on unrecognized files
-- If quality checks (lint, build, tests) fail due to files you didn't touch, **stop and tell the user** — do not delete or revert those files to make checks pass
-
 ### Worktrees
 
 - If you need to update from upstream, run `git checkout origin/main` from within the worktree

@@ -27,7 +27,7 @@ Resolve any conflicts; skip the PR if resolution isn't straightforward. Don't pu
 **6. Push, watch CI, and squash-merge.**
 
 ```bash
-git push --force-with-lease origin <head-branch>
+git push --force origin <head-branch>
 gh pr checks <number> --watch
 gh pr merge <number> --squash
 ```

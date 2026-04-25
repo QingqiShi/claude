@@ -10,7 +10,10 @@
   },
   "permissions": {
     "allow": [],
-    "deny": ["Read(./.env)", "Read(./.env.*)"],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ],
     "ask": [],
     "defaultMode": "auto"
   },
@@ -27,6 +30,9 @@
   },
   "effortLevel": "xhigh",
   "skipDangerousModePermissionPrompt": true,
+  "skipAutoPermissionPrompt": true,
   "voiceEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "teammateMode": "auto",
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true
 }

@@ -83,13 +83,14 @@ Team name: <team_name>
 
 ### Evaluator
 
-Team agent, `mode: "auto"`:
+Team agent, `mode: "auto"`. Before creating it, decide which reviewer the Evaluator will use. Check your own available subagents — this is a self-knowledge check, don't probe the filesystem. If `codex:codex-rescue` is listed, set `<reviewer>` to `codex:codex-rescue`; otherwise set `<reviewer>` to `sub-agent`.
 
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/evaluator.md and follow those instructions exactly.
 Project directory: <project_dir>
 Default branch: <DEFAULT_BRANCH>
 Team name: <team_name>
+Reviewer: <reviewer>
 ```
 
 ## Your role

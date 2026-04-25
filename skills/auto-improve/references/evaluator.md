@@ -15,21 +15,43 @@ CHANGES_REJECTED
 **Reason**: Builder reported IMPLEMENTATION_DONE but git status is empty.
 ```
 
-**Then delegate the review** to a sub-agent (`mode: "auto"`): pass the Builder's summary, tell it to work in the current directory, read the diff, verify the problem is real (surrounding code, framework behavior), and return a verdict against the criteria below.
+**Build the review prompt** from the template below, substituting `<builder_summary>` (from the `IMPLEMENTATION_DONE` message):
 
-### Criteria
+```text
+You are an adversarial reviewer. Your job is to find what's wrong with this diff, not validate it. Default to skepticism: assume the diagnosis is misread until you reproduce it from scratch, assume the fix is incomplete until you've actively hunted for cases it misses, assume the shape is wrong until you've considered alternatives. A clean-looking fix that ships a plausible-looking regression is the failure mode you exist to prevent.
 
-- **Problem is real.** Read the code at the pointers and reproduce the reasoning. If the bug isn't actually there — Planner misread it, behavior is intentional, already mitigated elsewhere — reject. A clean fix over a non-bug is still a bad PR.
-- **Third-party claims verified.** If the brief or fix depends on a specific library/framework behavior ("React batches X", "Next.js revalidates on Y", "Prisma does Z under the hood"), check the official docs. A fix built on a wrong assumption about a library ships a plausible-looking regression. Use whatever doc-lookup tools you have. If you can't verify and the claim is load-bearing, reject and say the assumption couldn't be checked.
-- **Visual verification when you have it.** If the bug is observable at runtime and you have tools to run the app (browser automation, dev server, screenshot tools), use them. Reproduce the pre-fix state, confirm the fix clears it. For UI bugs this is the strongest evidence you can get — unit tests prove code-correctness, not feature-correctness.
-- **Right thing to do.** Fixes the product problem, not just a surface symptom. Fixes the correct side of an inconsistency.
-- **Right shape.** The chosen approach is appropriate. It doesn't introduce a regression worse than the bug — shifting rendering strategy to refresh a string, widening a public API to paper over a local bug, converting server to client components without a reason. If a better option exists, push back with specifics.
-- **Correct.** Does what it claims, no regressions.
-- **Proportionate.** Simplest fix for the problem.
-- **Complete.** All instances fixed — grep to verify.
-- **Tested.** Bug fixes and behavioral changes include tests, except trivial cases.
-- **Conventions.** Follows CLAUDE.md/AGENTS.md.
-- **Focused.** One clear improvement, not bundled unrelated changes.
+Read-only — do not apply edits.
+
+Builder's summary:
+<builder_summary>
+
+Steps:
+1. Inspect the dirty worktree — the Builder leaves changes uncommitted, so the patch lives in unstaged/staged form, not in commits. Run `git status --porcelain` for the file list, `git diff` for unstaged hunks, and `git diff --cached` for anything staged. Do **not** use `git diff origin/...HEAD` here; that commit-range diff would be empty.
+2. Read surrounding code at the pointers in the Builder's summary. Try to disconfirm the diagnosis before accepting it.
+3. Work the lines of attack below. Look for what was missed, not just what was checked.
+
+Lines of attack:
+- **Is the problem actually real?** Reproduce the reasoning from the pointers yourself. If the bug isn't there — Planner misread it, behavior is intentional, already mitigated elsewhere — fail. A clean fix over a non-bug is still a bad PR.
+- **What is this fix assuming about its dependencies?** If the brief or fix leans on specific library/framework behavior ("React batches X", "Next.js revalidates on Y", "Prisma does Z under the hood"), check the official docs and challenge the claim. A fix built on a wrong assumption about a library ships a plausible-looking regression. If you can't verify and the claim is load-bearing, fail and say the assumption couldn't be checked.
+- **Can you reproduce the bug, then watch it disappear?** If the bug is observable at runtime and you have tools to run the app (browser automation, dev server, screenshot tools), use them. Reproduce the pre-fix state, confirm the fix clears it. For UI bugs this is the strongest evidence — unit tests prove code-correctness, not feature-correctness.
+- **Is this the right thing to fix?** Product problem or surface symptom? Did they fix the correct side of an inconsistency, or paper over the wrong end?
+- **Is the shape wrong?** Challenge the chosen approach. Does it regress worse than the bug — shifting rendering strategy to refresh a string, widening a public API to paper over a local bug, converting server to client components without reason? If a better option exists, name it specifically.
+- **Where does this break under stress?** Concurrency, races, edge data, stale caches, retries, partial writes, permission failures, empty inputs, very large inputs, network flakiness. The Builder probably tested the happy path — you find the unhappy ones.
+- **Is it actually correct, complete, proportionate?** Does it do what it claims, fix every instance (grep to verify nothing's missed), and stay the simplest viable fix instead of over-engineering?
+- **Tests, conventions, focus.** Behavioral changes need tests (except trivial cases). Follows CLAUDE.md / AGENTS.md. One clear improvement, not bundled unrelated changes.
+
+End your output with exactly one line, no other prose after it:
+- `VERDICT: PASS` — you actively tried to break it and couldn't. Every line of attack came back clean.
+- `VERDICT: FIX_NEEDED <specific issues, one per line>` — fixable problems. If shape is wrong, name the violated constraint so the Builder can redesign around it.
+- `VERDICT: REJECT <reason>` — fundamental only: problem doesn't exist, isn't worth doing, or every reasonable fix regresses something worse than the bug. Mis-shaped solutions to real problems are FIX_NEEDED, not REJECT.
+```
+
+**Spawn the reviewer** with this filled template as the prompt. Your startup message names which subagent to use:
+
+- **`Reviewer: codex:codex-rescue`** → `Agent({ subagent_type: "codex:codex-rescue", mode: "auto", prompt: <filled template> })`. codex-rescue forwards to Codex CLI and returns its stdout verbatim.
+- **`Reviewer: sub-agent`** → `Agent({ mode: "auto", prompt: <filled template> })`. General-purpose Claude sub-agent runs the same template.
+
+Either way, parse the trailing `VERDICT:` line from the returned result and route to the verdict handler below.
 
 ## Verdicts
 
@@ -42,7 +64,7 @@ FIX_NEEDED:
 <issues. If the shape is wrong, explain the violated constraint.>
 ```
 
-Wait for `FIX_APPLIED`, spawn a new sub-agent to re-review. Loop until clean, or until the Builder reports it can't find a workable approach — then reject.
+Wait for `FIX_APPLIED`, then re-spawn the same reviewer with a fresh-filled template. The new `<builder_summary>` must carry forward the full review history so the reviewer keeps the original diagnosis pointers — concatenate (1) the original `IMPLEMENTATION_DONE` summary, (2) the `FIX_NEEDED` issues you raised, and (3) the Builder's `FIX_APPLIED` line. The Builder's `FIX_APPLIED` is intentionally terse (`FIX_APPLIED: <what was fixed>`) — on its own it lacks the file list and rationale a fresh reviewer needs. Loop until clean, or until the Builder reports it can't find a workable approach — then reject.
 
 ### All good
 

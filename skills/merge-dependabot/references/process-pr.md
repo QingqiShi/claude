@@ -20,9 +20,26 @@ Resolve any conflicts; skip the PR if resolution isn't straightforward. Don't pu
 
 **3. Understand what's changing and apply any migrations.** Find release notes, a changelog, a migration guide, or whatever else the package's maintainers publish to describe this version bump — GitHub Releases, a CHANGELOG file, the project's docs site, a release blog post, etc. The goal is to know about breaking changes, deprecations, and migration steps. Apply any documented migrations even if nothing's currently failing — deprecations often don't break the build until a future removal, and doing the migration now is much cheaper than tracing a regression later. If it's a major version bump and nothing of that kind exists anywhere, treat that as a red flag and skip.
 
-**4. Validate the change.** Install dependencies, then run every check the project uses to gate normal development — linting, formatting, type-checking, tests, builds, anything else that's wired up. The goal is to confirm this upgrade doesn't disturb any part of the standard development lifecycle. If something fails because of the upgrade, attempt a straightforward fix or migration; skip if it's not clear.
+**4. Validate the change.** Install dependencies, then run every check the project uses to gate normal development — linting, formatting, type-checking, tests, builds, anything else that's wired up. The goal is to confirm this upgrade doesn't disturb any part of the standard development lifecycle.
 
-**5. Sanity-test production dependencies at runtime.** Runtime verification is required for production-dependency upgrades; dev dependencies don't need it because Step 4 already covers them, so move straight to Step 6 in that case. For production dependencies, exercise the affected functionality end-to-end with whatever browser automation is available (Playwright MCP, browser-use-style skill, etc.). Loading a page isn't enough — the code path that imports and runs the upgraded package must actually execute, with no console errors and the expected behaviour. If you can't reasonably exercise it (no runnable UI, missing credentials, etc.), skip the PR — without runtime verification we can't merge a production-dependency upgrade with confidence.
+If something fails because of the upgrade, the rule is **unambiguous fix → do it; ambiguous fix → stop**:
+
+- **Do the work whenever the migration path is unambiguous, regardless of scale.** A documented hook rename across a hundred files, snapshot updates, codegen drift, removed APIs with a clear replacement, type-errors in tests that follow the migration guide cleanly — these are the job, not blockers. "The fix isn't a one-liner" or "this would touch a lot of files" is not a valid skip reason. Read the migration guide; apply it.
+- **Stop only when the right fix is genuinely unclear.** Multiple plausible fixes that would lead to different user-facing behaviour, a breaking change with no migration guidance from the maintainer, or a fix that would force a project-rule violation (e.g., requires `any`/`as` and project rules forbid them with no clean alternative). When you stop, report exactly what's ambiguous so the human can decide.
+
+**5. Sanity-test production dependencies at runtime.** Required for every production-dependency upgrade — no exceptions. Dev dependencies skip to Step 6 because Step 4 already covers them.
+
+Exercise the affected functionality end-to-end with browser automation (Playwright MCP, browser-use-style skill, etc.). The code path that imports and runs the upgraded package must actually execute and produce the expected behaviour, with no related console errors. Loading a page that never reaches the new code, or hitting an endpoint that errors out before the upgraded code runs, does not count.
+
+**If you can't run that code path locally — missing credentials, missing API key, broken local infra, upstream service down — STOP and report what's blocking.** Do NOT substitute any of these rationalisations:
+
+- "the failure is environmental, not from the package"
+- "CI's E2E shards are green"
+- "it's only a patch-level bump"
+- "static checks all pass"
+- "the import succeeded, even though the call didn't run"
+
+The whole point of Step 5 is to catch what static checks and CI can't catch from inside this orchestration. None of those substitutes discharge the requirement. The human either fixes the local environment so verification can happen, or takes the merge decision themselves.
 
 **6. Push, watch CI, and squash-merge.**
 

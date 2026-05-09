@@ -7,172 +7,173 @@ disable-model-invocation: true
 
 # Auto-Improve
 
-Autonomous improvement loop. Three long-lived agents — Planner, Builder, Evaluator — plus you, the cycle coordinator.
+Autonomous improvement loop. You're the Lead — orchestrator, state guard. All sub-agents are ephemeral.
 
 ## Context
 
 Project directory: !`pwd`
-Default branch: !`git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main`
-
-## Precondition
-
-Must run inside a worktree (working directory under `.claude/worktrees/`). If not, tell the user to enter one first.
-
-Everything happens in the current worktree — all three agents share it. No cd, no new worktrees.
 
 ## Parse input
 
-The argument (if any) is free-form natural language, not a flag. Read it, extract whatever's there:
+The argument is free-form natural language. Extract:
 
-- _"focus on the auth module"_ → pass as a Focus hint to the Planner.
-- _"5 cycles"_, _"just do 3"_, _"run 20 times"_ → cycle target.
-- _"keep going until you run out of ideas"_, _"no cap"_, _"infinity"_ → uncapped; relies on the Planner's `ALL_AREAS_EXHAUSTED` to stop.
-- _"maintenance only"_, _"0"_, _"don't raise new PRs, just clean up what's there"_ → maintenance-only mode.
-- Combinations are fine: _"5 cycles focused on the API layer"_.
-- Nothing at all → defaults.
+- Target PR count `N` (e.g. _"5 cycles"_, _"run 20 times"_). Default `N=10`.
+- Focus hint (e.g. _"focus on the auth module"_) — passed to Planner.
 
-**Defaults**: 10 cycles, early-stop on 3 consecutive empties.
+Ambiguous → best interpretation, mention in opening update. Don't interrupt to clarify.
 
-**Maintenance-only mode**: skip team creation and cycles, run pre-cycle PR maintenance once, exit.
+## Pre-run safety checks
 
-If the argument is ambiguous, go with your best interpretation and mention it in your opening update. Don't interrupt the user to clarify.
+Run **before the first cycle**. Any failure → abort and report to user.
 
-## Setup
+```
+git fetch origin
+git status --porcelain          # must be empty (else: uncommitted changes)
+git rev-parse --abbrev-ref HEAD # must be `main` (else: not on main)
+```
 
-Make sure the label exists:
+Also ensure the label exists:
 
 ```
 gh label create auto-improve --description "Automated improvement PR" --color 0E8A16 --force
 ```
 
-Capture the default branch name:
+## State directory
+
+Fresh per run, outside the worktree:
 
 ```
-DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)
+STATE_DIR=$(mktemp -d -t auto-improve)
+trap 'rm -rf "$STATE_DIR"' EXIT
 ```
 
-## Create the team
+Files:
 
-Three long-lived agents. **Don't read their reference files yourself** — each agent reads its own. Don't override teammate models.
+- `brief.md` — per-cycle, written by Planner. Wiped pre-cycle.
+- `planner-memory.md` — whole-run backlog. Persists across cycles.
+- `fix-log.md` — per-cycle, append-only (Reviewer issues + Builder responses). Wiped pre-cycle.
 
-**Critical: all three are team agents.** Use `TeamCreate`, then three `Agent` calls each passing both `team_name` and `name` (Planner, Builder, Evaluator). The only `SendMessage` you send goes to the Planner (identify-improvement signals). The Planner sends briefs directly to the Builder; the Builder sends summaries to the Evaluator; the Evaluator reports results back to you. Don't intercept, don't mirror.
+Initialize `planner-memory.md` with empty sections:
 
-**Never** spawn a fresh `Agent` call with `subagent_type` or `team_name: null` to do team-role work yourself — that creates an ephemeral sub-agent, bypasses the team channel, and the team model collapses. Team agents spawning their own ephemeral sub-agents for batch reads (e.g. `Explore`) is a different pattern and is fine.
+```
+## explored
 
-### Planner
+## candidates
+```
 
-Team agent, `mode: "auto"`:
+## Counters
+
+- `pr_count = 0`
+- `consecutive_empties = 0`
+
+## Per-cycle flow
+
+Repeat until a stop condition fires (see "Stop conditions").
+
+### 1. Pre-cycle reset
+
+```
+git checkout main
+git reset --hard origin/main
+git clean -fd
+rm -f "$STATE_DIR/brief.md" "$STATE_DIR/fix-log.md"
+touch "$STATE_DIR/fix-log.md"
+```
+
+If a previous cycle picked an entry, its outcome status is written onto that entry in `planner-memory.md` (see step 5). Do that **before** running the Planner this cycle.
+
+### 2. Planner
+
+Spawn ephemeral (`Agent`, no `name`, `mode: "auto"`):
 
 ```
 Read the file at ${CLAUDE_SKILL_DIR}/references/planner.md and follow those instructions exactly.
-Project directory: <project_dir>
-Target cycle count: <cycles>
-Team name: <team_name>
+State directory: <STATE_DIR>
 Focus hint (optional): <focus_hint_or_empty>
 ```
 
-### Builder
+Wait for terminal status:
 
-Team agent, `mode: "auto"`:
+- `BRIEF_READY` → `$STATE_DIR/brief.md` is ready. Continue.
+- `EMPTY` → cycle outcome is empty (`planner_empty`). Skip to step 5.
 
-```
-Read the file at ${CLAUDE_SKILL_DIR}/references/builder.md and follow those instructions exactly.
-Project directory: <project_dir>
-Team name: <team_name>
-```
+The Planner has flipped the picked entry's `Status` to `attempted` in `planner-memory.md`. Note the entry id — you'll update it post-cycle.
 
-### Evaluator
+### 3. Build/review loop
 
-Team agent, `mode: "auto"`. Before creating it, decide which reviewer the Evaluator will use. Check your own available subagents — this is a self-knowledge check, don't probe the filesystem. If `codex:codex-rescue` is listed, set `<reviewer>` to `codex:codex-rescue`; otherwise set `<reviewer>` to `sub-agent`.
+`iterations = 0`. Loop:
 
-```
-Read the file at ${CLAUDE_SKILL_DIR}/references/evaluator.md and follow those instructions exactly.
-Project directory: <project_dir>
-Default branch: <DEFAULT_BRANCH>
-Team name: <team_name>
-Reviewer: <reviewer>
-```
+1. Increment `iterations`.
 
-## Your role
+2. Spawn ephemeral Builder:
 
-You're the cycle coordinator, state guard, and PR maintainer.
+   ```
+   Read the file at ${CLAUDE_SKILL_DIR}/references/builder.md and follow those instructions exactly.
+   State directory: <STATE_DIR>
+   ```
 
-### Pre-cycle PR maintenance
+   Builder reads `brief.md` + `fix-log.md`. On iteration 1 the log is empty, so Builder implements the brief. On later iterations Builder addresses the most recent Reviewer round and appends a `## Round N — Builder` block.
 
-Before every cycle (cycle 1 included), check whether open auto-improve PRs need attention. This runs **before** the pre-cycle reset — maintenance checks out PR branches, which has to happen on a clean tree. The Planner is idle during maintenance by design; you don't need to pause it.
+   Wait for terminal status:
+   - `DONE` → continue.
+   - `FAILED: <reason>` → if reason mentions blocked tools, missing paths, or hook rejections, this is infrastructure — **stop the run**. Otherwise outcome is `builder_failed`. Skip to step 5 and revert tree (`git reset --hard origin/main && git clean -fd`).
 
-Maintenance is heavy (branch checkouts, local builds to reproduce CI failures, diff reading, comment threads). **Delegate the whole maintenance pass to a single ephemeral sub-agent** each cycle so the coordinator's context stays lean — you only see the terminal status. The sub-agent lists the PRs, loops through them, and handles the three cases itself.
+3. Spawn ephemeral Reviewer:
 
-**1. Spawn** one ephemeral sub-agent (`Agent`, no `team_name`, `mode: "auto"`) with a prompt built from `${CLAUDE_SKILL_DIR}/references/pr-maintenance.md`, filling in `<default_branch>`.
+   ```
+   Read the file at ${CLAUDE_SKILL_DIR}/references/reviewer.md and follow those instructions exactly.
+   State directory: <STATE_DIR>
+   ```
 
-**2. Wait** for the final-line terminal status:
+   Reviewer appends its `## Round N — Reviewer` block to `fix-log.md` itself before returning.
 
-- `DONE` — maintenance pass completed. Individual PRs may have been handled, skipped, or had nothing to do; the sub-agent summarizes in its final message.
-- `BLOCKED: <reason>` — infrastructure block (tool call rejected, path unreachable, hook failure, push denied for non-conflict reasons). **Stop the run and escalate to the user.**
+   Wait for terminal status:
+   - `VERDICT: PASS` → exit loop, continue to step 4.
+   - `VERDICT: REJECT <reason>` → outcome is `diff_rejected`. Skip to step 5 and revert tree.
+   - `VERDICT: FIX_NEEDED` → if `iterations >= 3`, outcome is `diff_rejected` (loop exhausted). Skip to step 5 and revert tree. Otherwise re-loop.
 
-**3. Restore the worktree** once maintenance is done:
+### 4. Raise PR
 
-```
-git fetch origin
-git checkout origin/$DEFAULT_BRANCH
-git status --porcelain
-```
+Look for a PR-raising skill via the `Skill` tool and use it if one exists — non-interactive, worktree-aware. The skill needs `$STATE_DIR/brief.md` as the rationale for the PR description.
 
-### Pre-cycle reset
-
-`git status --porcelain` must be empty. If it's not, **stop and report to the user** — don't `git clean`, `git reset --hard`, or otherwise touch unknown state. The user may have in-progress work. The fetch + checkout that would normally live here already ran at the end of maintenance.
-
-### Identify-improvement signal
-
-The Planner stays idle until you signal. It sends briefs directly to the Builder — not through you. You don't see the brief; you don't forward anything.
-
-Cycle 1:
+After the PR is created, label it:
 
 ```
-"Send the next improvement to Builder."
+gh pr edit <number> --add-label auto-improve
 ```
 
-Cycle N (N > 1), carry the previous outcome so the Planner can update its skip list:
+Outcomes:
 
-```
-"Previous cycle: <outcome>. Send the next improvement to Builder."
-```
+- PR opened, URL captured → outcome is `shipped`.
+- `gh` auth missing, no network, no write permissions, hook rejection, or any tool/path issue from the skill or `gh edit` → **stop the run** with the verbatim error.
 
-Where `<outcome>` is one of:
+### 5. Post-cycle bookkeeping
 
-- `PR raised: <url>`
-- `Changes rejected: <reason>`
-- `Execution failed: <reason>`
+Update counters:
 
-### Cycle flow
+- `shipped` → `pr_count++`, `consecutive_empties = 0`.
+- Any empty (`planner_empty`, `builder_failed`, `diff_rejected`) → `consecutive_empties++`.
 
-After sending the signal, wait for the Evaluator's result: `PR_RAISED`, `CHANGES_REJECTED`, or `INFRASTRUCTURE_BLOCKED`. Update counters. Loop back to pre-cycle maintenance.
+If the Planner picked an entry this cycle, edit `$STATE_DIR/planner-memory.md` and write onto that entry:
 
-The Evaluator owns PR creation. Don't run `gh pr create` yourself.
+- `Status:` → `shipped` | `diff_rejected` | `builder_failed` | `rejected`
+- `Cycle:` → current cycle number
+- `Notes:` → reason if non-shipped (one line: e.g. `Builder failed: every approach regressed perf`)
 
-**Stay active.** A teammate idle notification is not completion. After you've sent the signal, the Planner should be exploring or the brief should already be with the Builder. If the whole team reports idle before you see a result, nudge whoever's stuck.
+If the cycle was `planner_empty`, no entry to update.
 
-### Infrastructure blockers — never route around
+Check stop conditions, then loop to step 1.
 
-If a tool call is blocked, a path is unreachable, a hook rejects work, or a `SendMessage` can't deliver — **stop the run immediately and escalate to the user.** Don't spawn a replacement sub-agent, don't invent an alternative flow (e.g. running `gh pr create` yourself instead of via the Evaluator), don't skip the step, don't retry with different args. Report verbatim what was blocked, which agent, which cycle.
+## Stop conditions
 
-An `IMPLEMENTATION_FAILED` that mentions blocked tool calls, missing paths, or hook rejections is infrastructure, not a bad brief. Same for any `SendMessage` that won't deliver. This is the single most important rule in this skill.
+Stop when any of:
 
-## Tracking cycles
+- `pr_count >= N` (target hit).
+- `consecutive_empties >= 3`.
+- Any infrastructure block (Builder/Reviewer reports a blocked tool, missing path, or hook rejection; or an unrecoverable git/gh error during PR raising).
 
-When a cycle ends, remember the outcome — you'll deliver it to the Planner as part of the next cycle's signal. **Don't message the Planner between cycles** — it's idle, the outcome rides with the next signal.
+Report to user: PRs raised (URLs), cycles attempted, reason for stopping.
 
-- `PR_RAISED <url>` → reset consecutive empties to 0, bump PR count. Outcome: `PR raised: <url>`.
-- `CHANGES_REJECTED` → bump consecutive empties. Outcome: `Changes rejected: <reason>`.
-- Non-infrastructure `IMPLEMENTATION_FAILED` from the Builder (wording does **not** mention blocked tools, missing paths, or hook rejections — things like "brief was wrong" or "pattern not in the code") → treat as `CHANGES_REJECTED`, outcome `Execution failed: <reason>`. **Don't stop the run** — the brief was wrong, the skill is working as intended.
-- `INFRASTRUCTURE_BLOCKED` from the Evaluator, or `IMPLEMENTATION_FAILED` from the Builder citing blocked tools/paths/hooks (infra flavor — disambiguate by wording, since builder.md requires explicit mention) → **stop the run immediately.** Shut down the team, report the block to the user, ask how to proceed.
-- `STOP: ALL_AREAS_EXHAUSTED` from the Planner → stop cleanly, shut down the team, report summary.
+## Infrastructure blockers — never route around
 
-**Stop** when any of:
-
-- PR count hits target (unless uncapped)
-- Consecutive empties hits 3
-- Planner says `STOP: ALL_AREAS_EXHAUSTED`
-- Any infrastructure block
-
-Then shut down the team and report the summary: PRs raised, cycles attempted, reason for stopping.
+If a tool is blocked, a path is unreachable, a hook rejects work, `gh` auth is broken, or a sub-agent reports infrastructure failure — **stop immediately and escalate**. Don't spawn replacements, don't invent alternative flows, don't retry with different args. Report verbatim what was blocked, which step, which cycle.

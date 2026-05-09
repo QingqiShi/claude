@@ -1,59 +1,84 @@
 # Auto-Improve
 
-Autonomous improvement loop. Finds issues in a project, implements fixes, raises PRs — unattended, until a target count is hit or nothing useful is left.
+Autonomous improvement loop. Finds issues in a project, implements fixes, raises PRs — unattended, until a target PR count is hit, three cycles come back empty, or infrastructure breaks.
 
-Runs inside a worktree. All team agents share the same worktree; there is no per-agent isolation.
+## Invocation
 
-## Team
+Run from a clean `main` checkout. The Lead aborts on uncommitted changes or a non-`main` branch.
 
-| Agent         | Role                                                                           |
-| ------------- | ------------------------------------------------------------------------------ |
-| **Lead**      | Main session. Coordinates cycles, runs PR maintenance, tracks stop conditions. |
-| **Planner**   | Explores the codebase, triages findings, writes problem-only briefs.           |
-| **Builder**   | Receives a brief, designs a solution, implements it, hands off.                |
-| **Evaluator** | Reviews the Builder's diff, iterates via `FIX_NEEDED`, raises the PR.          |
+Optional argument is free-form natural language:
 
-Planner, Builder, and Evaluator are long-lived **team agents** (via `TeamCreate`). When the Lead needs one of them to act, it uses `SendMessage` to the existing teammate — it never spawns a fresh `Agent` call to do their job, because that would collapse the team model into ephemeral one-shots. The team agents themselves are free to spawn sub-agents (e.g. `Explore` for batch reads) whenever it helps.
+- _"5 cycles"_ — set PR target (default 10).
+- _"focus on the auth module"_ — pass a focus hint to the Planner.
+
+## Agents
+
+- **Lead** (your session) — orchestrator. Pre-run safety checks, per-cycle reset, state files, counters, stop conditions, PR raising. Lives in `SKILL.md`.
+- **Planner** (ephemeral, per cycle) — picks the next improvement using a Severity × Confidence backlog with two-gate exploration. See `references/planner.md`.
+- **Builder** (ephemeral, per build/fix) — modifies the working tree, runs lint/typecheck/test. Implements the brief or addresses the latest Reviewer round. See `references/builder.md`.
+- **Reviewer** (ephemeral, per review) — adversarial semantic review. Returns `PASS` / `FIX_NEEDED` / `REJECT`. See `references/reviewer.md`.
 
 ## Cycle flow
 
-The Planner is idle by default — it only explores when the Lead sends it an explicit start-cycle signal. That removes any race with PR maintenance and keeps the control flow linear.
+```mermaid
+sequenceDiagram
+    participant Lead
+    participant Planner
+    participant Builder
+    participant Reviewer
+    participant State as $STATE_DIR
 
-1. **Pre-cycle PR maintenance** — Lead checks open auto-improve PRs, rebases or fixes CI for any that need it.
-2. **Lead sends identify-improvement signal** to Planner ("Send the next improvement to Builder". Planner begins exploring.
-3. **Planner** explores and sends an identified improvement along with some code pointers to the Builder.
-4. **Builder** reads the brief, designs a fix, implements it, runs quality checks, leaves the worktree dirty, reports `IMPLEMENTATION_DONE` to the Evaluator.
-   - If a solution cannot be found, send `IMPLEMENTATION_FAILED` to the lead.
-5. **Evaluator** challenges the problem and reviews the solution. Three outcomes:
-   - **Clean** → raises PR via the user's preferred method (skill or otherwise) → `PR_RAISED <url>` to Lead.
-   - **Fixable** → `FIX_NEEDED` to Builder (line-level fixes or "try a different approach"); Builder replies `FIX_APPLIED`; re-review.
-   - **Fundamental problem** → `CHANGES_REJECTED` to Lead.
-6. **Lead** updates counters and the stored outcome, then loops back to step 1.
+    Note over Lead: pre-run: git fetch,<br/>clean tree, on main
+    Lead->>State: mktemp -d, init planner-memory.md
 
-## Design principles
+    loop until N PRs / 3 empties / infra block
+        Note over Lead: pre-cycle reset:<br/>tree to main, wipe brief + fix-log,<br/>write prev outcome to planner-memory
 
-- Planner is eager to explore, it tries to understand an area fully before identifying improvement opportunities.
-- Planner can identify multiple opportunities at once, it will triage them for the highest valuable and sends only that one to the Builder. It's up to the Planner if it wants to keep exploring in the next round or send the next improvement it already knows.
-- Planner should prioritize user facing bug fixes first, then architectural issues as the next high priority, followed by other improvements such as security vulnerabilities, accessibility, edge case handling, performance optimization, and SEO etc.
-- Builder owns solution design, and delivers high quality solution. It must be very strict about following project instructions. No taking shortcuts just to check the improvement as complete. If an improvement can't be done after meaningful attempt, that's fine.
-- If any tool call is blocked, a hook rejects work, or a team agent can't perform its role for reasons the skill didn't anticipate, Lead stops the run and reports to the user. Never route around.
-- **Stay in the current worktree.** No `cd`, no new worktrees, no `git clean`/`reset --hard` on unknown state. The user's in-progress work may be in the worktree.
+        Lead->>Planner: spawn
+        Planner->>State: read planner-memory.md
+        Note over Planner: short-circuit if entry score ≥16,<br/>else read code & add up to K=5<br/>scored candidates to backlog
+        Planner->>State: update planner-memory.md (new candidates, mark attempted)
+        Planner->>State: write brief.md
+        Planner-->>Lead: BRIEF_READY / EMPTY
 
-## Stop conditions
+        loop ≤3 build/review iterations
+            Lead->>Builder: spawn
+            Builder->>State: read brief.md + fix-log.md
+            Note over Builder: modify tree,<br/>lint/typecheck/test
+            Builder->>State: append response to fix-log.md
+            Builder-->>Lead: DONE / FAILED
 
-- Target PR count reached (default 10, `infinity` removes the cap).
-- 3 consecutive empty cycles (`CHANGES_REJECTED` or `IMPLEMENTATION_FAILED`).
-- Planner sends `STOP: ALL_AREAS_EXHAUSTED`.
-- Infrastructure block (immediate escalation, not counted).
+            Lead->>Reviewer: spawn
+            Reviewer->>State: read brief.md + fix-log.md
+            Note over Reviewer: review git diff
+            Reviewer->>State: append issues to fix-log.md
+            Reviewer-->>Lead: PASS / FIX_NEEDED / REJECT
+        end
+
+        Lead->>State: read brief.md
+        Note over Lead: invoke project's PR-raising skill,<br/>add auto-improve label
+
+        Note over Lead: write status to planner-memory.md,<br/>update counters
+    end
+
+    Note over Lead,State: EXIT trap: rm -rf STATE_DIR
+```
+
+1. Pre-cycle reset (`main` clean, wipe `brief.md`/`fix-log.md`, write previous outcome onto `planner-memory.md`).
+2. Planner picks an entry from the backlog, writes `brief.md`, marks `attempted`.
+3. Build/review loop (≤3 iterations): Builder modifies + checks → Reviewer reviews. `PASS` exits, `FIX_NEEDED` re-loops, `REJECT` or exhaustion empties.
+4. Lead opens the PR via the project's PR-raising skill.
+5. Lead writes the cycle outcome (`shipped` / `diff_rejected` / `builder_failed` / `rejected`) onto the picked entry, updates counters.
+
+Stops on: target hit | 3 consecutive empties | infrastructure block.
 
 ## Files
 
 ```
-SKILL.md                        Lead's instructions (coordinator + PR maintainer)
+SKILL.md                        Lead instructions (orchestrator)
 README.md                       This file
-references/planner.md           Planner agent instructions
-references/builder.md           Builder agent instructions
-references/evaluator.md         Evaluator agent instructions
-references/pr-maintenance.md    Ephemeral sub-agent prompt for per-PR maintenance
+references/planner.md           Planner instructions
+references/builder.md           Builder instructions
+references/reviewer.md          Reviewer instructions
 evals/                          Scenario-based evaluation harness
 ```

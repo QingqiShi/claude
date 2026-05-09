@@ -17,10 +17,14 @@ Project directory: !`pwd`
 
 The argument is free-form natural language. Extract:
 
-- Target PR count `N` (e.g. _"5 cycles"_, _"run 20 times"_). Default `N=10`.
+- Target PR count `N` (e.g. _"5 cycles"_, _"run 20 times"_). Default `N=10`. Phrases like _"keep going"_, _"no cap"_, _"infinity"_ → uncapped (`N=∞`); the run stops only on 3 empties or infrastructure block.
 - Focus hint (e.g. _"focus on the auth module"_) — passed to Planner.
 
 Ambiguous → best interpretation, mention in opening update. Don't interrupt to clarify.
+
+## Precondition
+
+Auto-improve is destructive between cycles — it resets the working tree to upstream. Must run inside a worktree (working directory under `.claude/worktrees/`). If not, tell the user to enter one first.
 
 ## Pre-run safety checks
 
@@ -28,8 +32,13 @@ Run **before the first cycle**. Any failure → abort and report to user.
 
 ```
 git fetch origin
-git status --porcelain          # must be empty (else: uncommitted changes)
-git rev-parse --abbrev-ref HEAD # must be `main` (else: not on main)
+git status --porcelain  # must be empty (else: uncommitted changes)
+```
+
+Capture the default branch name (handles both `main` and `master`):
+
+```
+DEFAULT_BRANCH=$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|^origin/||' || echo main)
 ```
 
 Also ensure the label exists:
@@ -73,12 +82,14 @@ Repeat until a stop condition fires (see "Stop conditions").
 ### 1. Pre-cycle reset
 
 ```
-git checkout main
-git reset --hard origin/main
+git fetch origin
+git checkout origin/$DEFAULT_BRANCH
 git clean -fd
 rm -f "$STATE_DIR/brief.md" "$STATE_DIR/fix-log.md"
 touch "$STATE_DIR/fix-log.md"
 ```
+
+`git checkout origin/$DEFAULT_BRANCH` puts the worktree on a detached HEAD at upstream — works regardless of which local branch the worktree is on, and doesn't conflict with `main`/`master` checked out elsewhere.
 
 If a previous cycle picked an entry, its outcome status is written onto that entry in `planner-memory.md` (see step 5). Do that **before** running the Planner this cycle.
 
@@ -116,7 +127,7 @@ The Planner has flipped the picked entry's `Status` to `attempted` in `planner-m
 
    Wait for terminal status:
    - `DONE` → continue.
-   - `FAILED: <reason>` → if reason mentions blocked tools, missing paths, or hook rejections, this is infrastructure — **stop the run**. Otherwise outcome is `builder_failed`. Skip to step 5 and revert tree (`git reset --hard origin/main && git clean -fd`).
+   - `FAILED: <reason>` → if reason mentions blocked tools, missing paths, or hook rejections, this is infrastructure — **stop the run**. Otherwise outcome is `builder_failed`. Skip to step 5 and revert tree (`git checkout origin/$DEFAULT_BRANCH && git clean -fd`).
 
 3. Spawn ephemeral Reviewer:
 
@@ -136,6 +147,8 @@ The Planner has flipped the picked entry's `Status` to `attempted` in `planner-m
 
 Look for a PR-raising skill via the `Skill` tool and use it if one exists — non-interactive, worktree-aware. The skill needs `$STATE_DIR/brief.md` as the rationale for the PR description.
 
+**Don't fall back to `gh pr create` yourself.** If no PR-raising skill is registered, treat that as an infrastructure block and stop — the project's PR conventions matter more than getting one PR out.
+
 After the PR is created, label it:
 
 ```
@@ -145,7 +158,7 @@ gh pr edit <number> --add-label auto-improve
 Outcomes:
 
 - PR opened, URL captured → outcome is `shipped`.
-- `gh` auth missing, no network, no write permissions, hook rejection, or any tool/path issue from the skill or `gh edit` → **stop the run** with the verbatim error.
+- `gh` auth missing, no network, no write permissions, hook rejection, no PR-raising skill registered, or any tool/path issue from the skill or `gh edit` → **stop the run** with the verbatim error.
 
 ### 5. Post-cycle bookkeeping
 
@@ -168,7 +181,7 @@ Check stop conditions, then loop to step 1.
 
 Stop when any of:
 
-- `pr_count >= N` (target hit).
+- `pr_count >= N` (target hit). Skipped if `N=∞`.
 - `consecutive_empties >= 3`.
 - Any infrastructure block (Builder/Reviewer reports a blocked tool, missing path, or hook rejection; or an unrecoverable git/gh error during PR raising).
 

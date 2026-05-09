@@ -4,7 +4,7 @@ Autonomous improvement loop. Finds issues in a project, implements fixes, raises
 
 ## Invocation
 
-Run from a clean `main` checkout. The Lead aborts on uncommitted changes or a non-`main` branch.
+Run from inside a worktree (under `.claude/worktrees/`). The Lead aborts on uncommitted changes or if the working directory isn't a worktree. The default branch is auto-detected from `origin/HEAD` (works with both `main` and `master`).
 
 Optional argument is free-form natural language:
 
@@ -28,11 +28,11 @@ sequenceDiagram
     participant Reviewer
     participant State as $STATE_DIR
 
-    Note over Lead: pre-run: git fetch,<br/>clean tree, on main
+    Note over Lead: pre-run: in a worktree,<br/>git fetch, clean tree
     Lead->>State: mktemp -d, init planner-memory.md
 
     loop until N PRs / 3 empties / infra block
-        Note over Lead: pre-cycle reset:<br/>tree to main, wipe brief + fix-log,<br/>write prev outcome to planner-memory
+        Note over Lead: pre-cycle reset:<br/>tree to upstream, wipe brief + fix-log,<br/>write prev outcome to planner-memory
 
         Lead->>Planner: spawn
         Planner->>State: read planner-memory.md

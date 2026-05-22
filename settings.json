@@ -17,6 +17,9 @@
     "defaultMode": "bypassPermissions"
   },
   "model": "opus[1m]",
+  "worktree": {
+    "baseRef": "fresh"
+  },
   "statusLine": {
     "type": "command",
     "command": "bash ~/.claude/statusline-command.sh",

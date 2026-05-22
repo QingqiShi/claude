@@ -28,11 +28,11 @@ PR Description:
 ```markdown
 ## Summary
 
-Adds JWT-based authentication to secure the API. The API currently allows unrestricted access to all endpoints, which is a security gap we need to address before launch.
+Adds JWT-based authentication to secure the API — endpoints are currently unrestricted, a launch blocker.
 
 ## Notes
 
-Uses stateless JWT tokens so we don't need session storage. The middleware pattern allows routes to opt-in to authentication, so public endpoints remain accessible.
+Stateless JWT tokens avoid session storage. The middleware pattern lets routes opt-in, so public endpoints remain accessible.
 ```
 
 ## Example 2: Bug Fix (Fix template, linked to GitHub issue)
@@ -96,11 +96,11 @@ PR Description:
 ```markdown
 ## Summary
 
-Replaces Redux with React Context API. Redux was over-engineered for this app's simple state needs — we only have a handful of global values and no complex async flows. This reduces state management code by ~60% and makes it easier to understand.
+Replaces Redux with the React Context API — Redux was over-engineered for the app's handful of global values and lack of async flows, dropping state code by ~60%.
 
 ## Notes
 
-No functional changes to the application. The migration was done atomically to avoid any broken intermediate states.
+No functional changes; migrated atomically to avoid broken intermediate states.
 ```
 
 ## Example 4: Trivial fix (Summary template, despite being a fix)
@@ -238,3 +238,59 @@ Auto-rollback in `createInstance` via `gitService.removeInstance` was rejected �
 
 Concurrency regression tests use a new `SuspendingMockShellExecutor` that parks its first `run(...)` on a `CheckedContinuation` + `OSAllocatedUnfairLock` gate; the plain `MockShellExecutor` never yields, so a same-test concurrent `removeProject` would execute synchronously and the test would false-pass. `OSAllocatedUnfairLock` over `NSLock` because Swift 6 marks `NSLock.lock()` unavailable from async contexts.
 ````
+
+## Example 7: Mapping refactor (Summary template, with table)
+
+When the diff is dominated by 1:1 renames or replacements — token migrations, API replacements, enum value shifts — the reference content is tabular. A table makes it scannable; prose hides the shape and forces the reviewer to mentally pair up names. The lead Summary sentence stays short; the table goes under its own heading.
+
+**Analysis passed to the PR-creation sub-agent:**
+
+```
+Summary: Replaces the ambiguous semantic background tokens (raised/elevated/sunken/hover) with a numbered ramp where each step is simply darker, making layering decisions mechanical.
+Change type: refactor
+Mapping: backgroundMain → background (#000000 dark); backgroundSunken → backgroundDim (#050505); backgroundRaised → background1 (#0d0d0d); backgroundHover → background2 (#171717); backgroundElevated → background3 (#1c1c1c); new background4 (#222222); backgroundCalculatorButton → background5 (#292929); backgroundMainChannels → backgroundChannels (0,0,0); backgroundRaisedChannels → background1Channels (13,13,13). Removed: backgroundTranslucent, backgroundInverse, backgroundCalculatorButtonHover, gradient.surfaceSubtle, gradient.surfaceRaised.
+Notes: Convention — hovers → background2, tactile controls → background5, scrims stay inline rgba. In light mode background1-background5 all collapse to #ffffff and shadow does the lifting. Two surfaces deviate from the hover rule because they float on the page rather than sit on a card: Button primitive (background2 → background5) and theme-switch track override (background2); both need contrast against #000. Two intentional visual shifts: calculator keys move from #444850 to #292929, and card hover swaps a translucent rgba overlay for background2.
+Issue: none
+Worktree: false
+Base from main: false
+Commit to current branch: false
+Stack on: none
+```
+
+**Output** — Construct:
+
+Branch: `refactor/background-tokens-numbered-ramp`
+
+PR Title / Commit: `refactor: replace semantic background tokens with numbered ramp`
+
+PR Description:
+
+```markdown
+## Summary
+
+Replaces the ambiguous semantic background tokens (`raised`/`elevated`/`sunken`/`hover`) with a numbered ramp where each step is simply darker, making layering decisions mechanical.
+
+## Token mapping
+
+| Before | After | Dark |
+|---|---|---|
+| `backgroundMain` | `background` | `#000000` |
+| `backgroundSunken` | `backgroundDim` | `#050505` |
+| `backgroundRaised` | `background1` | `#0d0d0d` |
+| `backgroundHover` | `background2` | `#171717` |
+| `backgroundElevated` | `background3` | `#1c1c1c` |
+| — | `background4` | `#222222` |
+| `backgroundCalculatorButton` | `background5` | `#292929` |
+| `backgroundMainChannels` | `backgroundChannels` | `0,0,0` |
+| `backgroundRaisedChannels` | `background1Channels` | `13,13,13` |
+
+Removed: `backgroundTranslucent`, `backgroundInverse`, `backgroundCalculatorButtonHover`, `gradient.surfaceSubtle`, `gradient.surfaceRaised`.
+
+## Notes
+
+Convention: hovers → `background2`, tactile controls → `background5`, scrims stay inline rgba. In light mode, `background1`–`background5` all collapse to `#ffffff` and shadow does the lifting.
+
+Two surfaces deviate from the hover rule because they float on the page rather than sit on a card: the Button primitive (`background2` → `background5`) and the theme-switch track override (`background2`). Both need extra contrast against `#000`.
+
+Two intentional visual shifts ship with this refactor: calculator keys move from `#444850` to `#292929`, and card hover swaps a translucent rgba overlay for `background2`.
+```

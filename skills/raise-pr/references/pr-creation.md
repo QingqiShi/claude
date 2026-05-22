@@ -1,6 +1,6 @@
 # PR Creation Conventions
 
-You are creating a pull request. You will be given an analysis containing: a change type, type-appropriate content fields (either `Bug` + `Fix` for the Fix template, or `Summary` for the Summary template), optional `Notes`, optional GitHub issue number, and branch-mode flags (worktree, base_from_main, commit_to_current, stack_on). Follow these conventions exactly.
+You are creating a pull request. You will be given an analysis containing: a change type, type-appropriate content fields (either `Bug` + `Fix` for the Fix template, or `Summary` for the Summary template), optional `Notes` and `Mapping`, optional GitHub issue number, and branch-mode flags (worktree, base_from_main, commit_to_current, stack_on). Follow these conventions exactly.
 
 ## Change Types
 
@@ -60,13 +60,13 @@ Applies to `feat`, `refactor`, `perf`, `style`, `test`, `docs`, `build`, `ci`, `
 ```markdown
 ## Summary
 
-<Short prose (2-5 sentences) covering WHY and WHAT. For bundled multi-change PRs, use a one-sentence scope line followed by bulleted items — see "Length and structure" below.>
+<One sentence covering WHY and WHAT. Expand the lead beyond one sentence only when the WHY genuinely needs more. For structural body content (mappings, bundled items, sequences), see "Length and structure" below.>
 
 ## Notes
 
 <!-- optional — only include if a Notes field was provided in the analysis input. Omit this entire section otherwise. -->
 
-<Trade-offs, rejected alternatives, or non-obvious decisions. For multi-step design discussions, use a numbered list of iterations followed by a short takeaway paragraph.>
+<Trade-offs, rejected alternatives, or non-obvious decisions. Pick the shape that matches the content: short paragraphs for connected reasoning, bullets for independent items, numbered list for iterations or sequences.>
 ```
 
 ### Trivial changes
@@ -79,30 +79,34 @@ Whichever template you use: explain **why** the change was made, not just what f
 
 ### Length and structure
 
-These rules apply to the Summary template's `## Summary` section. The Fix template's `## The bug` and `## The fix` sections should each stay tight — typically 2-3 sentences per section — since the split already separates the two concerns; do not bullet them.
+Two principles govern every section:
 
-The default for `## Summary` is short prose (2-5 sentences). Use prose for any PR with a single coherent purpose, even if it touches multiple files or adds multiple related rules.
+1. **Be brief.** Default to a one-sentence Summary. Expand only when the WHY genuinely needs more — a non-obvious rationale, a constraint that shapes the change, a trade-off the reviewer needs to weigh. The Fix template's `## The bug` and `## The fix` sections each stay tight (typically 2-3 sentences) since the split already separates the two concerns; do not bullet them.
 
-**Switch to list format only when the PR genuinely bundles independent changes.** Apply this test before counting items:
+2. **Match the shape of the format to the shape of the content.** Pick whichever fits — none is the default:
+   - **Table** — for before→after mappings or other tabular reference data: renames, token migrations, API replacements, enum value shifts. Place under its own heading (e.g. `## Token mapping`) between Summary and Notes.
+   - **Bullets** — for independent items where order doesn't carry meaning. Genuine bundled PRs (see the test below). Format: **bold label** + em-dash + one sentence per bullet; group under subheadings when items cluster by component or concern.
+   - **Numbered list** — for sequences or iterations: design alternatives considered, ordered states, steps in a process.
+   - **Short paragraphs** — for genuinely connected reasoning that loses meaning when split (a single argument, a cause-and-effect chain). One thought per paragraph; keep each paragraph to a few sentences.
+   - **Diagram** — for flow-shaped mechanics (race, sequence, state transition); see "Diagrams for complex flows" below.
+
+A long paragraph with many inline `` `code` `` references is almost always a smell — the content is structured (a mapping, a list, a comparison) and prose is hiding the shape. Convert it.
+
+#### When to bullet vs paragraph
+
+A bulleted list signals "these items are independent." A paragraph signals "this is one connected thing." Don't bullet a Summary just because the diff touches three files or adds three related rules — that's one change.
+
+Apply this test before listing:
 
 > Could each item have plausibly shipped as its own PR with its own description?
 
-If yes for 3+ items, use list format. If no, it's one change — use prose. A PR that adds rule A, rule B, and an example demonstrating both is **one change** with three components, not three changes. A PR that adds dedupe to the Planner *and* cost capture to the eval infra *and* an unrelated operator polish is **three changes** — each could ship alone.
+If yes for 3+ items, bullet them. If no, it's one change — keep it as a single sentence or short paragraph.
 
 Concrete signals the items are genuinely independent:
 
 - They affect different subsystems with no shared motivation
 - They were held pending separate validation and shipped together for convenience, not because they belong together
 - The Summary would naturally read as "X, and also Y, and also Z" rather than "X (which requires Y and is demonstrated by Z)"
-
-Also use list format when the Notes section narrates a **multi-step design process** (iterations, rejected alternatives, rule changes) — even if the Summary stays prose.
-
-When using list format:
-
-- **Summary**: open with one sentence stating the scope ("Bundles N improvements to X, held pending Y."), then a bulleted list. Each bullet starts with a **bold label** naming the change, followed by an em-dash and one sentence. If the changes naturally cluster (by component, layer, or concern), group them under bold subheadings — otherwise flat bullets.
-- **Notes**: if the section narrates an iterative design discussion, use a **numbered list** for the iterations (one line each), then a short paragraph for the takeaway. Do not retell the conversation blow-by-blow.
-
-A Summary listing 3+ genuinely independent items as prose is not allowed — convert to bullets. But never bullet a Summary just because the diff touches three files or adds three related rules — that's still one change. See Example 5 in `examples.md` for the genuine bundled case.
 
 ### Diagrams for complex flows
 

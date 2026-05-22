@@ -98,6 +98,7 @@ Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 >
 > **Optional for any template:**
 > - Notes: <trade-offs, rejected alternatives, test utilities, or non-obvious decisions from the conversation that aren't in the diff — omit if there's nothing to add>
+> - Mapping: <list before→after pairs and any removed entries for 1:1 rename/replacement diffs. Renders as a table. See Example 7.>
 
 The sub-agent will create the branch, commit, push, and open the PR following the conventions in the reference files. Present its result to the user in this format:
 

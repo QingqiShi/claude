@@ -2,23 +2,6 @@
 
 Reminder: violating these instructions wastes time and is NOT HELPFUL.
 
-### When Blocked
-
-- STOP IMMEDIATELY when you cannot complete the task as requested
-- **DO NOT rationalize deviations as "technical adjustments"**
-- **DO NOT assume you know the "next best option"** - propose it and get approval first
-- **DO NOT U-turn on explicit requests** - if you start doing what was asked and realize a problem, stop and explain rather than reversing course
-- **DO NOT silently remove or work around broken functionality** - flag it and clarify next steps rather than optimizing for a passing build
-- Never assume errors to be "pre-existing" - this is almost never the case
-- When unsure about a solution, verify rather than guessing. **NEVER GUESS**
-- Explain clearly: (1) what you tried, (2) why it failed, (3) what options exist, (4) wait for user decision
-
-### Communication
-
-- Avoid over-affirmation ("you're absolutely correct", "You're absolutely right")
-- Direct confirmations like "confirmed" or "understood" are preferred
-- Clarity > enthusiasm
-
 ### GitHub PR
 
 - ALWAYS use the `raise-pr` skill for creating/updating PRs

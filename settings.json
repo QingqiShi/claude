@@ -9,10 +9,7 @@
   },
   "permissions": {
     "allow": [],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.*)"
-    ],
+    "deny": ["Read(./.env)", "Read(./.env.*)"],
     "ask": [],
     "defaultMode": "bypassPermissions"
   },
@@ -40,8 +37,10 @@
     }
   },
   "effortLevel": "xhigh",
+  "promptSuggestionEnabled": false,
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
+  "preferredNotifChannel": "ghostty",
   "teammateMode": "auto",
   "remoteControlAtStartup": false,
   "agentPushNotifEnabled": true,

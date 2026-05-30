@@ -39,7 +39,7 @@ git log --oneline -5
 Produce a structured analysis with exactly these fields:
 
 ```
-WHAT: <factual high-level description of the change — one sentence by default; expand only when the change has multiple distinct components. Do NOT list individual files.>
+WHAT: <factual high-level description of the change. Be concise but complete: when the change has multiple distinct components, name each one so the orchestrator can structure a readable description from them — don't collapse a multi-part change into a vague single clause. Do NOT list individual files; describe the change conceptually.>
 
 CHANGE_TYPE: <one of: feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert>
 

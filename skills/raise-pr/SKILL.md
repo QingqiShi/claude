@@ -90,11 +90,11 @@ Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
 > - Stack on: <branch name, or "none">
 >
 > **For non-trivial `fix` PRs (Fix template):**
-> - Bug: <what was broken — the mechanic, brief enough for the reviewer to understand severity and follow the fix. Include the WHY (from step 3) for why this is a bug worth fixing if not self-evident.>
+> - Bug: <what was broken — the mechanic, with enough detail for the reviewer to understand severity and follow the fix. Include the WHY (from step 3) for why this is a bug worth fixing if not self-evident.>
 > - Fix: <what changed and why this approach over alternatives>
 >
 > **For all other types, and for trivial fixes (Summary template):**
-> - Summary: <compose by combining the WHY (from step 3 — user-stated reason or self-evident motivation) with the WHAT (from the sub-agent's analysis). Lead with the WHY. Do not paste the sub-agent's WHAT verbatim if it lacks the WHY — you must add it.>
+> - Summary: <compose by combining the WHY (from step 3 — user-stated reason or self-evident motivation) with the WHAT (from the sub-agent's analysis). Lead with the WHY, then give the reviewer the context they need to follow the change. Do not paste the sub-agent's WHAT verbatim if it lacks the WHY — you must add it.>
 >
 > **Optional for any template:**
 > - Notes: <trade-offs, rejected alternatives, test utilities, or non-obvious decisions from the conversation that aren't in the diff — omit if there's nothing to add>

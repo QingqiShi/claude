@@ -33,6 +33,8 @@ Format: `<type>: <short description>`
 
 The body structure depends on the change type. Pick the template that matches.
 
+Every template below serves one goal: a description a reviewer can read and follow quickly. Optimize for their comprehension, not word count.
+
 ### Fix template
 
 Applies to non-trivial `fix` PRs. Separates *what was broken* from *what you did about it* — they answer different questions for the reviewer.
@@ -60,7 +62,7 @@ Applies to `feat`, `refactor`, `perf`, `style`, `test`, `docs`, `build`, `ci`, `
 ```markdown
 ## Summary
 
-<One sentence covering WHY and WHAT. Expand the lead beyond one sentence only when the WHY genuinely needs more. For structural body content (mappings, bundled items, sequences), see "Length and structure" below.>
+<Lead with a clear sentence covering WHY and WHAT. Then add whatever context the reviewer needs to follow the change — a second paragraph for motivation, bullets for distinct points. Don't cram everything into one dense sentence. For structural body content (mappings, bundled items, sequences), see "Readability and structure" below.>
 
 ## Notes
 
@@ -71,36 +73,38 @@ Applies to `feat`, `refactor`, `perf`, `style`, `test`, `docs`, `build`, `ci`, `
 
 ### Trivial changes
 
-A typo, a one-line null guard, a dependency version bump — collapse to a single `## Summary` section with one sentence, regardless of change type. See Example 4.
+A typo, a one-line null guard, a dependency version bump — collapse to a single `## Summary` section with one sentence, regardless of change type. When the change is genuinely self-explanatory, more words just get in the reviewer's way. See Example 4.
 
 ---
 
 Whichever template you use: explain **why** the change was made, not just what files changed. Reviewers can see the diff — tell them what the diff can't show.
 
-### Length and structure
+### Readability and structure
 
-Two principles govern every section:
+Two principles serve that goal:
 
-1. **Be brief.** Default to a one-sentence Summary. Expand only when the WHY genuinely needs more — a non-obvious rationale, a constraint that shapes the change, a trade-off the reviewer needs to weigh. The Fix template's `## The bug` and `## The fix` sections each stay tight (typically 2-3 sentences) since the split already separates the two concerns; do not bullet them.
+1. **Write for the reader; cut what doesn't earn its place.** Include the context a reviewer needs to follow the change — the motivation, the constraint that shaped it, the trade-off they should weigh. But every sentence must pull its weight: filler, hedging, and restatement make a PR *harder* to consume, not easier. Concision is a tool in service of readability, not the goal itself.
 
-2. **Match the shape of the format to the shape of the content.** Pick whichever fits — none is the default:
+   In practice: lead with a clear sentence, then give the change room to breathe — a second sentence or a few bullets, not one dense line. The Fix template's `## The bug` and `## The fix` sections each cover one concern; give each enough room to actually explain, a couple of sentences normally, more if the mechanic warrants it.
+
+2. **Match the shape of the format to the shape of the content.** Structure is the main lever for readability — a wall of prose is hard to scan even when it's short. Pick whichever shape fits the content (none is the default), and reach for visible structure whenever the content has more than one part:
    - **Table** — for before→after mappings or other tabular reference data: renames, token migrations, API replacements, enum value shifts. Place under its own heading (e.g. `## Token mapping`) between Summary and Notes.
    - **Bullets** — for independent items where order doesn't carry meaning. Genuine bundled PRs (see the test below). Format: **bold label** + em-dash + one sentence per bullet; group under subheadings when items cluster by component or concern.
    - **Numbered list** — for sequences or iterations: design alternatives considered, ordered states, steps in a process.
    - **Short paragraphs** — for genuinely connected reasoning that loses meaning when split (a single argument, a cause-and-effect chain). One thought per paragraph; keep each paragraph to a few sentences.
    - **Diagram** — for flow-shaped mechanics (race, sequence, state transition); see "Diagrams for complex flows" below.
 
-A long paragraph with many inline `` `code` `` references is almost always a smell — the content is structured (a mapping, a list, a comparison) and prose is hiding the shape. Convert it.
+A long paragraph with many inline `` `code` `` references is almost always a smell — the content is structured (a mapping, a list, a comparison) and prose is hiding the shape. Convert it. Likewise, a single sentence weighed down by three or four clauses is a paragraph or a bullet list in disguise — break it apart so the reader can take it in one piece at a time.
 
 #### When to bullet vs paragraph
 
-A bulleted list signals "these items are independent." A paragraph signals "this is one connected thing." Don't bullet a Summary just because the diff touches three files or adds three related rules — that's one change.
+A bulleted list signals "these items are independent." A paragraph signals "this is one connected thing." Don't bullet a Summary just because the diff touches three files or adds three related rules — that's one change, so use a paragraph; but do split that one change across two sentences if a single sentence would force the reader to hold too much at once.
 
 Apply this test before listing:
 
 > Could each item have plausibly shipped as its own PR with its own description?
 
-If yes for 3+ items, bullet them. If no, it's one change — keep it as a single sentence or short paragraph.
+If yes for 3+ items, bullet them. If no, it's one change — keep it as a paragraph, a sentence or two is normal.
 
 Concrete signals the items are genuinely independent:
 
@@ -118,7 +122,7 @@ Signals you should switch to a diagram:
 
 - The prose uses words like "meanwhile", "concurrently", "while the await is in flight", "between step N and step N+1".
 - You find yourself numbering actors or steps inline to keep them straight.
-- The Summary is creeping past 5 sentences purely to describe mechanics (not to cover multiple changes).
+- You're describing one flow (not multiple changes) and need several sentences just to keep the sequence straight — a diagram conveys it faster.
 
 See Example 6 in `examples.md`.
 

@@ -28,12 +28,16 @@ PR Description:
 ```markdown
 ## Summary
 
-Adds JWT-based authentication to secure the API — endpoints are currently unrestricted, a launch blocker.
+Adds JWT-based authentication to secure the API, which currently accepts unauthenticated requests — a launch blocker.
+
+The change introduces token generation, a validation middleware for protected routes, and `/login` / `/logout` endpoints.
 
 ## Notes
 
-Stateless JWT tokens avoid session storage. The middleware pattern lets routes opt-in, so public endpoints remain accessible.
+Tokens are stateless, so there's no session store to operate. Routes opt in to the middleware, leaving public endpoints reachable without a token.
 ```
+
+The three additions stay in prose rather than bullets because they're one cohesive feature, not three independently-shippable changes (see the bullet-vs-paragraph test in `pr-creation.md`).
 
 ## Example 2: Bug Fix (Fix template, linked to GitHub issue)
 
@@ -65,7 +69,7 @@ Parser event listeners were never removed after disposal, causing unbounded memo
 
 ## The fix
 
-Remove listeners in `dispose()` before dropping the reference.
+Remove listeners in `dispose()` before dropping the reference — tying cleanup to the existing teardown path means every disposal frees them without callers having to remember.
 
 Closes #42
 ```
@@ -96,7 +100,9 @@ PR Description:
 ```markdown
 ## Summary
 
-Replaces Redux with the React Context API — Redux was over-engineered for the app's handful of global values and lack of async flows, dropping state code by ~60%.
+Replaces Redux with the React Context API for global state.
+
+Redux was over-engineered for what this app actually needs — a handful of global values and no complex async flows — so it added boilerplate without earning its keep. The migration drops state-management code by ~60%.
 
 ## Notes
 

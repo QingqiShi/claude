@@ -22,3 +22,11 @@ Reminder: violating these instructions wastes time and is NOT HELPFUL.
 - "Clean up" (worktrees, branches, folders, etc.) means remove things that are **no longer used** — never delete everything
 - Always check status first (uncommitted changes, whether branches are merged, whether folders are referenced) before removing anything
 - Flag anything ambiguous for the user's decision
+
+### Browser Use
+
+- Always use the `playwright-cli` skill to operate the browser.
+
+### Output Style
+
+- When reporting information to me, be extremely concise, sacrifice grammar for the sake of concision.

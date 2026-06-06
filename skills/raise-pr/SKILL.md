@@ -35,5 +35,9 @@ What did *this conversation* tell you about why this change was made? Quote or p
 The sub-agent returns the PR (url, branch, title) and any WHY it couldn't resolve from diff + context.
 
 - Quality checks failed → it raised nothing. Show the user, stop.
-- Gaps → ask the user for those reasons, then `gh pr edit` the description to fill them (WHY only — leave the WHAT alone, you have no diff).
+- Gaps → ask the user for those reasons, then `gh pr edit` the description to fill them (WHY only — leave the WHAT alone, you have no diff). Your edits follow the same 4 rules the sub-agent wrote to, so the description stays consistent:
+  1. Optimize for reviewer comprehension; lead with WHY.
+  2. No test plan.
+  3. Don't list code changes — describe behaviour, not the diff.
+  4. Prefer a Mermaid diagram when the change has a shape (flow, before/after, duplication).
 - Report url / branch / title.

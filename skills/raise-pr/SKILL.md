@@ -5,112 +5,35 @@ description: Create pull requests with titles, branch names, and descriptions ma
 
 # Raising Pull Requests
 
-## Git Context
-
 Current branch: !`git branch --show-current`
-
 Working directory: !`pwd`
 
----
+A sub-agent does the work: it reads the diff, validates your context against it, writes the description, and raises the PR. You supply the WHY (from conversation) and handle any gaps it reports back. The split only works if your half stays uncontaminated by the diff — **you never read the diff/log/commits; the sub-agent does.**
 
-### 1. Check Branch Safety
+## 1. Branch mode
 
-Use the branch name from Git Context above.
+- main/master or detached HEAD → default (new branch)
+- cwd under `.claude/worktrees/` → `worktree`
+- another branch → `AskUserQuestion`: stash & branch from main (`base_from_main`) / stack on current (`stack_on`) / commit to current (`commit_to_current`)
 
-- **On main/master or detached HEAD**: Proceed to step 2.
-- **In a worktree** (working directory is under `.claude/worktrees/`): Proceed to step 2. Note `worktree: true` for step 4.
-- **On another branch**: The choice affects PR topology — the user must decide. Use `AskUserQuestion` to present these options:
-  - **Stash and switch to main** — stash changes, switch to main/master, create a new branch from there
-  - **Stack on current branch** — create a new branch based on the current branch
-  - **Commit into current branch** — commit and push directly to this branch
+## 2. Recall the WHY — conversation only
 
-  Once the user responds, note their choice for step 4 (`base_from_main: true`, `stack_on: <current_branch>`, or `commit_to_current: true`) and proceed to step 2.
+What did *this conversation* tell you about why this change was made? Quote or paraphrase it. If it told you nothing, say exactly that ("nothing from conversation"). Thin or empty context is normal — a cleared session, the tail of a long run — pass it as-is; the sub-agent surfaces the gaps for the user.
 
-### 2. Spawn Analysis Sub-Agent
+**Don't read the diff, log, or commits — that's the sub-agent's job.** Reading them yourself manufactures a WHY you can't source and launders it back as if it were known intent. Relay only what the conversation gave you.
 
-Use the `Agent` tool with `model: sonnet` and `subagent_type: "Explore"` to spawn a sub-agent. Prompt it:
+## 3. Spawn the sub-agent
 
-> **You are analyzing staged changes in a git repository to produce a structured factual description of the diff. Do not create branches, commits, or PRs. Do not speculate about why the change was made — only describe what it does.**
->
-> Read the file at `${CLAUDE_SKILL_DIR}/references/analysis.md` and follow its instructions. The working directory is `<working_directory>`.
+`Agent` (inherit your own model — don't downgrade; this needs the reasoning):
 
-Do **not** pass conversation context to the sub-agent. The sub-agent's job is to report what the diff does, factually — the WHY comes from you (step 3). Giving it conversation context tempts it to launder your hypotheses back to you as if it had verified them.
+> Read `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and follow it. Working dir: `<cwd>`.
+> Branch mode: `<mode + flags>`. Issue: `<#n or none>`.
+> Context (potentially partial — validate against the diff, assume it may be incomplete, never invent beyond it): `<the WHY from conversation, or "nothing from conversation">`
 
-The sub-agent will stage files, run quality checks, read the diff, and return a structured analysis with WHAT, CHANGE_TYPE, and QUALITY fields.
+## 4. Finish
 
+The sub-agent returns the PR (url, branch, title) and any WHY it couldn't resolve from diff + context.
 
-### 3. Determine the WHY
-
-The analysis sub-agent reports **what** the diff does. **You** are responsible for the **why** — the motivation, which only the conversation can supply. Reviewers can read the diff to see what changed; the PR description exists to tell them what the diff cannot show.
-
-**If quality checks failed**: Show the failures to the user and stop.
-
-#### Where the WHY must come from
-
-Exactly two valid sources:
-
-1. **The user stated it** in this conversation (or an earlier one you have context for). Direct quotes or clear paraphrases of their stated reason.
-2. **It is genuinely self-evident from the diff itself** — a literal typo fix, a null guard for an obvious crash, a dependency version bump. "Self-evident" means a reasonable engineer reading only the diff would arrive at the same single reason. If multiple plausible reasons exist, it is NOT self-evident — even if one of them feels likely.
-
-That's it. There is no third source. You do not get to invent a WHY because one sounds plausible, because the change "obviously" cleans something up, or because the sub-agent's WHAT description suggests a motivation. If you find yourself reaching for phrases like "keeps the codebase clean", "improves maintainability", "removes ad-hoc/legacy code", "follows best practices", or "no place in source control" — stop. Those are template rationalizations that fill the gap when you don't actually know. The right move is to ask.
-
-#### Decision
-
-- **WHY came from the user OR is genuinely self-evident** → proceed to step 4.
-- **Otherwise** → use `AskUserQuestion` to ask the user for the reason. State the WHAT (from the sub-agent) so they know what you're describing, and ask why they made the change. Once they respond, use their answer as the WHY and proceed to step 4.
-
-The default when in doubt is to ask. A 10-second clarifying question is far cheaper than a PR description that misrepresents the user's intent.
-
-#### Bare directives ALWAYS require asking
-
-If the user's request was a bare directive with no stated reason, you must ask. Examples:
-
-- "remove X" / "delete Y" / "drop Z" — could be cleanup, perf, conflict resolution, tooling friction, etc.
-- "rename X to Y" — could be clarity, convention, conflict, refactor.
-- "move X into Y" — could be organization, dependency direction, reuse.
-- "switch from X to Y" — could be perf, cost, deprecation, ergonomics.
-- "add X" without context — could be a feature ask, a workaround, a debugging aid.
-
-The fact that the change executed cleanly does not tell you the WHY. Ask.
-
-### 4. Spawn PR Creation Sub-Agent
-
-Use the `Agent` tool with `model: sonnet` to spawn a sub-agent. Prompt it:
-
-> **You are creating a pull request from already-analyzed changes. Do not re-analyze the changes or modify any source files.**
->
-> Read the files at `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and `${CLAUDE_SKILL_DIR}/references/examples.md`, then follow the instructions in pr-creation.md to create a pull request.
->
-> Analysis (the content fields depend on change type — see pr-creation.md for templates):
-> - Change type: <CHANGE_TYPE from analysis>
-> - Issue: <GitHub issue number if referenced in conversation context, otherwise "none">
-> - Worktree: <true/false>
-> - Base from main: <true/false>
-> - Commit to current branch: <true/false>
-> - Stack on: <branch name, or "none">
->
-> **For non-trivial `fix` PRs (Fix template):**
-> - Bug: <what was broken — the mechanic, with enough detail for the reviewer to understand severity and follow the fix. Include the WHY (from step 3) for why this is a bug worth fixing if not self-evident.>
-> - Fix: <what changed and why this approach over alternatives>
->
-> **For all other types, and for trivial fixes (Summary template):**
-> - Summary: <compose by combining the WHY (from step 3 — user-stated reason or self-evident motivation) with the WHAT (from the sub-agent's analysis). Lead with the WHY, then give the reviewer the context they need to follow the change. Do not paste the sub-agent's WHAT verbatim if it lacks the WHY — you must add it.>
->
-> **Optional for any template:**
-> - Notes: <trade-offs, rejected alternatives, test utilities, or non-obvious decisions from the conversation that aren't in the diff — omit if there's nothing to add>
-> - Mapping: <list before→after pairs and any removed entries for 1:1 rename/replacement diffs. Renders as a table. See Example 7.>
-
-The sub-agent will create the branch, commit, push, and open the PR following the conventions in the reference files. Present its result to the user in this format:
-
-```
-PR: <url>
-Branch: <branch_name>
-Title: <pr_title>
-```
-
-## Error Handling
-
-- **Quality checks fail**: Show errors, ask user (step 3)
-- **Branch already exists**: The PR creation sub-agent should ask for a different name
-- **PR creation fails**: Show error and suggest fixes
-- **No changes staged**: Warn user
+- Quality checks failed → it raised nothing. Show the user, stop.
+- Gaps → ask the user for those reasons, then `gh pr edit` the description to fill them (WHY only — leave the WHAT alone, you have no diff).
+- Report url / branch / title.

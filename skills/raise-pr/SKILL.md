@@ -39,5 +39,5 @@ The sub-agent returns the PR (url, branch, title) and any WHY it couldn't resolv
   1. Optimize for reviewer comprehension; lead with WHY.
   2. No test plan.
   3. Don't list code changes — describe behaviour, not the diff.
-  4. Prefer a Mermaid diagram when the change has a shape (flow, before/after, duplication).
+  4. Use a Mermaid diagram when it shows something the prose can't say as clearly — a non-trivial flow, state machine, or web of relationships.
 - Report url / branch / title.

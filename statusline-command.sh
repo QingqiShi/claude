@@ -6,6 +6,9 @@ input=$(cat)
 # --- Model ---
 model=$(echo "$input" | jq -r '.model.display_name // "Unknown model"')
 
+# --- Reasoning effort (absent when model doesn't support it) ---
+effort=$(echo "$input" | jq -r '.effort.level // empty')
+
 # --- Git branch ---
 cwd=$(echo "$input" | jq -r '.workspace.current_dir // .cwd // ""')
 branch=""
@@ -48,6 +51,7 @@ fi
 # --- Assemble ---
 parts=()
 [ -n "$model" ]  && parts+=("🧠 $model")
+[ -n "$effort" ] && parts+=("⚡ $effort")
 [ -n "$repo" ]   && parts+=("📦 $repo")
 [ -n "$branch" ] && parts+=("🌿 $branch")
 parts+=("💰 $cost")

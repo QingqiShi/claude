@@ -23,9 +23,8 @@ if [ -n "$project_dir" ]; then
   repo=$(basename "$project_dir")
 fi
 
-# --- Today's cost via ccusage ---
-today=$(date +"%Y-%m-%d")
-raw_cost=$(pnpm dlx ccusage daily --json 2>/dev/null | jq -r --arg d "$today" '.daily[] | select(.date == $d) | .totalCost')
+# --- Session cost (client-side estimate from stdin) ---
+raw_cost=$(echo "$input" | jq -r '.cost.total_cost_usd // empty')
 if [ -n "$raw_cost" ]; then
   cost=$(printf '$%.2f' "$raw_cost")
 else

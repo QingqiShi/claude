@@ -9,7 +9,10 @@
   },
   "permissions": {
     "allow": [],
-    "deny": ["Read(./.env)", "Read(./.env.*)"],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)"
+    ],
     "ask": [],
     "defaultMode": "bypassPermissions"
   },

@@ -16,3 +16,11 @@ skills/**/evals/results/
 !output-styles/
 !output-styles/**
 !statusline-command.sh
+!README.md
+!bootstrap.sh
+!update.sh
+
+# Third-party skills: reinstalled via bootstrap.sh, never vendored here.
+# (Must come after the !skills/** allow-list to override it.)
+skills/vercel-cli/
+skills/playwright-cli/

@@ -11,9 +11,11 @@ Two independent adversarial reviews — the built-in code-review skill and Codex
 ## 1. Preflight
 
 - `git status --short` plus `git diff HEAD --shortstat` — diff against `HEAD`, not the index, so staged-but-uncommitted work counts (and the diff vs the base branch if the work is already committed). Nothing to review in any scope → tell the user, stop.
-- If this session established how to run the project's tests or lint, run them now — sending code that fails its own tests into review wastes both reviewers. Don't invent test commands; if none are known, skip this.
+- **Deterministic sweep first — never pay an LLM fan-out to find greppable nits.** Run the cheap mechanical checks and fix what they catch *before* launching the reviews: the project's tests, lint, and typecheck (if this session established how to run them — don't invent commands; skip if none are known), plus, for a rename or convergence refactor (e.g. right after a `language-sweep`), a **case-insensitive** `rg` for every old term/spelling being replaced. A spelling residue or half-renamed term caught by `rg -i` costs ~nothing; the same residue caught by the multi-agent review costs a whole round — measured, this is where the loop bleeds the most. Send only semantic risk into the fan-out.
 
 ## 2. Launch both reviews — same turn, in parallel
+
+**Scope by round: round 1 reviews the full diff with both reviewers; every later round reviews only the files the previous round's fixes touched.** The only new defect risk in round N is round N−1's fix, so re-scanning the whole diff each round re-pays round 1's cost for nothing. Round 1 is the sole full-scope pass — keep it complete; scope everything after it to the delta.
 
 **Codex** — background Bash so it overlaps with code-review:
 
@@ -22,11 +24,11 @@ CODEX_ROOT=$(ls -d "$HOME/.claude/plugins/cache/openai-codex/codex"/*/ | sort -V
 node "${CODEX_ROOT}scripts/codex-companion.mjs" adversarial-review "--wait"
 ```
 
-Run with `run_in_background: true` (`--wait` keeps the script synchronous inside that shell; the background Bash is what detaches it). Scope resolves automatically — working tree if dirty, else branch. Add `--base <ref>` when the base isn't the default branch. On rounds ≥ 2, append focus text naming what was just fixed so Codex re-checks those areas hardest.
+Run with `run_in_background: true` (`--wait` keeps the script synchronous inside that shell; the background Bash is what detaches it). Scope resolves automatically — working tree if dirty, else branch. Add `--base <ref>` when the base isn't the default branch. On rounds ≥ 2, append focus text naming the exact files the last fix touched (`git diff --name-only` since the previous round) so Codex concentrates on the delta rather than re-reading everything.
 
 If the script errors (Codex CLI not set up, plugin missing), continue with code-review alone and tell the user the Codex leg was skipped — suggest `/codex:setup`. One reviewer down is degraded, not blocked.
 
-**code-review** — launch the built-in review workflow: `Workflow({name: "code-review", args: "<level> [target]"})` — the same multi-agent review as `/code-review`. Level must be `high`, `xhigh`, or `max` — anything else is read as target text (omit args entirely → `high`, the right default here). Target is an optional path/ref/free-form focus. Pass a level only if the user asked for one when invoking this skill. On rounds ≥ 2, pass the target — the same list of just-fixed areas you gave Codex. If the Workflow tool isn't available in this session, this leg is down — same degraded-not-blocked rule as Codex; with both legs down, stop and ask the user to run `/code-review` themselves.
+**code-review** — launch the built-in review workflow: `Workflow({name: "code-review", args: "<level> [target]"})` — the same multi-agent review as `/code-review`. Level must be `high`, `xhigh`, or `max` — anything else is read as target text (omit args entirely → `high`, the right default here). Target is an optional path/ref/free-form focus. Pass a level only if the user asked for one when invoking this skill. On rounds ≥ 2, set the target to the actual changed-file paths from the last fix (`git diff --name-only` since the previous round) — this genuinely scopes the fan-out to the delta, not just hints a focus, so a small fix buys a small review instead of a full re-scan. If the Workflow tool isn't available in this session, this leg is down — same degraded-not-blocked rule as Codex; with both legs down, stop and ask the user to run `/code-review` themselves.
 
 Both legs run in the background — collect each result as its completion notification arrives.
 
@@ -42,8 +44,9 @@ Both legs run in the background — collect each result as its completion notifi
 
 ## 4. Loop
 
-- Substantive fixes made → repeat step 2; fixes introduce bugs too. Trivial-only fixes (comments, naming) → no re-review needed.
-- Keep looping while it converges: each round surfacing strictly fewer confirmed findings than the last is the healthy tail of polishing — follow it all the way to zero.
+- Substantive fixes made → repeat step 2, but **scoped to only the files those fixes touched** (round 1 was the sole full-diff pass); fixes introduce bugs too, but only in what they changed. Trivial-only fixes (comments, naming, spelling) → no re-review needed.
+- Keep looping while it converges: each round surfacing strictly fewer confirmed findings than the last is the healthy tail of polishing — follow it all the way to zero. Because rounds ≥ 2 are delta-scoped, this tail is cheap; don't let its length tempt you back into full-diff re-scans.
+- **Converged short-circuit — don't buy a round to reconfirm zero.** When Codex approves *and* the code-review round comes back clean in the same round, you've converged; stop there. Likewise, if a round's fixes were trivial-only and both reviewers' last pass was already clean/approving, that's convergence — hand off without another round.
 - Stop on churn, whatever the round count: findings not shrinking round-over-round, or a round surfacing new defects in code the fixes never touched. More rounds won't fix that — something is structurally wrong; report what remains, do not raise the PR.
 - Hard backstop: 10 rounds. With the churn rule it should never bind; if it does, treat it as churn.
 

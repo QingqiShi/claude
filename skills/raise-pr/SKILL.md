@@ -13,7 +13,7 @@ A sub-agent does the work: it reads the diff, validates your context against it,
 ## 1. Branch mode
 
 - main/master or detached HEAD → default (new branch)
-- cwd under `.claude/worktrees/` → `worktree`
+- cwd under `.claude/worktrees/` or an orca worktree (path contains `orca/workspaces/`) → `worktree`
 - another branch → `AskUserQuestion`: stash & branch from main (`base_from_main`) / stack on current (`stack_on`) / commit to current (`commit_to_current`)
 
 ## 2. Recall the WHY — conversation only

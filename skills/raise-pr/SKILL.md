@@ -29,15 +29,19 @@ What did *this conversation* tell you about why this change was made? Quote or p
 > Read `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and follow it. Working dir: `<cwd>`.
 > Branch mode: `<mode + flags>`. Issue: `<#n or none>`.
 > Context (potentially partial — validate against the diff, assume it may be incomplete, never invent beyond it): `<the WHY from conversation, or "nothing from conversation">`
+> Screenshots already captured this session: `<paths + what each shows, or "none">`
+
+Screenshots are the one thing you can hand over beyond the WHY — if this session already shot the UI, pass the paths so the sub-agent reuses them instead of re-running the app. Listing files you saved is not reading the diff.
 
 ## 4. Finish
 
 The sub-agent returns the PR (url, branch, title) and any WHY it couldn't resolve from diff + context.
 
 - Quality checks failed → it raised nothing. Show the user, stop.
-- Gaps → ask the user for those reasons, then `gh pr edit` to fill them. Update the description and title however you see fit — re-check the title's type prefix (Conventional Commits), since the new WHY can change what the change *is* — but keep the description to the same 4 rules the sub-agent wrote to:
+- Gaps → ask the user for those reasons, then `gh pr edit` to fill them. Update the description and title however you see fit — re-check the title's type prefix (Conventional Commits), since the new WHY can change what the change *is* — but keep the description to the same 5 rules the sub-agent wrote to:
   1. Optimize for reviewer comprehension; lead with WHY.
   2. No test plan.
   3. Don't list code changes — describe behaviour, not the diff.
   4. Use a Mermaid diagram when it shows something the prose can't say as clearly — a non-trivial flow, state machine, or web of relationships.
+  5. Show a before/after comparison for user-facing visual changes, high up. Keep any `<img>` tags the sub-agent added — re-uploading is wasteful and the old URLs stay live.
 - Report url / branch / title.

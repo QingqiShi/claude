@@ -17,25 +17,27 @@ Which review, how deep, and how many rounds are yours to judge from the change i
 git status --short
 ```
 
-`git add -N` any untracked path that belongs to the change — every review below diffs tracked files only, so an untracked file is reviewed by nobody and ships anyway.
+`git add -N` any untracked path that belongs to the change — the reviews below diff tracked files only.
 
-If nothing changed, say so and stop. Otherwise read the diff: step 2 asks what kind of change this is, which a file list can't answer.
+If nothing changed, say so and stop. Otherwise read the diff, not just the file list — step 2 turns on what's in it.
 
 ## 2. Choose the review
 
 Three tools. Say what you picked and why before running anything.
 
-**`code-review`** — correctness angles in parallel plus a cleanup finder, every candidate independently verified, findings ranked and capped. Reviews only. The default for anything carrying correctness risk.
+**`code-review`** — correctness angles in parallel plus a cleanup finder, every candidate independently verified, findings ranked and capped. Reviews only.
 
 **`/simplify`** — four cleanup agents in parallel (Reuse, Simplification, Efficiency, Altitude). Applies its own fixes.
 
-**Codex adversarial** — challenges the approach: assumptions, tradeoffs, whether this design is right. Reviews only. Worth it when there was a real design decision that could be wrong; not for a bug fix.
+**Codex adversarial** — challenges the approach: assumptions, tradeoffs, whether this design is right. Reviews only. Worth it when there was a real design decision that could be wrong.
 
 ### code-review vs /simplify
 
 code-review's coverage is a superset — the same cleanup lenses, plus Conventions (the diff against the CLAUDE.md files governing it), plus correctness. What `/simplify` adds is depth and fixes: code-review folds every lens into one finder, and when the cap forces a cut correctness always outranks cleanup, so cleanup findings are the first crowded out.
 
-So `/simplify` when cleanup *is* the work, or when you expect it to lose the cap fight. Pure refactor → `/simplify` alone; paying correctness finders to hunt bugs in a rename is the wrong spend. Bug fix → `code-review` alone. Both only when the change is large and cleanup matters.
+So pick on correctness risk: `code-review` when there's risk left to catch, `/simplify` when there isn't.
+
+Neither category nor size decides it: a bug fix you've already reasoned through may want only `/simplify`; a rename whose blast radius you never traced wants `code-review`. Run both only when the cap would crowd cleanup out.
 
 ### Depth
 
@@ -47,21 +49,21 @@ So `/simplify` when cleanup *is* the work, or when you expect it to lose the cap
 
 Scale to blast radius, not diff size — two lines of auth logic outrank a thousand-line rename. `high` by default; `xhigh` for architectural changes, cross-subsystem work, changed persisted formats, or security; `max` when the reasoning is the hard part rather than the surface area.
 
-Pass the level explicitly, or a bare call inherits the session's effort slider and the skill drifts run to run. If the user named one, use theirs.
+Pass the level explicitly — a bare call inherits the session's effort slider. If the user named one, use theirs.
 
 ## 3. Run it
 
-**`/simplify` first**, if you're running it — it rewrites the working tree, so anything reviewed before it ran was reviewed stale, and its own edits would go unreviewed.
+**`/simplify` first**, if you're running it — it rewrites the working tree, so reviews that ran before it are stale.
 
 ```
 Workflow({ name: "code-review", args: "<level> <scope or focus>" })
 ```
 
-Runs in the background; verified findings arrive as a task notification. Anything after the level is the review target — exclude paths with it, or say what the change is *for*, the one thing finders can't derive from the diff. Don't put `--fix` there; it parses as target text, and applying findings is step 4.
+Runs in the background; verified findings arrive as a task notification. Anything after the level is the review target — exclude paths with it, or say what the change is *for*. Don't put `--fix` there; it parses as target text.
 
 Never invoke `ultra` — a billed cloud review only the user can start. If the change warrants it, say so and let them type `/code-review ultra`.
 
-If the workflow name doesn't resolve, its routing sits behind a remote feature gate that may be off. Don't improvise — ask the user to run `/code-review <level> --fix` and continue from step 4.
+If the workflow name doesn't resolve, don't improvise — ask the user to run `/code-review <level> --fix` and continue from step 4.
 
 **Codex**, when the approach is what's in question:
 
@@ -75,7 +77,7 @@ Resolve the path rather than hardcoding a version — several are usually instal
 
 Report findings with `ReportFindings`, then fix each directly. Skip any whose fix would change intended behaviour, reach well outside the diff, or that you judge a false positive — note the skip rather than arguing with it. Then call `ReportFindings` again with the same findings, each carrying an `outcome` of `fixed`, `no_change_needed`, or `skipped`, before any prose summary; the per-finding status updates only from that call.
 
-Run the repo's typecheck, lint and tests — including after `/simplify`, whose edits are as unreviewed as anyone else's. Use commands this session actually learned. A failure that predates the change isn't this change's fault; say which it was rather than chasing it.
+Run the repo's typecheck, lint and tests, including after `/simplify`. Use commands this session actually learned. A failure that predates the change isn't this change's fault; say which it was rather than chasing it.
 
 ## 5. Decide whether to go again
 
@@ -85,7 +87,7 @@ Judgement, not a fixed number: is there now materially unreviewed risk another p
 Workflow({ name: "code-review", args: "<level> <paths the fixes touched> — review only these" })
 ```
 
-Not because findings existed, the count felt high, or you want to be thorough — those reasons never run out. A reviewer asked for more always produces more, so "repeat until a round comes back empty" doesn't terminate. Each round should answer a narrower question than the last; when it wouldn't, you're done.
+Not because findings existed, the count felt high, or you want to be thorough — those reasons never run out. Each round should answer a narrower question than the last; when it wouldn't, you're done.
 
 If a round surfaces something structural — fixes fighting each other, a defect that keeps reappearing — stop and report instead of raising.
 
@@ -93,7 +95,7 @@ If a round surfaces something structural — fixes fighting each other, a defect
 
 Invoke **`raise-pr`**.
 
-Carry what's still open into the PR description: findings you skipped, and correctness findings verified PLAUSIBLE rather than CONFIRMED — real mechanisms with unproven triggers, which a human who knows whether that configuration occurs judges better than a review pass can. Give the finding and its evidence, not a count.
+Carry what's still open into the PR description: findings you skipped, and correctness findings verified PLAUSIBLE rather than CONFIRMED — real mechanisms with unproven triggers, left for the user to judge. Give the finding and its evidence, not a count.
 
 If Codex was wanted and didn't run, say the review was Codex-degraded and suggest `/codex:setup`.
 
@@ -105,7 +107,7 @@ Once raise-pr reports the PR number:
 gh pr checks <PR#> --watch
 ```
 
-Run it in background Bash; its completion notification is the signal to act. No `--fail-fast` — letting every check finish means one fix round covers all the reds. "No checks reported" → wait a minute, retry once; still nothing → no CI, report and finish.
+Run it in background Bash; its completion notification is the signal to act. No `--fail-fast`, so one fix round can cover every red. "No checks reported" → wait a minute, retry once; still nothing → no CI, report and finish.
 
 On failure read before touching anything: `gh pr checks <PR#>` for which check failed, `gh run view <run-id> --log-failed` for why.
 

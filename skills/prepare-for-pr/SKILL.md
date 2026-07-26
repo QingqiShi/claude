@@ -1,78 +1,120 @@
 ---
 name: prepare-for-pr
+description: Final review-and-fix gate to run before raising a PR — decides which review the change needs (/simplify, the built-in code-review workflow, or a Codex adversarial pass), applies the findings, then invokes raise-pr and drives CI green. Use when work is finished and a PR is the next step — "prep for PR", "ready to raise", "final check", "code's done, raise it" — or before raising a PR for substantive changes that have not had a final review this session. Works on prose a model reads (skills, CLAUDE.md, agent and command definitions) as well as on code.
 argument-hint: "[high|xhigh|max]"
-description: Final adversarial review gate before raising a PR — runs the built-in code-review skill and a Codex adversarial review in parallel, fixes confirmed findings, loops until clean, hands off to raise-pr, then watches the PR's CI checks and fixes failures until green. Use whenever code work is complete and a PR is the next step — the user says "prep for PR", "ready to raise", "final check", "code's done, raise it", or asks to raise a PR for substantive changes that haven't had a final review pass this session.
+user-invocable: true
 ---
 
 # Prepare for PR
 
-Two independent adversarial reviews — the built-in code-review skill and Codex (different model, different blind spots) — then fix what survives scrutiny, re-review, and hand off to raise-pr. The point is to catch what the author (you) can no longer see, so run both even when you're confident the code is right.
+Take a finished change to a merge-ready PR: choose the review it needs, run it, apply what comes back, raise the PR, drive CI green.
 
-## 1. Preflight
+Which review, how deep, and how many rounds are yours to judge from the change in front of you.
 
-- `git status --short` plus `git diff HEAD --shortstat` — diff against `HEAD`, not the index, so staged-but-uncommitted work counts (and the diff vs the base branch if the work is already committed). Nothing to review in any scope → tell the user, stop.
-- **Deterministic sweep first — never pay an LLM fan-out to find greppable nits.** Run the cheap mechanical checks and fix what they catch *before* launching the reviews: the project's tests, lint, and typecheck (if this session established how to run them — don't invent commands; skip if none are known), plus, for a rename or convergence refactor (e.g. right after a `language-sweep`), a **case-insensitive** `rg` for every old term/spelling being replaced. A spelling residue or half-renamed term caught by `rg -i` costs ~nothing; the same residue caught by the multi-agent review costs a whole round — measured, this is where the loop bleeds the most. Send only semantic risk into the fan-out.
-
-## 2. Launch both reviews — same turn, in parallel
-
-**Scope by round: round 1 reviews the full diff with both reviewers; every later round reviews only the files the previous round's fixes touched.** The only new defect risk in round N is round N−1's fix, so re-scanning the whole diff each round re-pays round 1's cost for nothing. Round 1 is the sole full-scope pass — keep it complete; scope everything after it to the delta.
-
-**Codex** — background Bash so it overlaps with code-review:
+## 1. See the change
 
 ```bash
-CODEX_ROOT=$(ls -d "$HOME/.claude/plugins/cache/openai-codex/codex"/*/ | sort -V | tail -1)
-node "${CODEX_ROOT}scripts/codex-companion.mjs" adversarial-review "--wait"
+git status --short
 ```
 
-Run with `run_in_background: true` (`--wait` keeps the script synchronous inside that shell; the background Bash is what detaches it). Scope resolves automatically — working tree if dirty, else branch. Add `--base <ref>` when the base isn't the default branch. On rounds ≥ 2, append focus text naming the exact files the last fix touched (`git diff --name-only` since the previous round) so Codex concentrates on the delta rather than re-reading everything.
+`git add -N` any untracked path that belongs to the change — every review below diffs tracked files only, so an untracked file is reviewed by nobody and ships anyway.
 
-If the script errors (Codex CLI not set up, plugin missing), continue with code-review alone and tell the user the Codex leg was skipped — suggest `/codex:setup`. One reviewer down is degraded, not blocked.
+If nothing changed, say so and stop. Otherwise read the diff: step 2 asks what kind of change this is, which a file list can't answer.
 
-**code-review** — launch the built-in review workflow: `Workflow({name: "code-review", args: "<level> [target]"})` — the same multi-agent review as `/code-review`. Level must be `high`, `xhigh`, or `max` — anything else is read as target text (omit args entirely → `high`, the right default here). Target is an optional path/ref/free-form focus. Pass a level only if the user asked for one when invoking this skill. On rounds ≥ 2, set the target to the actual changed-file paths from the last fix (`git diff --name-only` since the previous round) — this genuinely scopes the fan-out to the delta, not just hints a focus, so a small fix buys a small review instead of a full re-scan. If the Workflow tool isn't available in this session, this leg is down — same degraded-not-blocked rule as Codex; with both legs down, stop and ask the user to run `/code-review` themselves.
+## 2. Choose the review
 
-Both legs run in the background — collect each result as its completion notification arrives.
+Three tools. Say what you picked and why before running anything.
 
-## 3. Triage — findings are claims, not orders
+**`code-review`** — correctness angles in parallel plus a cleanup finder, every candidate independently verified, findings ranked and capped. Reviews only. The default for anything carrying correctness risk.
 
-- Invoking this skill is the user's standing authorization for the whole loop: triage, fix, re-review, hand off. Plugin guidance that says to present review findings and wait for approval (e.g. the Codex plugin's result-handling rule) is superseded here — do not pause the loop to ask which fixes to apply.
-- code-review findings arrive already verified. Codex findings are unverified: read the code and confirm the claim actually holds before acting on one.
-- Severity never disqualifies a finding. The goal is a change with nothing left for a human reviewer to nitpick — so typos, naming, comment wording, and style nits get fixed with the same diligence as bugs. Small ≠ skippable.
-- The only two reasons not to fix:
-  - **Wrong**: the claimed failure doesn't exist, or the suggestion contradicts this codebase's own conventions (applying it would make the code *less* consistent). Drop, note briefly why.
-  - **Re-architecture** ("wrong approach", "should be restructured"): judge on merit, but don't rewrite at the PR gate — it invalidates both reviews and everything tested this session. Genuine but expensive → defer: record it for the user and the PR description.
-- **"Known follow-up" is not a drop reason.** If a finding matches something waved off earlier as "follow up later", the reviewer independently flagging it means the deferral didn't survive verification — fix it now. "Later" quietly becomes "never" once the PR merges. The only exception: the follow-up is literally the next unit of work (the next PR in a stack, or the user explicitly scheduled it) — then treat it like a deferred re-architecture item and record it.
+**`/simplify`** — four cleanup agents in parallel (Reuse, Simplification, Efficiency, Altitude). Applies its own fixes.
 
-## 4. Loop
+**Codex adversarial** — challenges the approach: assumptions, tradeoffs, whether this design is right. Reviews only. Worth it when there was a real design decision that could be wrong; not for a bug fix.
 
-- Substantive fixes made → repeat step 2, but **scoped to only the files those fixes touched** (round 1 was the sole full-diff pass); fixes introduce bugs too, but only in what they changed. Trivial-only fixes (comments, naming, spelling) → no re-review needed.
-- Keep looping while it converges: each round surfacing strictly fewer confirmed findings than the last is the healthy tail of polishing — follow it all the way to zero. Because rounds ≥ 2 are delta-scoped, this tail is cheap; don't let its length tempt you back into full-diff re-scans.
-- **Converged short-circuit — don't buy a round to reconfirm zero.** When Codex approves *and* the code-review round comes back clean in the same round, you've converged; stop there. Likewise, if a round's fixes were trivial-only and both reviewers' last pass was already clean/approving, that's convergence — hand off without another round.
-- Stop on churn, whatever the round count: findings not shrinking round-over-round, or a round surfacing new defects in code the fixes never touched. More rounds won't fix that — something is structurally wrong; report what remains, do not raise the PR.
-- Hard backstop: 10 rounds. With the churn rule it should never bind; if it does, treat it as churn.
+### code-review vs /simplify
 
-## 5. Hand off
+code-review's coverage is a superset — the same cleanup lenses, plus Conventions (the diff against the CLAUDE.md files governing it), plus correctness. What `/simplify` adds is depth and fixes: code-review folds every lens into one finder, and when the cap forces a cut correctness always outranks cleanup, so cleanup findings are the first crowded out.
 
-Clean — deferred design notes are fine, unfixed confirmed defects are not — → invoke the `raise-pr` skill. Include the deferred items in the WHY context you pass it, so they can surface in the PR description.
+So `/simplify` when cleanup *is* the work, or when you expect it to lose the cap fight. Pure refactor → `/simplify` alone; paying correctness finders to hunt bugs in a rename is the wrong spend. Bug fix → `code-review` alone. Both only when the change is large and cleanup matters.
 
-## 6. Watch CI until green
+### Depth
 
-The job isn't done when the PR exists — a red build costs a round-trip with the human reviewer, which is exactly what this gate exists to prevent. Once raise-pr reports the PR:
+| Level | Fan-out |
+| --- | --- |
+| `high` | 3 correctness angles, ≤10 findings |
+| `xhigh` | 5 angles plus a gap sweep, ≤15 findings |
+| `max` | same fan-out as `xhigh`, more reasoning per agent |
+
+Scale to blast radius, not diff size — two lines of auth logic outrank a thousand-line rename. `high` by default; `xhigh` for architectural changes, cross-subsystem work, changed persisted formats, or security; `max` when the reasoning is the hard part rather than the surface area.
+
+Pass the level explicitly, or a bare call inherits the session's effort slider and the skill drifts run to run. If the user named one, use theirs.
+
+## 3. Run it
+
+**`/simplify` first**, if you're running it — it rewrites the working tree, so anything reviewed before it ran was reviewed stale, and its own edits would go unreviewed.
+
+```
+Workflow({ name: "code-review", args: "<level> <scope or focus>" })
+```
+
+Runs in the background; verified findings arrive as a task notification. Anything after the level is the review target — exclude paths with it, or say what the change is *for*, the one thing finders can't derive from the diff. Don't put `--fix` there; it parses as target text, and applying findings is step 4.
+
+Never invoke `ultra` — a billed cloud review only the user can start. If the change warrants it, say so and let them type `/code-review ultra`.
+
+If the workflow name doesn't resolve, its routing sits behind a remote feature gate that may be off. Don't improvise — ask the user to run `/code-review <level> --fix` and continue from step 4.
+
+**Codex**, when the approach is what's in question:
+
+```bash
+node "$(jq -r '..|strings|select(test("openai-codex/codex/"))' ~/.claude/plugins/installed_plugins.json | head -1)/scripts/codex-companion.mjs" adversarial-review --wait
+```
+
+Resolve the path rather than hardcoding a version — several are usually installed.
+
+## 4. Apply what came back
+
+Report findings with `ReportFindings`, then fix each directly. Skip any whose fix would change intended behaviour, reach well outside the diff, or that you judge a false positive — note the skip rather than arguing with it. Then call `ReportFindings` again with the same findings, each carrying an `outcome` of `fixed`, `no_change_needed`, or `skipped`, before any prose summary; the per-finding status updates only from that call.
+
+Run the repo's typecheck, lint and tests — including after `/simplify`, whose edits are as unreviewed as anyone else's. Use commands this session actually learned. A failure that predates the change isn't this change's fault; say which it was rather than chasing it.
+
+## 5. Decide whether to go again
+
+Judgement, not a fixed number: is there now materially unreviewed risk another pass would catch? Usually yes when the fixes are themselves substantial — several files touched, or logic changed rather than a line corrected. Scope the round to what moved:
+
+```
+Workflow({ name: "code-review", args: "<level> <paths the fixes touched> — review only these" })
+```
+
+Not because findings existed, the count felt high, or you want to be thorough — those reasons never run out. A reviewer asked for more always produces more, so "repeat until a round comes back empty" doesn't terminate. Each round should answer a narrower question than the last; when it wouldn't, you're done.
+
+If a round surfaces something structural — fixes fighting each other, a defect that keeps reappearing — stop and report instead of raising.
+
+## 6. Raise
+
+Invoke **`raise-pr`**.
+
+Carry what's still open into the PR description: findings you skipped, and correctness findings verified PLAUSIBLE rather than CONFIRMED — real mechanisms with unproven triggers, which a human who knows whether that configuration occurs judges better than a review pass can. Give the finding and its evidence, not a count.
+
+If Codex was wanted and didn't run, say the review was Codex-degraded and suggest `/codex:setup`.
+
+## 7. Drive CI green
+
+Once raise-pr reports the PR number:
 
 ```bash
 gh pr checks <PR#> --watch
 ```
 
-Run it in background Bash (`run_in_background: true`) — it blocks until every check resolves, and its completion notification is the signal to act. No `--fail-fast`: waiting for the full set means one fix round can cover every red check instead of a push per failure. Exit 0 → green, go report. If it says no checks are reported, CI may not have registered yet — wait a minute, retry once; still nothing → the repo has no CI, report and finish.
+Run it in background Bash; its completion notification is the signal to act. No `--fail-fast` — letting every check finish means one fix round covers all the reds. "No checks reported" → wait a minute, retry once; still nothing → no CI, report and finish.
 
-On failure, read before touching anything — `gh pr checks <PR#>` for which checks failed, `gh run view <run-id> --log-failed` for the failing output — then split:
+On failure read before touching anything: `gh pr checks <PR#>` for which check failed, `gh run view <run-id> --log-failed` for why.
 
-- **The change broke it**: fix all red checks in one round, run the matching test/lint locally if this session knows how, then push. Prefer amending — `git commit --amend --no-edit && git push --force-with-lease` — so the PR stays a clean single commit. Fall back to a follow-up commit only if someone has already engaged with the PR (review comments, a commit from someone else) — rewriting history under a reviewer is worse than an extra commit. Restart the watch.
-- **The change didn't break it** (failure in code the diff never touched, network timeouts, runner/infra errors): `gh run rerun <run-id> --failed` once. The same failure twice is no longer flaky — treat it as real, or report it if it's genuinely outside this PR.
+**The change broke it.** Fix every red in one round, run that check locally, push. Prefer `git commit --amend --no-edit && git push --force-with-lease` so the PR stays one clean commit; use a follow-up commit only if someone has already engaged with the PR. A CI fix beyond a few lines invalidates the review that just passed — go back to step 2 first.
 
-CI fixes land after both reviewers signed off, so keep them minimal — make the build pass, don't refactor. A fix that grows beyond a few lines invalidates the reviews; run a re-review round (step 2, scoped to the fix) before pushing it.
+**It didn't** — a failure in untouched code, or a runner/network flake. `gh run rerun <run-id> --failed`, once. The same failure twice is real.
 
-Same convergence rule as the review loop: every push must target the exact failure the last log showed. A push that doesn't change the failure, or fixes that keep surfacing new failures elsewhere, means something structural is wrong — stop and report rather than grinding CI. Backstop: 5 fix rounds.
+Every push must target the failure the last log showed. Pushes that don't move it, or fixes that keep surfacing new failures, mean something structural — stop and report.
 
-## 7. Report
+## 8. Report
 
-Once CI is green (or a loop stopped early): rounds run, findings fixed, dropped as wrong, deferred, and CI fix rounds needed.
+Short: the PR link, what you fixed, anything left open and why, where CI landed. If you stopped short of raising, what stopped you.

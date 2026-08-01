@@ -40,7 +40,10 @@ npx --yes skills update --global --yes || warn "  (skills update failed)"
 # 3. playwright-cli (bump the npm pkg, then regenerate the skill tree) -------
 log "Updating $PLAYWRIGHT_CLI_PKG and regenerating skills/playwright-cli/…"
 npm install -g "$PLAYWRIGHT_CLI_PKG"
-playwright-cli install --skills || warn "  (playwright-cli install --skills failed)"
+# Run from the parent of ~/.claude: playwright-cli creates its workspace at
+# <cwd>/.claude, so running inside ~/.claude would nest a second .claude/.
+( cd "$(dirname "$CLAUDE_DIR")" && playwright-cli install --skills ) \
+  || warn "  (playwright-cli install --skills failed)"
 
 # 4. Record the run ----------------------------------------------------------
 pw_ver="$(npm ls -g @playwright/cli 2>/dev/null | grep -o '@playwright/cli@[0-9.]*' | head -1 || true)"

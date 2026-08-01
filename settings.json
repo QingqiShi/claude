@@ -16,13 +16,14 @@
     "ask": [],
     "defaultMode": "bypassPermissions"
   },
+  "model": "opus[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -33,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -44,7 +45,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -55,7 +56,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -66,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -77,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -89,7 +90,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -101,7 +102,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -113,7 +114,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]
@@ -125,7 +126,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else cat >/dev/null 2>&1 || :; fi",
+            "command": "if [ -f '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -r '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ] && [ -x '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh' ]; then /bin/sh '/Users/qingqishi/.orca/agent-hooks/claude-hook.sh'; else { command -p cat 2>/dev/null || cat; } >/dev/null 2>&1 || :; fi",
             "timeout": 10
           }
         ]

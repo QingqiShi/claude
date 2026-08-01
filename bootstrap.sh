@@ -65,6 +65,9 @@ done
 # 4. playwright-cli (binary-generated — must flow in from the install command)
 log "Installing $PLAYWRIGHT_CLI_PKG and regenerating skills/playwright-cli/…"
 npm install -g "$PLAYWRIGHT_CLI_PKG"
-playwright-cli install --skills || warn "  (playwright-cli install --skills failed)"
+# Run from the parent of ~/.claude: playwright-cli creates its workspace at
+# <cwd>/.claude, so running inside ~/.claude would nest a second .claude/.
+( cd "$(dirname "$CLAUDE_DIR")" && playwright-cli install --skills ) \
+  || warn "  (playwright-cli install --skills failed)"
 
 log "Done. Restart Claude Code to load newly-installed plugins."

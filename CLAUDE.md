@@ -1,9 +1,15 @@
-ALWAYS use the `raise-pr` skill for creating PRs.
-When working from within a worktree, use `git checkout origin/main` instead of `git checkout main`, because main is likely already checked out in another worktree.
-Reading a web page: use the `playwright-cli` skill, never `WebFetch` (unreliable). `WebSearch` is fine for finding URLs. Exception: reading a claude.ai Artifact's content — use `WebFetch` there as the Artifact tool documents; the page is auth-gated, so a plain browser hits a login wall.
-Plan before large chunks of work, but NEVER use Plan Mode.
-Keep comments and JSDoc to a line or two saying only what the code can't say itself — no design rationale, history, alternatives considered, or prose that restates the implementation.
-Large dev work: break it down and hand the implementation to sub-agents, picking Sonnet for simpler or mechanical changes. Use reviewer agents for line-by-line reviews — never do those yourself; hold quality from a higher level instead (build passes, tests pass, Playwright end-to-end coverage exists). Follow-up iterations go to sub-agents too. The point is to keep the main agent's context lean so iteration can run long without compaction.
-When a large piece of work is done, report it as an Artifact optimised for human review — few words, images and diagrams over prose — rather than a long markdown response. Two or three lines is a fine artifact; short usually reviews better.
-Speak to me in ASD-STE100 Simplified Technical English: approved words in one meaning each, short sentences, active voice, one instruction per sentence. This applies only to what you say to me in the conversation. Deliverables keep their own voice — code, comments, docs, artifacts, PR descriptions and commit messages.
-If a CONTEXT.md exists with a glossary (or a CONTEXT-MAP.md pointing at per-context CONTEXT.md files), use its terms in code, comments, copy, and conversation. If the user's wording is ambiguous or uses a synonym or an `_Avoid_` term, confirm which glossary term they mean before acting — especially while planning, so requirements are stated in unambiguous language.
+Always use the `raise-pr` skill to make a pull request. This rule applies to all pull requests.
+
+In a worktree, use `git checkout origin/main`. Do not use `git checkout main`, because a different worktree usually has main.
+
+To read a web page, use the `playwright-cli` skill. Do not use `WebFetch`, because it is not reliable. You can use `WebSearch` to find a URL. There is one exception: to read the content of a claude.ai Artifact, use `WebFetch` as the Artifact tool tells you. The page has an authentication gate, and a usual browser shows only the login page.
+
+Make a plan before a large task. Do not use Plan Mode.
+
+For a large task, divide the work. Give each part to a sub-agent. Select Sonnet for a simple or mechanical change. Use reviewer agents for a line-by-line review. Do not do a line-by-line review yourself. Control the quality at a higher level: the build is correct, the tests pass, and Playwright tests the full flow. Give each later change to a sub-agent also. This keeps the context of the main agent small, and you can then do many steps before compaction.
+
+Speak to me in ASD-STE100 Simplified Technical English. Use approved words with one meaning for each word. Write short sentences. Use the active voice. Give one instruction in each sentence. Write comments and JSDoc in the same English.
+
+Also keep comments and JSDoc to one or two lines. Write only what the code cannot show. Do not write design reasons, history, other possible solutions, or text that says the code again.
+
+If a CONTEXT.md file has a glossary, use its terms in code, comments, copy, and conversation. A CONTEXT-MAP.md file can point to one CONTEXT.md file for each context. If my words are not clear, or if I use a synonym or an `_Avoid_` term, ask me which glossary term is correct. Ask before you start the work, especially during the planning.

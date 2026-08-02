@@ -19,15 +19,22 @@ Use the given context, or a reason genuinely self-evident from the diff. If you 
 
 1. Optimize for reviewer comprehension; lead with WHY.
 2. No test plan.
-3. Don't list code changes — describe behaviour, not the diff.
+3. Write about the change that a user of the app can see. Do not write about the code. The rule is the same for sentences and for lists.
 4. Use a Mermaid diagram when it shows something the prose can't say as clearly — a non-trivial flow, state machine, or web of relationships.
 5. Show a before/after comparison for user-facing visual changes, high up. The prose must still stand on its own without it.
 
-No template — pick whatever structure explains this change best. If WHY is missing for any part, open the PR as a **draft**.
+No template — pick whatever structure explains this change best.
+
+Remove the parts that the reviewer does not need. Write about the change. Do not write about your work on the change.
+
+Do not write about a task that you did not do. Do not write about a method that you did not use. Do not write about the limits of the change. Write about one of these three items only if it changes what the reviewer must do.
+
+If WHY is missing for any part, open the PR as a **draft**.
 
 ## Conventions
 
 - Type ∈ {feat, fix, refactor, perf, style, test, docs, build, ci, chore, revert}.
 - Branch `<type>/<kebab-desc>`, ≤50 chars. Commit & title `<type>: <desc>`, lowercase, title ≤72.
+- Write each paragraph of the description on one line. Do not break a paragraph into short lines.
 - Branch setup: default → `git checkout -b`; `worktree` → `git branch -m`; `stack_on` → `git checkout -b` off current; `commit_to_current` → commit on current, no new branch; `base_from_main` → `git stash -u` → checkout main → `git stash pop` → `git checkout -b`.
 - Then `git commit` → `git push -u origin <branch>` → `gh pr create` (heredoc body to preserve Mermaid/formatting). Issue given → last body line `Closes #<n>`.

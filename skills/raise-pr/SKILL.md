@@ -41,7 +41,11 @@ The sub-agent returns the PR (url, branch, title) and any WHY it couldn't resolv
 - Gaps → ask the user for those reasons, then `gh pr edit` to fill them. Update the description and title however you see fit — re-check the title's type prefix (Conventional Commits), since the new WHY can change what the change *is* — but keep the description to the same 5 rules the sub-agent wrote to:
   1. Optimize for reviewer comprehension; lead with WHY.
   2. No test plan.
-  3. Don't list code changes — describe behaviour, not the diff.
+  3. Write about the change that a user of the app can see. Do not write about the code. The rule is the same for sentences and for lists.
   4. Use a Mermaid diagram when it shows something the prose can't say as clearly — a non-trivial flow, state machine, or web of relationships.
   5. Show a before/after comparison for user-facing visual changes, high up. Keep any `<img>` tags the sub-agent added — re-uploading is wasteful and the old URLs stay live.
+
+  Remove the parts that the reviewer does not need. Write about the change. Do not write about your work on the change. Do not write about a task that you did not do. Do not write about a method that you did not use. Do not write about the limits of the change. Write about one of these three items only if it changes what the reviewer must do.
+
+  Write each paragraph of the description on one line. Do not break a paragraph into short lines.
 - Report url / branch / title.

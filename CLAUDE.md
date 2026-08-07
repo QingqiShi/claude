@@ -14,6 +14,6 @@ Avoid resuming previous sub-agents, because it's expensive.
 
 Use the file system or scratch pad to communicate between agents.
 
-Keep comments and JSDoc to one or two lines. Write only what the code cannot show. Do not write design reasons, history, other possible solutions, or text that says the code again.
+Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained.
 
 Look for a CONTEXT.md file or a CONTEXT-MAP.md file that contains the domain language used in the repository. Challenge me when I could have used domain language to communicate more clearly.

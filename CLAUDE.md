@@ -12,7 +12,19 @@ Look for a CONTEXT.md file or a CONTEXT-MAP.md file that contains the domain lan
 
 Make a plan before a large task, but never use Plan Mode.
 
-Always keep a HANDOFF.md file up to date, so that you can be terminated and your context cleared at any time. Keep it structured and very brief: one sentence for the goal of the current task, the solid facts settled by my explicit instructions or by the code you read, the running approach, the current state, and the next steps. A sub-agent can read the file when you tell it to.
+Keep a HANDOFF.md file, so that you can be terminated and your context cleared at any time. A sub-agent can read the file when you tell it to.
+
+Use exactly these five headings, in this order, with at most five one-line bullets each. Keep the whole file under 40 lines.
+
+- `## Goal` — one sentence for the current task.
+- `## Settled` — facts fixed by my explicit instructions or by the code you read.
+- `## Approach` — the running plan.
+- `## State` — what is done and what is in flight.
+- `## Next` — the immediate next steps.
+
+Update it only at natural stopping points: a sub-agent reports back, a milestone lands, I change the goal, or you are about to start something long or risky. Never update it after every tool call or edit.
+
+It is a snapshot, not a log. Rewrite or delete stale bullets rather than appending to them, and keep no history of what the file used to say.
 
 Delegate implementation and iterations to sub-agents, to minimise context rot.
 

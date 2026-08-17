@@ -2,6 +2,8 @@
 name: language-sweep
 argument-hint: "[learn|converge] [diff|<path>] [focus…]"
 description: Sweep a repo for inconsistent technical and domain language — competing synonyms across code identifiers, comments, docs, and user-facing product copy — and converge on one term per concept. Learning phase distills the glossary into CONTEXT.md; convergence phase finds and fixes drift against it. Use when the user asks for a language sweep, wants a domain glossary or CONTEXT.md, mentions ubiquitous language, or complains that the same concept goes by different names in the code or the product.
+user-invocable: true
+disable-model-invocation: true
 ---
 
 # Language Sweep

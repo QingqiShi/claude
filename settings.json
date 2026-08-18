@@ -13,7 +13,7 @@
     "ask": [],
     "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "claude-fable-5[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -201,6 +201,7 @@
   },
   "effortLevel": "xhigh",
   "promptSuggestionEnabled": false,
+  "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
   "preferredNotifChannel": "ghostty",
@@ -236,6 +237,5 @@
       "routine under ~/.claude/ prefix: skill authoring, settings.json/CLAUDE.md edits, and bootstrap.sh-driven plugin/skill installs are routine personal config maintenance in this repo"
     ]
   },
-  "voiceEnabled": true,
-  "tui": "fullscreen"
+  "voiceEnabled": true
 }

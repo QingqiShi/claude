@@ -4,7 +4,7 @@ In a worktree, use `git checkout origin/main` instead of `git checkout main`, be
 
 To read a web page, use the `playwright-cli` skill. Do not use the unreliable `WebFetch`. You can use `WebSearch` to find a URL. There is one exception: to read the content of a claude.ai Artifact, use `WebFetch` as the Artifact tool tells you. The Artifact page has an authentication gate, and a usual browser shows only the login page.
 
-Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained.
+Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained. Inline comments should be one to two lines max and adopt ASD-STE100 Simplified Technical English.
 
 Look for a CONTEXT.md file or a CONTEXT-MAP.md file that contains the domain language used in the repository. Challenge me when I could have used domain language to communicate more clearly.
 
@@ -30,7 +30,7 @@ Delegate implementation and iterations to sub-agents, to minimise context rot.
 
 Tell each sub-agent in its prompt that it is a sub-agent, so that it obeys the correct section.
 
-Always specify the model explicitly. Select the model to fit the task: Haiku for code exploration, Sonnet for a simple or mechanical change, Opus for usual implementation and review work, and Fable for the most difficult reasoning or a long agentic task.
+Always pass the `model` parameter explicitly when you create a sub-agent. Select the model to fit the task: Haiku for code exploration, Sonnet for a simple or mechanical change, Opus for usual implementation and review work, and Fable for the most difficult reasoning or a long agentic task.
 
 Never restart a sub-agent after it is done, because it is expensive. There is one exception: if the sub-agent sent no response, you can send it a message immediately after it supposedly finished.
 

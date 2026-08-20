@@ -24,7 +24,7 @@ What did *this conversation* tell you about why this change was made? Quote or p
 
 ## 3. Spawn the sub-agent
 
-`Agent` (inherit your own model — don't downgrade; this needs the reasoning):
+`Agent` with `model: sonnet`:
 
 > Read `${CLAUDE_SKILL_DIR}/references/pr-creation.md` and follow it. Working dir: `<cwd>`.
 > Branch mode: `<mode + flags>`. Issue: `<#n or none>`.

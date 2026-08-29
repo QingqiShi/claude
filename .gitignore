@@ -16,6 +16,8 @@ skills/**/evals/results/
 !output-styles/
 !output-styles/**
 !statusline-command.sh
+!hooks/
+!hooks/**
 !README.md
 !bootstrap.sh
 !update.sh

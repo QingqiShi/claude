@@ -91,6 +91,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash ~/.claude/hooks/require-agent-model.sh",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUse": [

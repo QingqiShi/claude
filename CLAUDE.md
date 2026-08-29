@@ -1,39 +1,49 @@
-Always use the `raise-pr` skill to make a pull request.
+Always use the `prepare-for-pr` skill to make a pull request.
 
-In a worktree, use `git checkout origin/main` instead of `git checkout main`, because a different worktree usually has main.
+In a worktree, use `git checkout origin/main` instead of `git checkout main`, because another worktree usually has `main` checked out.
 
-To read a web page, use the `playwright-cli` skill. Do not use the unreliable `WebFetch`. You can use `WebSearch` to find a URL. There is one exception: to read the content of a claude.ai Artifact, use `WebFetch` as the Artifact tool tells you. The Artifact page has an authentication gate, and a usual browser shows only the login page.
+Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained. Inline comments should be at most two lines and use ASD-STE100 Simplified Technical English.
 
-Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained. Inline comments should be one to two lines max and adopt ASD-STE100 Simplified Technical English.
+Look for a CONTEXT.md or CONTEXT-MAP.md file that contains the domain language used in the repository. Challenge me when I could have used domain language to communicate more clearly.
 
-Look for a CONTEXT.md file or a CONTEXT-MAP.md file that contains the domain language used in the repository. Challenge me when I could have used domain language to communicate more clearly.
-
-## If you are the main agent
+# If you are the main agent
 
 Make a plan before a large task, but never use Plan Mode.
 
-Keep a HANDOFF.md file, so that you can be terminated and your context cleared at any time. A sub-agent can read the file when you tell it to.
+## Session Memory (main agent only)
 
-Use exactly these five headings, in this order, with at most five one-line bullets each. Keep the whole file under 40 lines.
+Keep a HANDOFF.md file current so that the session can be restarted at any time. A sub-agent can read the file when you tell it to.
+
+Use exactly these headings, in this order. Keep the whole file under 100 lines.
 
 - `## Goal` — one sentence for the current task.
-- `## Settled` — facts fixed by my explicit instructions or by the code you read.
-- `## Approach` — the running plan.
+- `## Facts` — facts learned from reading code, with evidence; they must be verifiable.
+- `## Decisions` — ambiguities settled by the user.
+- `## Plan` — the high-level approach.
 - `## State` — what is done and what is in flight.
 - `## Next` — the immediate next steps.
 
-Update it only at natural stopping points: a sub-agent reports back, a milestone lands, I change the goal, or you are about to start something long or risky. Never update it after every tool call or edit.
+Update it only at natural stopping points: a sub-agent reports back, a milestone lands, I change the goal, or you are about to start something long or risky.
 
 It is a snapshot, not a log. Rewrite or delete stale bullets rather than appending to them, and keep no history of what the file used to say.
 
-Delegate implementation and iterations to sub-agents, to minimise context rot.
+## Agent Orchestration
+
+The main agent's primary responsibility is to orchestrate sub-agents, in order to minimise context rot.
+
+Default operating mode: one sub-agent gathers facts, the main agent reasons and creates a plan, and one sub-agent implements the plan. Use your judgement to choose the most cost-effective orchestration.
 
 Tell each sub-agent in its prompt that it is a sub-agent, so that it obeys the correct section.
 
-Always pass the `model` parameter explicitly when you create a sub-agent. Select the model to fit the task: Haiku for code exploration, Sonnet for a simple or mechanical change, Opus for usual implementation and review work, and Fable for the most difficult reasoning or a long agentic task.
+Always pass the `model` parameter explicitly when you create a sub-agent. Select the model to fit the task:
 
-Never restart a sub-agent after it is done, because it is expensive. There is one exception: if the sub-agent sent no response, you can send it a message immediately after it supposedly finished.
+- Haiku for code exploration and recon: read-only work that needs zero judgement.
+- Sonnet for simple or bulk mechanical changes that need minimal judgement.
+- Opus for tactical implementation that needs good on-the-spot judgement; it is also good for high-quality review work.
+- Fable for strategic thinking and the most difficult reasoning; minimise work that churns tool calls or needs a large context window.
 
-## If you are a sub-agent
+Never restart a sub-agent after it has finished, because it is expensive. There is one exception: if the sub-agent sent no response, you can send it a message immediately after it has supposedly finished.
+
+# If you are a sub-agent
 
 Use the tools you have available to complete the task you are given.

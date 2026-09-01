@@ -52,7 +52,19 @@ A concern you judged acceptable rather than fixed is context for it — the reas
 
 ## 4. Drive CI green
 
-Once raise-pr reports the PR number:
+Once raise-pr reports the PR number, confirm the PR can merge before you watch CI — a conflicting PR builds nothing, so the watch would wait forever:
+
+```bash
+gh pr view <PR#> --json mergeable,baseRefName
+```
+
+`UNKNOWN` → GitHub is still computing; wait a few seconds, retry. `CONFLICTING` → rebase onto the base branch:
+
+```bash
+git fetch origin <base> && git rebase origin/<base>
+```
+
+Resolve each conflict so the change keeps its intent, `git rebase --continue`, then `git push --force-with-lease`. Re-run the check; once it says `MERGEABLE`, watch:
 
 ```bash
 gh pr checks <PR#> --watch

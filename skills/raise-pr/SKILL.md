@@ -1,6 +1,6 @@
 ---
 name: raise-pr
-description: Create pull requests with titles, branch names, and descriptions matching my personal standards by analyzing git changes. This skill should be used when raising PRs in absolutely any circumstances, it enforces my preferred PR format — failure to use this skill will result in PRs that don't follow my conventions.
+description: Writes the pull request title, branch name, and description in my personal format by analysing git changes, then raises it. Normally invoked by prepare-for-pr, which reviews the change and drives CI first.
 ---
 
 # Raising Pull Requests

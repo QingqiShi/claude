@@ -1,6 +1,6 @@
 ---
 name: prepare-for-pr
-description: Takes a finished change to a merge-ready PR — judges what review it needs, applies the findings, invokes raise-pr, drives CI green.
+description: Use whenever the user asks to raise, open, or create a pull request. Takes a finished change to a merge-ready PR: judges what review it needs, applies the findings, invokes raise-pr, and drives CI green.
 user-invocable: true
 ---
 

@@ -59,7 +59,7 @@ Only truly proprietary or contradictory terms earn a question — a handful per 
 
 - Write `CONTEXT.md` at repo root (or per-context files plus `CONTEXT-MAP.md` when clearly separate bounded contexts exist — see the format spec).
 - Wire the loop: if the project's CLAUDE.md doesn't yet point at the glossary, add one line naming the actual layout ("Domain language is defined in CONTEXT.md — use those terms in code, comments, and copy"; in a multi-context repo, name CONTEXT-MAP.md instead). Without this pointer future sessions never read the glossary and drift resumes at the source.
-- Raise a PR via the raise-pr skill containing the glossary (and the CLAUDE.md pointer) only — no renames, and no prepare-for-pr gate: a prose-only glossary has no code to adversarially review; this PR's human review *is* the gate. List observed-but-unfixed drift in the PR description: the reviewer should see what accepting each pick will later rename.
+- Raise a PR to pr-standards containing the glossary (and the CLAUDE.md pointer) only — no renames, and no prepare-for-pr gate: a prose-only glossary has no code to adversarially review; this PR's human review *is* the gate. List observed-but-unfixed drift in the PR description: the reviewer should see what accepting each pick will later rename.
 
 ## Convergence phase
 

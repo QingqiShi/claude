@@ -1,6 +1,6 @@
 ---
 name: prepare-for-pr
-description: Use whenever the user asks to raise, open, or create a pull request. Takes a finished change to a merge-ready PR: judges what review it needs, applies the findings, invokes raise-pr, and drives CI green.
+description: Use whenever the user asks to raise, open, or create a pull request. Takes a finished change to a merge-ready PR: judges what review it needs, applies the findings, raises it to my PR standards, and drives CI green.
 user-invocable: true
 ---
 
@@ -46,13 +46,11 @@ Review a fix that carries material risk of its own.
 
 ## 3. Raise
 
-Invoke **`raise-pr`**.
-
-A concern you judged acceptable rather than fixed is context for it — the reasoning, so a reviewer can disagree with it.
+Raising the PR is a natural unit to delegate: the sub-agent reads the diff itself and follows `pr-standards`. Give it what the conversation knows and the diff cannot show: the WHY as the user stated it, or that nothing was stated; screenshots already captured this session; and any concern you judged acceptable rather than fixed, with the reasoning, so a reviewer can disagree with it.
 
 ## 4. Drive CI green
 
-Once raise-pr reports the PR number, confirm the PR can merge before you watch CI — a conflicting PR builds nothing, so the watch would wait forever:
+Once the PR exists, confirm it can merge before you watch CI — a conflicting PR builds nothing, so the watch would wait forever:
 
 ```bash
 gh pr view <PR#> --json mergeable,baseRefName

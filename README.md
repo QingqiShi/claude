@@ -11,7 +11,7 @@ Git-backed so a new machine can be restored from scratch. The guiding rule:
 | Thing | In git? | Source of truth | Restored by |
 |---|---|---|---|
 | `settings.json`, `CLAUDE.md`, `statusline-command.sh`, `hooks/` | ✅ committed | this repo | `git clone` |
-| **My custom skills** — `auto-improve`, `raise-pr`, `merge-dependabot`, `language-sweep`, `prepare-for-pr` | ✅ committed | this repo | `git clone` |
+| **My custom skills** — `auto-improve`, `pr-standards`, `merge-dependabot`, `language-sweep`, `prepare-for-pr` | ✅ committed | this repo | `git clone` |
 | **Marketplace plugins** — `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | ❌ ignored | `settings.json` → `enabledPlugins` + `extraKnownMarketplaces` | `bootstrap.sh` → `claude plugin install` |
 | **`vercel-cli`** skill | ❌ ignored | `npx skills add github.com/vercel/vercel --skill vercel-cli` | `bootstrap.sh` |
 | **`playwright-cli`** skill (binary-generated) | ❌ ignored | `@playwright/cli` npm pkg → `playwright-cli install --skills` | `bootstrap.sh` |

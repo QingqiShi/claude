@@ -26,3 +26,6 @@ skills/**/evals/results/
 # (Must come after the !skills/** allow-list to override it.)
 skills/vercel-cli
 skills/playwright-cli
+
+# Python writes these next to the hooks and their tests; must come after the !hooks/** allow-list.
+__pycache__/

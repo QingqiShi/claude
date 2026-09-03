@@ -15,11 +15,22 @@ Lead the description with why the change was made, as the conversation told you.
 
 ## Description
 
-Write for the reviewer's comprehension. Describe the change as the people affected by it experience it, not as the code that implements it, in sentences and in lists alike. Use a Mermaid diagram when it says something the prose cannot say as clearly: a non-trivial flow, a state machine, a web of relationships. Pick whatever structure explains this change best; there is no template and no test plan.
-
-Cut what the reviewer does not need. Write about the change, not about your work on it. Mention a task you did not do, a method you did not use, or a limit of the change only when it changes what the reviewer must do.
+Write so the reviewer takes in the change at a glance and then finds what they need to approve it. Describe the change as the people affected by it experience it, not as the code that implements it. Pick whatever structure explains this change best; there is no template and no test plan.
 
 Keep each paragraph on one line, because GitHub turns a line break inside a paragraph into a hard break. When the change closes an issue, `Closes #<n>` is the last line.
+
+Use a visual where it shows a shape faster than prose can: a shallow file tree for a layout change, a call tree for control flow, a component tree for UI structure, pseudocode for an algorithm, a Mermaid diagram for a flow between parts. Show a change as a diff against the existing shape, so the reviewer sees what moved without re-reading the whole, keep only the nodes that make the point, and place the visual next to the sentence it supports.
+
+```diff
+ src/
+ ├── commands/
++│   └── show-me.ts       # expands the slash command
+ ├── sessions/
+-└── transport.ts
++└── transport/
++    ├── client.ts
++    └── stream.ts
+```
 
 ## Screenshots
 

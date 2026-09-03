@@ -23,6 +23,11 @@
       "allowRead": [
         "~/.claude"
       ]
+    },
+    "network": {
+      "allowedDomains": [
+        "*"
+      ]
     }
   },
   "autoMode": {

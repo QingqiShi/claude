@@ -30,39 +30,31 @@ fields=$(printf '%s' "$input" | jq -r '[
 } <<< "$fields"
 
 # --- Git ---
-branch=""
+branch_full=""
 dirty=""
 ahead=""
 if [ -n "$cwd" ]; then
-  branch=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null)
+  branch_full=$(git -C "$cwd" --no-optional-locks symbolic-ref --short HEAD 2>/dev/null)
 fi
-if [ -n "$branch" ]; then
+if [ -n "$branch_full" ]; then
   if [ -n "$(git -C "$cwd" --no-optional-locks status --porcelain --untracked-files=no 2>/dev/null)" ]; then
     dirty="*"
   fi
   ahead=$(git -C "$cwd" --no-optional-locks rev-list --count '@{upstream}..HEAD' 2>/dev/null)
   [ "${ahead:-0}" != 0 ] || ahead=""
 fi
-repo=""
+repo_full=""
 if [ -n "$project_dir" ]; then
-  repo=$(basename "$project_dir")
+  repo_full=$(basename "$project_dir")
 fi
 
-# --- Width tier ---
+# --- Width budget ---
 # Claude Code sets COLUMNS to the terminal width and draws the footer with a
-# margin of 2 columns on each side. Without COLUMNS, keep one wide row.
+# margin of 2 columns on each side. Without COLUMNS, show the full row.
 if [[ ${COLUMNS:-} =~ ^[1-9][0-9]*$ ]]; then
-  cols=$COLUMNS
+  budget=$(( COLUMNS - 4 ))
 else
-  cols=1000
-fi
-budget=$(( cols - 4 ))
-if (( cols >= 90 )); then
-  tier=wide
-elif (( cols >= 60 )); then
-  tier=medium
-else
-  tier=narrow
+  budget=1000
 fi
 
 # --- Palette (24-bit) ---
@@ -88,9 +80,9 @@ WARN="217;181;124"
 BAD="224;138;138"
 
 mix() {  # mix VAR FROM TO STEP STEPS
-  local a0 a1 a2 b0 b1 b2
-  IFS=';' read -r a0 a1 a2 <<< "$2"
-  IFS=';' read -r b0 b1 b2 <<< "$3"
+  local a=$2 b=$3 a0 a1 a2 b0 b1 b2
+  a0=${a%%;*}; a=${a#*;}; a1=${a%%;*}; a2=${a#*;}
+  b0=${b%%;*}; b=${b#*;}; b1=${b%%;*}; b2=${b#*;}
   printf -v "$1" '%d;%d;%d' \
     $(( a0 + (b0 - a0) * $4 / $5 )) \
     $(( a1 + (b1 - a1) * $4 / $5 )) \
@@ -142,15 +134,7 @@ shorten() {  # shorten VAR NAME MAX
   printf -v "$1" '%s' "${head}${name:0:keep}…"
 }
 
-# --- Segments: coloured text and its display width in cells ---
-seg_text=()
-seg_w=()
-add_seg() {
-  seg_text+=("$1")
-  seg_w+=("$2")
-}
-
-# Model and effort
+# --- Values that do not change with the width ---
 nbolts=0
 eff=$effort
 case $effort in
@@ -162,133 +146,18 @@ case $effort in
 esac
 bolts=""
 for (( i = 0; i < nbolts; i++ )); do bolts+="⚡"; done
-short_model=${model%% *}
-if [ "$tier" = wide ]; then
-  text="${F}${INK}m🧠 ${BOLD}${model}${NOBOLD}"
-  w=$(( 3 + ${#model} ))
-  if (( nbolts > 0 )); then
-    text+=" ${bolts}"
-    w=$(( w + 1 + 2 * nbolts ))
-  elif [ -n "$eff" ]; then
-    text+=" ${eff}"
-    w=$(( w + 1 + ${#eff} ))
-  fi
-else
-  text="${F}${INK}m${BOLD}${short_model}${NOBOLD}"
-  w=${#short_model}
-  if [ -n "$eff" ]; then
-    text+="${F}${INK_SOFT}m·${eff}"
-    w=$(( w + 1 + ${#eff} ))
-  fi
-fi
-add_seg "$text" "$w"
+model_short=${model#Claude }
+model_family=${model_short%% *}
 
-# Repository and branch, with short names on small screens
-if [ -n "$branch" ]; then
-  case $tier in
-    wide)
-      overhead=$(( 3 + ${#repo} + 4 + ${#dirty} + 3 ))
-      [ -n "$ahead" ] && overhead=$(( overhead + 2 + ${#ahead} ))
-      room=$(( budget - overhead ))
-      (( room < 12 )) && room=12
-      ;;
-    medium) room=24 ;;
-    *)      room=16 ;;
-  esac
-  shorten branch "$branch" "$room"
-fi
-if [ "$tier" = medium ] && [ -n "$repo" ]; then
-  shorten repo "$repo" 12
-fi
-text=""
-w=0
-if [ "$tier" = wide ]; then
-  if [ -n "$repo" ]; then
-    text="${F}${MUTED}m📦 ${repo}"
-    w=$(( 3 + ${#repo} ))
-  fi
-  if [ -n "$branch" ]; then
-    [ -n "$text" ] && { text+=" "; w=$(( w + 1 )); }
-    text+="${F}${ACC}m🌿 ${branch}"
-    w=$(( w + 3 + ${#branch} ))
-  fi
-elif [ "$tier" = medium ]; then
-  if [ -n "$repo" ]; then
-    text="${F}${MUTED}m${repo}"
-    w=${#repo}
-    [ -n "$branch" ] && { text+="/"; w=$(( w + 1 )); }
-  fi
-  if [ -n "$branch" ]; then
-    text+="${F}${ACC}m${branch}"
-    w=$(( w + ${#branch} ))
-  fi
-elif [ -n "$branch" ]; then
-  text="${F}${ACC}m${branch}"
-  w=${#branch}
-elif [ -n "$repo" ]; then
-  text="${F}${MUTED}m${repo}"
-  w=${#repo}
-fi
-if [ -n "$branch" ]; then
-  if [ -n "$dirty" ]; then
-    text+="${F}${WARN}m*"
-    w=$(( w + 1 ))
-  fi
-  if [ "$tier" = wide ] && [ -n "$ahead" ]; then
-    text+="${F}${MUTED}m ↑${ahead}"
-    w=$(( w + 2 + ${#ahead} ))
-  fi
-fi
-[ -n "$text" ] && add_seg "$text" "$w"
-
-# Lines changed and cache warmth (wide only)
-if [ "$tier" = wide ]; then
-  text=""
-  w=0
-  if [ -n "$added" ] && [ -n "$removed" ] && [ "${added}${removed}" != 00 ]; then
-    text="${F}${OK}m+${added} ${F}${BAD}m−${removed}"
-    w=$(( 3 + ${#added} + ${#removed} ))
-  fi
-  if [ -n "$cache_warm" ]; then
-    [ -n "$text" ] && { text+="  "; w=$(( w + 2 )); }
-    if [ "$cache_warm" = true ]; then
-      text+="${F}${ACC}m◉${F}${MUTED}m warm"
-    else
-      text+="${F}${MUTED}m○ cold"
-    fi
-    w=$(( w + 6 ))
-  fi
-  [ -n "$text" ] && add_seg "$text" "$w"
-fi
-
-# Five-hour rate limit, once it passes half (not on phones)
-if [ "$tier" != narrow ] && [ -n "$limit_pct" ]; then
-  limit_int=$(printf '%.0f' "$limit_pct")
-  if (( limit_int >= 50 )); then
-    col=$WARN
-    (( limit_int >= 85 )) && col=$BAD
-    add_seg "${F}${MUTED}m5h ${F}${col}m${limit_int}%" $(( 4 + ${#limit_int} ))
-  fi
-fi
-
-# Session cost (client-side estimate from stdin)
 if [ -n "$raw_cost" ]; then
   cost=$(printf '$%.2f' "$raw_cost")
 else
   cost='$0.00'
 fi
-if [ "$tier" = wide ]; then
-  add_seg "${F}${FG}m💰 ${cost}" $(( 3 + ${#cost} ))
-else
-  add_seg "${F}${FG}m${cost}" "${#cost}"
-fi
 
-# Context meter
-case $tier in
-  wide)   cells=20 ;;
-  medium) cells=10 ;;
-  *)      cells=5 ;;
-esac
+limit_int=""
+[ -n "$limit_pct" ] && limit_int=$(printf '%.0f' "$limit_pct")
+
 if [ -n "$used_pct" ]; then
   used_int=$(printf '%.0f' "$used_pct")
   pct_text="${used_int}%"
@@ -304,14 +173,175 @@ else
   pct_text="-"
   pct_ansi="${F}${MUTED}m-"
 fi
-# Halve the bar once when that keeps the meter on the same row.
-used_w=0
-for w in "${seg_w[@]}"; do used_w=$(( used_w + w + 3 )); done
-if (( cells > 5 && used_w + cells + 4 + ${#pct_text} > budget && used_w + cells / 2 + 4 + ${#pct_text} <= budget )); then
-  cells=$(( cells / 2 ))
+
+# --- Segments: coloured text and its display width in cells ---
+# The row stays on one line. When the full row does not fit, the fit steps
+# below apply one by one, in order, until it does: first the decorations go,
+# then the names get shorter, and only then does information get hidden.
+steps=(bar10 icons model2 effort names model1 branch16 bar5 branch12 cache limit85 lines repo cost branch8 bar0 branch0)
+
+seg_text=()
+seg_w=()
+total=0
+bars=()
+add_seg() {
+  seg_text+=("$1")
+  seg_w+=("$2")
+  total=$(( total + $2 + 3 ))
+}
+
+build_row() {  # build_row STEPS BRANCH_MAX
+  local i text w name col bar
+  local icons=1 model_len=3 effort_style=bolts bar_cells=20 limit_min=50
+  local show_cache=1 show_lines=1 show_repo=1 show_branch=1 show_cost=1
+  local repo_max=0 branch_max=$2
+  for (( i = 0; i < $1; i++ )); do
+    case ${steps[i]} in
+      bar10)    bar_cells=10 ;;
+      icons)    icons=0 ;;
+      model2)   model_len=2 ;;
+      effort)   effort_style=text ;;
+      names)    repo_max=12; branch_max=24 ;;
+      model1)   model_len=1 ;;
+      branch16) branch_max=16 ;;
+      bar5)     bar_cells=5 ;;
+      branch12) branch_max=12 ;;
+      cache)    show_cache=0 ;;
+      limit85)  limit_min=85 ;;
+      lines)    show_lines=0 ;;
+      repo)     show_repo=0 ;;
+      cost)     show_cost=0 ;;
+      branch8)  branch_max=8 ;;
+      bar0)     bar_cells=0 ;;
+      branch0)  show_branch=0 ;;
+    esac
+  done
+  seg_text=()
+  seg_w=()
+  total=0
+
+  # Model and effort
+  case $model_len in
+    3) name=$model ;;
+    2) name=$model_short ;;
+    *) name=$model_family ;;
+  esac
+  text="${F}${INK}m"
+  w=0
+  if (( icons )); then
+    text+="🧠 "
+    w=3
+  fi
+  text+="${BOLD}${name}${NOBOLD}"
+  w=$(( w + ${#name} ))
+  if [ "$effort_style" = bolts ] && (( nbolts > 0 )); then
+    text+=" ${bolts}"
+    w=$(( w + 1 + 2 * nbolts ))
+  elif [ -n "$eff" ]; then
+    text+="${F}${INK_SOFT}m·${eff}"
+    w=$(( w + 1 + ${#eff} ))
+  fi
+  add_seg "$text" "$w"
+
+  # Repository and branch
+  local repo=$repo_full branch=$branch_full
+  (( show_repo )) || repo=""
+  (( show_branch )) || branch=""
+  if [ -n "$repo" ] && (( repo_max > 0 )); then
+    shorten repo "$repo" "$repo_max"
+  fi
+  [ -n "$branch" ] && shorten branch "$branch" "$branch_max"
+  text=""
+  w=0
+  if [ -n "$repo" ]; then
+    if (( icons )); then
+      text="${F}${MUTED}m📦 ${repo}"
+      w=$(( 3 + ${#repo} ))
+    else
+      text="${F}${MUTED}m${repo}"
+      w=${#repo}
+    fi
+  fi
+  if [ -n "$branch" ]; then
+    if [ -n "$text" ]; then
+      if (( icons )); then text+=" "; else text+="/"; fi
+      w=$(( w + 1 ))
+    fi
+    if (( icons )); then
+      text+="${F}${ACC}m🌿 ${branch}"
+      w=$(( w + 3 + ${#branch} ))
+    else
+      text+="${F}${ACC}m${branch}"
+      w=$(( w + ${#branch} ))
+    fi
+    if [ -n "$dirty" ]; then
+      text+="${F}${WARN}m*"
+      w=$(( w + 1 ))
+    fi
+    if [ -n "$ahead" ]; then
+      text+="${F}${MUTED}m ↑${ahead}"
+      w=$(( w + 2 + ${#ahead} ))
+    fi
+  fi
+  [ -n "$text" ] && add_seg "$text" "$w"
+
+  # Lines changed and cache warmth
+  text=""
+  w=0
+  if (( show_lines )) && [ -n "$added" ] && [ -n "$removed" ] && [ "${added}${removed}" != 00 ]; then
+    text="${F}${OK}m+${added} ${F}${BAD}m−${removed}"
+    w=$(( 3 + ${#added} + ${#removed} ))
+  fi
+  if (( show_cache )) && [ -n "$cache_warm" ]; then
+    [ -n "$text" ] && { text+="  "; w=$(( w + 2 )); }
+    if [ "$cache_warm" = true ]; then
+      text+="${F}${ACC}m◉${F}${MUTED}m warm"
+    else
+      text+="${F}${MUTED}m○ cold"
+    fi
+    w=$(( w + 6 ))
+  fi
+  [ -n "$text" ] && add_seg "$text" "$w"
+
+  # Five-hour rate limit, once it passes the threshold
+  if [ -n "$limit_int" ] && (( limit_int >= limit_min )); then
+    col=$WARN
+    (( limit_int >= 85 )) && col=$BAD
+    add_seg "${F}${MUTED}m5h ${F}${col}m${limit_int}%" $(( 4 + ${#limit_int} ))
+  fi
+
+  # Session cost (client-side estimate from stdin)
+  if (( show_cost )); then
+    if (( icons )); then
+      add_seg "${F}${FG}m💰 ${cost}" $(( 3 + ${#cost} ))
+    else
+      add_seg "${F}${FG}m${cost}" "${#cost}"
+    fi
+  fi
+
+  # Context meter
+  if (( bar_cells > 0 )); then
+    if [ -z "${bars[bar_cells]}" ]; then
+      gradient_bar bar "$bar_cells" "$used_int"
+      bars[bar_cells]=$bar
+    fi
+    add_seg "${bars[bar_cells]} ${pct_ansi}" $(( bar_cells + 1 + ${#pct_text} ))
+  else
+    add_seg "$pct_ansi" "${#pct_text}"
+  fi
+}
+
+# The full branch name gets the free room, but at least 24 cells, before the
+# fit steps trim anything else.
+build_row 0 1000
+if (( total > budget )); then
+  branch_room=$(( ${#branch_full} - (total - budget) ))
+  (( branch_room < 24 )) && branch_room=24
+  for (( k = 0; k <= ${#steps[@]}; k++ )); do
+    build_row "$k" "$branch_room"
+    (( total <= budget )) && break
+  done
 fi
-gradient_bar bar "$cells" "$used_int"
-add_seg "${bar} ${pct_ansi}" $(( cells + 1 + ${#pct_text} ))
 
 # --- Backgrounds: accent, then greys that step toward the terminal background ---
 n=${#seg_text[@]}
@@ -329,31 +359,16 @@ for (( i = 0; i < n; i++ )); do
   fi
 done
 
-# --- Pack the segments into rows that fit the budget ---
-# Claude Code draws the status line dim. The reset at the start of each row
+# --- One row ---
+# Claude Code draws the status line dim. The reset at the start of the row
 # cancels that. The join glyph is a Powerline arrow (U+E0B0): the terminal
 # font must include it.
-rows=()
-row=""
-row_w=0
+row=$RESET
 prev_bg=""
 for (( i = 0; i < n; i++ )); do
-  w=$(( seg_w[i] + 3 ))
-  if [ -n "$row" ] && (( row_w + w > budget )); then
-    rows+=("${row}${DEFBG}${F}${prev_bg}m${ARROW}${RESET}")
-    row=""
-    row_w=0
-  fi
-  if [ -z "$row" ]; then
-    row=$RESET
-  else
-    row+="${B}${seg_bg[i]}m${F}${prev_bg}m${ARROW}"
-  fi
+  [ -n "$prev_bg" ] && row+="${B}${seg_bg[i]}m${F}${prev_bg}m${ARROW}"
   row+="${B}${seg_bg[i]}m ${seg_text[i]} "
-  row_w=$(( row_w + w ))
   prev_bg=${seg_bg[i]}
 done
-rows+=("${row}${DEFBG}${F}${prev_bg}m${ARROW}${RESET}")
-
-IFS=$'\n'
-printf '%s' "${rows[*]}"
+row+="${DEFBG}${F}${prev_bg}m${ARROW}${RESET}"
+printf '%s' "$row"

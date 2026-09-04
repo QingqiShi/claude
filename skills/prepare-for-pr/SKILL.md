@@ -46,7 +46,7 @@ Review a fix that carries material risk of its own.
 
 ## 3. Raise
 
-Raising the PR is a natural unit to delegate: the sub-agent reads the diff itself and follows `pr-standards`. Give it what the conversation knows and the diff cannot show: the WHY as the user stated it, or that nothing was stated; screenshots already captured this session; and any concern you judged acceptable rather than fixed, with the reasoning, so a reviewer can disagree with it.
+Raise a PR following `pr-standards`.
 
 ## 4. Drive CI green
 

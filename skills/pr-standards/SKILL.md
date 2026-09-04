@@ -17,9 +17,32 @@ Lead the description with why the change was made, as the conversation told you.
 
 Write so the reviewer takes in the change at a glance and then finds what they need to approve it. Describe the change as the people affected by it experience it, not as the code that implements it. Pick whatever structure explains this change best; there is no template and no test plan.
 
-Keep each paragraph on one line, because GitHub turns a line break inside a paragraph into a hard break. When the change closes an issue, `Closes #<n>` is the last line.
+The reviewer reads the description with the diff open. State each fact once, and let the diff carry how the new code works; a prose walk through the code is what made past descriptions dense. Length follows how much there is to say that the diff cannot say, never the size of the diff: a long description is fine when there is that much to tell, and it never grows just to list every change made.
 
-Use a visual where it shows a shape faster than prose can: a shallow file tree for a layout change, a call tree for control flow, a component tree for UI structure, pseudocode for an algorithm, a Mermaid diagram for a flow between parts. Show a change as a diff against the existing shape, so the reviewer sees what moved without re-reading the whole, keep only the nodes that make the point, and place the visual next to the sentence it supports.
+A non-obvious bug — one rooted in how a library or platform works rather than in a coding mistake — deserves its mechanism explained in depth, written for a reader who has forgotten how that part of the library works. Re-establish how the mechanism normally works before what went wrong and why it stayed hidden, in short paragraphs or a diagram, never one packed paragraph. A bug stated only in the library's own terms teaches nothing to a reader who no longer has that library's model in their head.
+
+Do not report verification — the commands run, the suites passed, the manual checks. A PR is raised only after the change is verified, so there is nothing to say about it. A number that shows the change's effect, such as an error count at zero, is part of the change and stays.
+
+Leave nothing for the reviewer to do before approving: no "please verify", no open questions, no decisions still to make. Anything unsettled means the PR was not ready to raise. Ideas for follow-up work stay out for the same reason — they are not in this diff. A judgment call that stays is stated as settled, with its reason, never offered up for debate — "four choices a reviewer may want to weigh in on" is the shape to avoid.
+
+Do not argue the change's case — proving what it did not break, or what another PR did not cause. A fact that matters, such as the bug predating this branch, gets one clause, not a paragraph.
+
+Write plain natural prose in short sentences and remove all mannered prose — metaphor or flourish where a literal phrase exists. Bold the phrase that carries a key paragraph's point so a scan finds it, and use a heading or list only where the content has that shape. (Both sentences correct Fable 5.1, which writes long packed sentences and under-formats; retest them when the model changes.)
+
+A structural change is expected to carry a visual, and prose is for the meaning a visual cannot carry. Show the change as a diff against the existing shape, so the reviewer sees what moved without re-reading the whole. Keep only the nodes that make the point, and place the visual next to the sentence it supports. Match the notation to what the reviewer already reads for that kind of structure:
+
+A component change, as JSX with opening tags only, keeping the hooks and boundaries that matter:
+
+```diff
+ <SessionPage>
+   useSessionEvents()
+   <SessionToolbar>
++    <RunSkillButton />
+   <SessionTimeline>
++    <SkillResultCard />
+```
+
+A file-layout change, as a shallow file tree:
 
 ```diff
  src/
@@ -31,6 +54,44 @@ Use a visual where it shows a shape faster than prose can: a shallow file tree f
 +    ├── client.ts
 +    └── stream.ts
 ```
+
+A call-tree or call-stack change, as indented calls:
+
+```diff
+ submitForm
+   createSession
+     persistPrompt
++    expandSkillMention
+     launchAgent
+-  navigateToSession
++  navigateToSession
++    subscribeToEvents
+```
+
+A state or control-flow change, as pseudocode:
+
+```diff
+ on(save)
+-  write content
++  if content is unchanged
++    return cached result
++  write new content
++  invalidate cache
+```
+
+A flow between parts, as a Mermaid diagram:
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant UI
+    participant Daemon
+    User->>UI: choose command
+    UI->>Daemon: send expanded prompt
+    Daemon-->>UI: stream result
+```
+
+Keep each paragraph on one line, because GitHub turns a line break inside a paragraph into a hard break. When the change closes an issue, `Closes #<n>` is the last line.
 
 ## Screenshots
 

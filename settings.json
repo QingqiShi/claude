@@ -249,5 +249,6 @@
       "**Repository visibility**: ~/.claude (github.com/QingqiShi/claude) is PUBLIC — a push there publishes to the internet"
     ]
   },
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "skipWorkflowUsageWarning": true
 }

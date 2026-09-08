@@ -6,7 +6,9 @@ user-invocable: true
 
 # Merge Dependabot PRs
 
-Process open Dependabot PRs one at a time. Merge if safe, skip if uncertain, report at the end.
+Process open Dependabot PRs. Merge if safe, skip if uncertain, report at the end.
+
+The work runs as a workflow so that judgement and mechanics sit in different agents on different models. Per PR, a read-only scout gathers facts, a decide agent on the session model writes a brief, and an executor on a cheap model carries the brief out and stops at the first thing the brief did not cover. Scouting and deciding run in parallel. Execution runs one PR at a time, because the work tree is shared and every squash-merge moves the default branch. Each role's instructions and output schema live together in `scripts/merge-dependabot.workflow.js`; the prompt an agent receives is complete on its own.
 
 ## Repository context
 
@@ -14,41 +16,15 @@ Process open Dependabot PRs one at a time. Merge if safe, skip if uncertain, rep
 bash "${CLAUDE_SKILL_DIR}/scripts/detect-context.sh"
 ```
 
-Use these values wherever `<placeholder>` appears below. If `package-manager` or `default-branch` is `unknown`, or the PR list errored, stop and ask the user.
+If `packageManager` or `defaultBranch` is `unknown`, or `prs` is an error string, stop and ask the user. If `prs` is empty, exit.
 
-## Phase 1 — Discover
+## Run
 
-If there are no open Dependabot PRs, exit.
+Call the Workflow tool from the repository, not from the skill directory, with `scriptPath` set to `${CLAUDE_SKILL_DIR}/scripts/merge-dependabot.workflow.js` and the context object above as `args`, verbatim. To process a subset, pass only those entries in `prs`. The run is in the background; the completion notification carries the result. If the run dies part-way, relaunch with the same `scriptPath` and `args` plus `resumeFromRunId`, and the finished agents return from cache.
 
-## Phase 2 — For each PR
+## Report
 
-The work tree is shared, so PRs must run **serially**. Each PR is otherwise independent — delegate the per-PR work to a fresh `general-purpose` sub-agent so its install logs, rebase output, and browser transcripts don't bloat this main context.
-
-For each open PR, the orchestrator (main thread):
-
-1. Resets the work tree to a known-clean state on the default branch:
-   ```bash
-   git fetch origin <default-branch> && git checkout origin/<default-branch>
-   ```
-2. Spawns a `general-purpose` sub-agent with this exact prompt — substitute the four values from the detected context and the current PR, but otherwise pass it verbatim and add nothing else:
-
-   > You are a sub-agent in a larger orchestration that I am coordinating. Your only task is to process Dependabot PR #`<number>` by reading and following the instructions in `${CLAUDE_SKILL_DIR}/references/process-pr.md`.
-   >
-   > Use these values throughout that file:
-   >
-   > - PR number: `<number>`
-   > - Head branch: `<head-branch>`
-   > - Default branch: `<default-branch>`
-   > - Package manager: `<package-manager>`
-   >
-   > Read **only** that instructions file. Do not read SKILL.md or browse other files in the skill directory — the instructions file is self-contained for this task. When done, report back briefly: whether the PR was merged, skipped (and why), or stopped pending human attention (and what's blocking).
-
-3. When the sub-agent finishes, note its outcome — merged, skipped with reason, or stopped pending human attention — along with the PR's title and URL from the detected context, for the Phase 3 report.
-4. Moves to the next PR.
-
-## Phase 3 — Report
-
-Produce a markdown table with one row per PR processed: a clickable link (`[#NNNN](url)`), the PR's title, and the final status. Status is one of `Merged`, `Skipped — <reason>`, or `Needs attention — <what's blocking>`. If any rows need attention, surface them as bullets above the table so they aren't missed.
+Print the result's `markdown` field as it is. It is the summary table, with a needs-attention callout above it when any row needs one, in this shape:
 
 ```
 ## Dependabot PR Summary
@@ -62,5 +38,3 @@ Produce a markdown table with one row per PR processed: a clickable link (`[#NNN
 | [#NNNN](url) | <title> | Skipped — <reason> |
 | [#NNNN](url) | <title> | Needs attention — <what's blocking> |
 ```
-
-Omit the **Needs attention** callout entirely if no rows need it.

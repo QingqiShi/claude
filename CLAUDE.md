@@ -4,7 +4,11 @@ In a worktree, use `git checkout origin/main` instead of `git checkout main`, be
 
 Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained, and write it in ASD-STE100 Simplified Technical English.
 
-A CONTEXT.md or CONTEXT-MAP.md holds a repository's domain language. Those words are mine and they lead the code, so learn the whole file before working in the area it covers, use its terms, and challenge me when I could have used one to communicate more clearly. A concept the file does not name is a decision for me, not a gap to fill: describe it in plain words, offer candidates, and ask before the name lands in an API or in the file.
+A CONTEXT.md or CONTEXT-MAP.md holds a repository's domain language. Those words are mine and they lead the code. Learn the whole file before working in the area it covers, and use its terms in code, comments, copy, and replies.
+
+The file is an input to read, not a document to review. What it lacks, or how it differs from other documents, is not something to report. The one check I want is on my wording: when my message describes in plain words something the file already names, stop and ask whether I mean that term before you act on it.
+
+When the work needs a name for a concept the file does not name, do not invent one. Describe the concept in plain words, offer candidates, and ask before the name lands in an API or in the file.
 
 # If you are the main agent
 

@@ -26,6 +26,7 @@ class HookCase(unittest.TestCase):
         cls.repo = os.path.realpath(cls.temp.name)
         subprocess.run(["git", "init", "-q", cls.repo], check=True)
         subprocess.run(["git", "-C", cls.repo, "remote", "add", "origin", "git@github.com:Owner/own-repo.git"], check=True)
+        subprocess.run(["git", "-C", cls.repo, "remote", "add", "upstream", "https://github.com/Upstream/own-repo.git"], check=True)
         cls.body_file = os.path.join(cls.repo, "body.md")
         with open(cls.body_file, "w") as handle:
             handle.write("Waits on facebook/stylex#1790.\n")
@@ -78,6 +79,33 @@ class HookCase(unittest.TestCase):
     def test_other_commands_are_allowed(self):
         self.assertAllowed("echo facebook/stylex#1790 >> notes.md")
         self.assertAllowed("grep -rn 'facebook/stylex#1790' .")
+
+    def test_every_remote_is_own(self):
+        self.assertAllowed("gh pr comment 12 --body 'rebased on Upstream/own-repo#3'")
+
+    def test_ssh_host_alias_and_port_are_own(self):
+        for url in ("git@github.com-work:Owner/own-repo.git", "ssh://git@github.com:443/Owner/own-repo.git"):
+            with tempfile.TemporaryDirectory() as temp:
+                repo = os.path.realpath(temp)
+                subprocess.run(["git", "init", "-q", repo], check=True)
+                subprocess.run(["git", "-C", repo, "remote", "add", "origin", url], check=True)
+                self.assertIsNone(self.decide("git commit -m 'see Owner/own-repo#9'", cwd=repo), url)
+
+    def test_pr_checkout_by_foreign_url_is_allowed(self):
+        self.assertAllowed("gh pr checkout https://github.com/facebook/stylex/pull/1790")
+
+    def test_graphql_query_is_allowed_and_mutation_is_denied(self):
+        self.assertAllowed("gh api graphql -f query='{ resource(url: \"https://github.com/facebook/stylex/issues/1790\") { ... on Issue { state } } }'")
+        self.assertDenied("gh api graphql -f query='mutation { addComment(input: {subjectId: \"x\", body: \"see facebook/stylex#1790\"}) { clientMutationId } }'", "facebook/stylex#1790")
+
+    def test_read_only_lookup_chained_before_publish_is_allowed(self):
+        self.assertAllowed("gh issue view https://github.com/facebook/stylex/issues/1790 --json state && gh pr comment 12 --body 'upstream is still open'")
+
+    def test_heredoc_on_stdin_is_denied(self):
+        self.assertDenied("git commit -F - <<'EOF'\nfix: work around it\n\nSee facebook/stylex#1790.\nEOF", "facebook/stylex#1790")
+
+    def test_variable_set_earlier_in_the_command_is_denied(self):
+        self.assertDenied("BODY='see facebook/stylex#1790'; gh pr comment 12 -b \"$BODY\"", "facebook/stylex#1790")
 
     def test_no_remote_treats_every_reference_as_foreign(self):
         with tempfile.TemporaryDirectory() as bare:

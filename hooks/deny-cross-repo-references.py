@@ -11,7 +11,7 @@ import sys
 # remove it. So the reference is refused before the text is published.
 
 READ_ONLY_GH = {
-    ("pr", "view"), ("pr", "list"), ("pr", "diff"), ("pr", "checks"), ("pr", "status"),
+    ("pr", "view"), ("pr", "list"), ("pr", "diff"), ("pr", "checks"), ("pr", "status"), ("pr", "checkout"),
     ("issue", "view"), ("issue", "list"), ("issue", "status"),
     ("repo", "view"), ("repo", "list"), ("release", "view"), ("release", "list"),
     ("run", "view"), ("run", "list"), ("run", "watch"), ("workflow", "view"), ("workflow", "list"),
@@ -25,23 +25,25 @@ PUNCTUATION = set("();<>|&")
 HEREDOC = re.compile(r"(?<!<)<<(?!<)-?\s*(['\"]?)(\w+)\1")
 SHORTHAND = re.compile(r"(?<![\w/.-])([A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)/([A-Za-z0-9_.-]+?)#(\d+)\b")
 URL = re.compile(r"https?://(?:www\.)?github\.com/([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)/(?:issues|pull|discussions)/(\d+)", re.I)
-REMOTE = re.compile(r"github\.com[:/]([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$", re.I)
+REMOTE = re.compile(r"github\.com[\w.-]*(?::\d+)?[:/]([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+?)(?:\.git)?/?$", re.I)
 
 
-def strip_heredoc_bodies(command):
-    kept, open_delimiters = [], []
+def split_heredocs(command):
+    kept, bodies, open_delimiters = [], [], []
     for line in command.split("\n"):
         if open_delimiters:
             if line.strip() == open_delimiters[0]:
                 open_delimiters.pop(0)
+            else:
+                bodies.append(line)
             continue
         kept.append(line)
         open_delimiters.extend(match.group(2) for match in HEREDOC.finditer(line))
-    return "\n".join(kept)
+    return "\n".join(kept), "\n".join(bodies)
 
 
 def segments(command):
-    flat = strip_heredoc_bodies(command).replace("\n", " ; ")
+    flat = split_heredocs(command)[0].replace("\n", " ; ")
     lexer = shlex.shlex(flat, posix=True, punctuation_chars=True)
     lexer.whitespace_split = True
     lexer.commenters = ""
@@ -80,7 +82,9 @@ def gh_publishes(words):
                 method = words[i + 1].upper()
             elif word.startswith("--method="):
                 method = word.split("=", 1)[1].upper()
-        return method != "GET" or "graphql" in positional
+        if "graphql" in positional:
+            return "mutation" in " ".join(words).lower()
+        return method != "GET"
     return (group, action) not in READ_ONLY_GH and (group, None) not in READ_ONLY_GH
 
 
@@ -120,16 +124,21 @@ def referenced_files(words, cwd):
     return texts
 
 
-def own_repository(cwd):
+def own_repositories(cwd):
     try:
-        url = subprocess.run(
-            ["git", "-C", cwd, "remote", "get-url", "origin"],
+        remotes = subprocess.run(
+            ["git", "-C", cwd, "remote", "-v"],
             capture_output=True, text=True, timeout=5,
-        ).stdout.strip()
+        ).stdout
     except (OSError, subprocess.SubprocessError):
-        return None
-    match = REMOTE.search(url)
-    return (match.group(1).lower(), match.group(2).lower()) if match else None
+        return set()
+    own = set()
+    for line in remotes.splitlines():
+        parts = line.split()
+        match = REMOTE.search(parts[1]) if len(parts) > 1 else None
+        if match:
+            own.add((match.group(1).lower(), match.group(2).lower()))
+    return own
 
 
 def foreign_references(text, own):
@@ -137,10 +146,15 @@ def foreign_references(text, own):
     for pattern in (URL, SHORTHAND):
         for match in pattern.finditer(text):
             owner, repo, number = match.group(1), match.group(2), match.group(3)
-            if own and (owner.lower(), repo.lower()) == own:
+            if (owner.lower(), repo.lower()) in own:
                 continue
             found.append(f"{owner}/{repo}#{number}")
     return sorted(set(found))
+
+
+def reads_only(words):
+    words = command_words(words)
+    return bool(words) and os.path.basename(words[0]) == "gh" and not gh_publishes(words)
 
 
 def decide(payload):
@@ -149,10 +163,11 @@ def decide(payload):
     publishing = publishing_segments(command)
     if not publishing:
         return None
-    texts = [command]
+    texts = [" ".join(words) for words in segments(command) if not reads_only(words)]
+    texts.append(split_heredocs(command)[1])
     for words in publishing:
         texts.extend(referenced_files(words, cwd))
-    references = foreign_references("\n".join(texts), own_repository(cwd))
+    references = foreign_references("\n".join(texts), own_repositories(cwd))
     if not references:
         return None
     listed = ", ".join(references)
@@ -160,8 +175,7 @@ def decide(payload):
         f"This command publishes text that references an issue or pull request in another "
         f"repository ({listed}). GitHub then posts a permanent \"mentioned this\" event on that "
         f"issue, visible to everyone there, and editing or deleting the source does not remove it. "
-        f"Describe the upstream state in words with no link or owner/repo#number, or ask the user "
-        f"before linking."
+        f"Describe the upstream item in words, with no link and no owner/repo#number."
     )
 
 

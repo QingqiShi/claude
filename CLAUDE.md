@@ -6,7 +6,7 @@ Code should be self-documenting. Only add a comment for something truly unexpect
 
 A CONTEXT.md or CONTEXT-MAP.md holds a repository's domain language. Those words are mine and they lead the code. Learn the whole file before working in the area it covers, and use its terms in code, comments, copy, and replies.
 
-The file is an input to read, not a document to review. What it lacks, or how it differs from other documents, is not something to report. The one check I want is on my wording: when my message describes in plain words something the file already names, stop and ask whether I mean that term before you act on it.
+One check on my wording: when my message describes in plain words something the file already names, stop and ask whether I mean that term before you act on it.
 
 When the work needs a name for a concept the file does not name, do not invent one. Describe the concept in plain words, offer candidates, and ask before the name lands in an API or in the file.
 

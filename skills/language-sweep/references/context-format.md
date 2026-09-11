@@ -26,7 +26,7 @@ A confirmed reservation of a vehicle for a date range. Shown to users as "trip".
 _Avoid_: Reservation, rental
 ```
 
-Group terms under subheadings when natural clusters emerge; a flat list is fine while the context stays cohesive.
+A flat list is fine while the glossary is small. Subheadings can group terms within a glossary; once a group could be loaded on its own, give it its own glossary (see below).
 
 ## The rules, and why each exists
 
@@ -36,36 +36,30 @@ Group terms under subheadings when natural clusters emerge; a flat list is fine 
 
 **Definitions say what a thing IS, not what the code does with it.** One or two sentences that draw the concept's boundary. The test: a reader should be able to predict whether a borderline case is or isn't this thing. Needing a third sentence usually means you're describing behavior or implementation — cut it.
 
-**The inclusion test is project-specific meaning, not domain-vs-technical.** Words the industry already defines (handler, retry, cache, timeout) don't belong, however often the repo uses them — nothing was decided here. But a general word this project has loaded with meaning of its own — a "Snapshot" that means one specific artifact, a "Sync" that is one particular pipeline — is glossary material even though it sounds technical. Ask: does this word mean something here that general knowledge wouldn't give you?
+**A term belongs when it means something here that general knowledge would not give you.** Whether it sounds like domain or like engineering does not matter. Words the industry already defines (handler, retry, cache, timeout) stay out however often the repo uses them, because nothing was decided here. A general word this project has loaded with its own meaning — a "Snapshot" that is one specific artifact, a "Sync" that is one particular pipeline — belongs even though it sounds technical.
 
 **One entry covers every casing and surface.** Name the concept in prose case; the entry applies to all its projections — `order_id`, `OrderCard`, "your order", the docs. Convergence maps the term through each surface's casing convention; never add separate entries per casing.
 
 **Deliberate UI divergence is recorded inline.** The default is that the internal term and the word users read are identical — that is the point of the exercise. When the product intentionally shows a different word, record it in the definition ("Shown to users as 'trip'"). A divergence the glossary records is a decision; one it doesn't is drift for the sweep to fix.
 
-## Single context vs many
+## One glossary or several
 
-Most repos are one context: one `CONTEXT.md` at the root.
+A small repo is one context: one `CONTEXT.md` at the root.
 
-Sometimes the same word legitimately means different things in different parts of the system — "Customer" in ordering is a person browsing; "Customer" in billing is a legal entity with a tax ID. That is not sloppiness to converge away; it is a boundary you've discovered. When a term genuinely can't be unified, split into per-context files with a root `CONTEXT-MAP.md`:
+Split into several glossaries as soon as the terms fall into natural groups — ordering, billing, the design system. Each file then stays small enough to read in full, and a session loads only the glossaries for the area it is working in. The split also settles the case where one word means different things in different parts of the system — "Customer" in ordering is a person browsing; "Customer" in billing is a legal entity with a tax ID. That is a boundary you have discovered, not sloppiness to converge away: each glossary keeps its own entry, and the sweep converges language within a glossary, never across two.
+
+Several glossaries need a root `CONTEXT-MAP.md` that lists them. Where a glossary applies to one part of the code, say so; a session can then pick its glossaries from the paths it is editing. A glossary with no scope applies everywhere.
 
 ```md
 # Context Map
 
 ## Contexts
 
-- [Ordering](./src/ordering/CONTEXT.md) — receives and tracks customer orders
-- [Billing](./src/billing/CONTEXT.md) — generates invoices and processes payments
-
-## Relationships
-
-- **Ordering → Billing**: Ordering emits `OrderPlaced`; Billing consumes it to invoice
-- **Ordering ↔ Billing**: shared types for `CustomerId` and `Money`
+- [Ordering](./src/ordering/CONTEXT.md) — receives and tracks customer orders. Applies to `src/ordering/` and `app/orders/`.
+- [Billing](./src/billing/CONTEXT.md) — generates invoices and processes payments. Applies to `src/billing/`.
+- [Design system](./packages/ui/CONTEXT.md) — the shared UI vocabulary.
 ```
 
-Relationships matter because boundaries are where words translate — Ordering's "Customer" may arrive in Billing as "Payer", legitimately. Record the seams so the sweep converges language *within* a context and never flattens meaning *across* one.
+## Which glossaries a session loads
 
-## How the sweep reads it
-
-- `CONTEXT-MAP.md` at root → multi-context. Read it to locate the glossaries; infer which context the code at hand belongs to, and ask only if genuinely unclear.
-- Only a root `CONTEXT.md` → single context.
-- Neither → no glossary exists yet; that is the learning phase's job. Create the root file when the first term is decided, not before.
+With a root `CONTEXT-MAP.md`, load the glossaries whose scope covers the code at hand, infer the rest from the work, and ask only if genuinely unclear. A lone root `CONTEXT.md` is the whole glossary.

@@ -82,4 +82,4 @@ Every push must target the failure the last log showed. Pushes that don't move i
 
 ## 5. Report
 
-Short: the PR link, what you fixed, anything left open and why, where CI landed. If you stopped short of raising, what stopped you.
+Short: the PR link, what you fixed, anything left open and why, where CI landed. If you stopped short of raising, what stopped you. If the PR is a draft for want of a WHY, the report ends with the question that fills it.

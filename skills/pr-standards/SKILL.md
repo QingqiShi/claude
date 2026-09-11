@@ -11,7 +11,7 @@ Conventional Commits, lowercase: the commit, the PR title, and the branch (`<typ
 
 ## The WHY comes from the person, not the diff
 
-Lead the description with why the change was made, as the conversation told you. The diff is ground truth for what changed and can confirm a reason, but it cannot supply one: a plausible motive read off the code is a guess, and a guessed WHY is the one error a reviewer cannot detect. Where no reason was given, write "motivation not recorded" at that point, open the PR as a draft, and report the gap so the person can fill it.
+Lead the description with why the change was made, as the conversation told you. The diff is ground truth for what changed and can confirm a reason, but it cannot supply one: a plausible motive read off the code is a guess, and a guessed WHY is the one error a reviewer cannot detect. Where no reason was given, write "motivation not recorded" at that point and open the PR as a draft, then end the turn by asking the person in chat why the change was made. Do not leave the gap for them to fill on GitHub: only they can supply the reason, so the run ends on that question. When the answer comes, write the WHY in, recheck the type, and mark the PR ready.
 
 ## Description
 

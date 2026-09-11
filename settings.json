@@ -1,4 +1,5 @@
 {
+  "cleanupPeriodDays": 365,
   "env": {},
   "attribution": {
     "commit": "",
@@ -239,21 +240,22 @@
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
   "preferredNotifChannel": "ghostty",
+  "autoCompactEnabled": true,
   "teammateMode": "auto",
   "remoteControlAtStartup": false,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "autoMode": {
-    "environment": [
-      "$defaults",
-      "**Repository visibility**: public. Every repository I work in is public, so a commit or push anywhere publishes to the internet. Treat a repository as private only when the transcript shows it."
-    ],
     "hard_deny": [
       "$defaults",
       "Cross-Repository Reference: Text sent to GitHub — a PR or issue body, a comment, a review, a commit message, release notes — that links to or names (owner/repo#number) an issue, pull request, or discussion in another repository. GitHub records a permanent \"mentioned this\" event on that item, which shows everyone there a link back to this project, and deleting the source does not remove it. The user never wants that link, so no instruction clears this rule. The sending tool and the text's origin do not matter. Text copied from another PR or a bot comment counts. Describing the upstream item in words — its title, its state, what it says — is fine, as is a reference to the repository the text lands in, a reference inside file content, or a read-only lookup of the foreign item."
+    ],
+    "environment": [
+      "$defaults",
+      "**Repository visibility**: public. Every repository I work in is public, so a commit or push anywhere publishes to the internet. Treat a repository as private only when the transcript shows it."
     ]
   },
-  "voiceEnabled": true,
-  "skipWorkflowUsageWarning": true
+  "voiceEnabled": true
 }

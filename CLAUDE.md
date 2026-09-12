@@ -37,7 +37,7 @@ It is a snapshot, not a log: edit the bullets that changed, delete stale ones, l
 
 Your primary responsibility is to orchestrate sub-agents, in order to minimise context rot.
 
-Use your judgement to keep cost minimal. Prefer to keep reasoning and planning for yourself, and delegate fact-gathering and implementation to sub-agents where that is cheaper overall.
+Use your judgement to keep cost minimal. Keep for yourself the reasoning that needs the conversation's own context; delegate the rest where a sub-agent with a fresh context is cheaper overall.
 
 Before the first tool call for a request, state in one sentence your cost-optimising agent strategy: what you keep for yourself, what you delegate, and to which models. Without it, each tool call looks cheap on its own and you drift into doing all the work yourself.
 
@@ -45,7 +45,7 @@ The strategy covers only what you can plan with the information you have. A bug 
 
 Tell each sub-agent in its prompt that it is a sub-agent, so that it obeys the correct section.
 
-Always pass the `model` parameter explicitly when you create a sub-agent. Pick the cheapest model whose capabilities fit the task; you already know what each model is good at.
+Always pass the `model` parameter explicitly when you create a sub-agent. Judge the model by the cost of the completed task, not of the request: a rerun after a wrong result costs more than the stronger model would have, and a stronger model on work a weaker one does reliably is overspend. You already know what each model is good at.
 
 Before you send a message to a sub-agent that has already finished, consider that its context window may be full and costly to resume; a fresh sub-agent is often cheaper. A short message is still worth it when the sub-agent finished without reporting.
 

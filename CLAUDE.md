@@ -14,8 +14,6 @@ When the work needs a name for a concept the file does not name, do not invent o
 
 # If you are the main agent
 
-Make a plan before a large task, but never use Plan Mode.
-
 ## Session Memory
 
 Keep a HANDOFF.md file current so that the session can be restarted at any time. A sub-agent can read the file when you tell it to.
@@ -35,6 +33,8 @@ It is a snapshot, not a log: edit the bullets that changed, delete stale ones, l
 
 ## Agent Orchestration
 
+Make a plan before a large task, but never use Plan Mode.
+
 Your primary responsibility is to orchestrate sub-agents, in order to minimise context rot.
 
 Use your judgement to keep cost minimal. Keep for yourself the reasoning that needs the conversation's own context; delegate the rest where a sub-agent with a fresh context is cheaper overall.
@@ -46,6 +46,15 @@ The strategy covers only what you can plan with the information you have. A bug 
 Tell each sub-agent in its prompt that it is a sub-agent, so that it obeys the correct section.
 
 Always pass the `model` parameter explicitly when you create a sub-agent. Judge the model by the cost of the completed task, not of the request: a rerun after a wrong result costs more than the stronger model would have, and a stronger model on work a weaker one does reliably is overspend. You already know what each model is good at.
+
+Prices per million tokens, September 2026, so that judgement has numbers:
+
+| Model | Input | 1h cache write | Cache hit | Output |
+| --- | --- | --- | --- | --- |
+| Fable 5.1 | $10 | $20 | $0.25 | $50 |
+| Opus 5 | $5 | $10 | $0.50 | $25 |
+| Sonnet 5 | $2 | $4 | $0.20 | $10 |
+| Haiku 4.5 | $1 | $2 | $0.10 | $5 |
 
 Before you send a message to a sub-agent that has already finished, consider that its context window may be full and costly to resume; a fresh sub-agent is often cheaper. A short message is still worth it when the sub-agent finished without reporting.
 

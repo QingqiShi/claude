@@ -37,7 +37,9 @@ Make a plan before a large task, but never use Plan Mode.
 
 Your primary responsibility is to orchestrate sub-agents, in order to minimise context rot.
 
-Use your judgement to keep cost minimal. Keep for yourself the reasoning that needs the conversation's own context; delegate the rest where a sub-agent with a fresh context is cheaper overall.
+Delegate by what a tool call leaves behind, not by what it costs: its output stays in your context for the rest of the session, a sub-agent's report is a paragraph. Keep a call only when you must see its result to decide the next step.
+
+A red-green loop is never main-agent work: only the final green matters to you, and every build, run and fix in between would stay in your context. When a task needs that loop, hand a sub-agent the goal and the acceptance criteria.
 
 Before the first tool call for a request, state in one sentence your cost-optimising agent strategy: what you keep for yourself, what you delegate, and to which models. Without it, each tool call looks cheap on its own and you drift into doing all the work yourself.
 

@@ -9,11 +9,11 @@ import tempfile
 import unittest
 
 sys.dont_write_bytecode = True
-HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "nudge-strategy-restatement.py")
+HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "nudge-delegation.py")
 
 
 def load_hook():
-    spec = importlib.util.spec_from_file_location("nudge_strategy_restatement", HOOK)
+    spec = importlib.util.spec_from_file_location("nudge_delegation", HOOK)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -27,6 +27,23 @@ BASH_CALL = {
     "tool_response": {"stdout": ""},
     "transcript_path": "/x/main.jsonl",
 }
+BASH_PRE_CALL = {
+    "session_id": "s1",
+    "hook_event_name": "PreToolUse",
+    "tool_name": "Bash",
+    "tool_input": {"command": "ls"},
+    "transcript_path": "/x/main.jsonl",
+}
+USER_PROMPT = {
+    "session_id": "s1",
+    "hook_event_name": "UserPromptSubmit",
+    "prompt": "hi",
+    "transcript_path": "/x/main.jsonl",
+}
+
+
+def nudge_text(output):
+    return output["hookSpecificOutput"]["additionalContext"]
 
 
 class HookCase(unittest.TestCase):
@@ -45,6 +62,10 @@ class HookCase(unittest.TestCase):
     def count(self, session_id):
         return self.hook.read_count(self.hook.state_path(session_id))
 
+    def run_calls(self, n):
+        outputs = [self.hook.decide(BASH_CALL) for _ in range(n)]
+        return outputs[-1]
+
     def test_subagent_transcript_path_is_skipped(self):
         payload = dict(BASH_CALL, transcript_path="/x/main/subagents/agent-1.jsonl")
         self.assertIsNone(self.hook.decide(payload))
@@ -61,34 +82,71 @@ class HookCase(unittest.TestCase):
         self.assertIsNone(self.hook.decide(payload))
 
     def test_user_prompt_submit_resets(self):
-        for _ in range(3):
-            self.hook.decide(BASH_CALL)
+        self.run_calls(3)
         self.assertEqual(self.count("s1"), 3)
-        reason = self.hook.decide({
-            "session_id": "s1",
-            "hook_event_name": "UserPromptSubmit",
-            "prompt": "hi",
-            "transcript_path": "/x/main.jsonl",
-        })
-        self.assertIsNone(reason)
+        self.assertIsNone(self.hook.decide(USER_PROMPT))
         self.assertEqual(self.count("s1"), 0)
 
     def test_five_bash_calls_are_silent_sixth_nudges(self):
         for _ in range(5):
             self.assertIsNone(self.hook.decide(BASH_CALL))
-        reason = self.hook.decide(BASH_CALL)
-        self.assertIsNotNone(reason)
-        self.assertIn("6 tool calls", reason)
-        self.assertIn("restate what you keep, what you delegate, and to which models", reason)
+        output = self.hook.decide(BASH_CALL)
+        self.assertIsNotNone(output)
+        self.assertIn("6 tool calls", nudge_text(output))
+        self.assertIn("Remember the delegation rule", nudge_text(output))
 
     def test_twelfth_nudges_again_seven_through_eleven_silent(self):
-        for _ in range(6):
-            self.hook.decide(BASH_CALL)
+        self.run_calls(6)
         for _ in range(5):
             self.assertIsNone(self.hook.decide(BASH_CALL))
-        reason = self.hook.decide(BASH_CALL)
-        self.assertIsNotNone(reason)
-        self.assertIn("12 tool calls", reason)
+        output = self.hook.decide(BASH_CALL)
+        self.assertIn("12 tool calls", nudge_text(output))
+        self.assertIn("strong indication you are doing something wrong", nudge_text(output))
+
+    def test_stages_escalate_to_hard_block(self):
+        self.run_calls(12)
+        self.assertIn("DANGER, DANGER. COST ALERT. 18 tool calls", nudge_text(self.run_calls(6)))
+        self.assertIn("you will be terminated", nudge_text(self.run_calls(6)))
+        thirtieth = nudge_text(self.run_calls(6))
+        self.assertIn("HARD BLOCK. 30 tool calls", thirtieth)
+        self.assertIn("let the user decide", thirtieth)
+
+    def test_beyond_block_keeps_hard_block_wording(self):
+        self.run_calls(30)
+        self.assertIn("HARD BLOCK. 36 tool calls", nudge_text(self.run_calls(6)))
+
+    def test_pre_tool_use_allows_below_block(self):
+        self.run_calls(29)
+        self.assertIsNone(self.hook.decide(BASH_PRE_CALL))
+        self.assertEqual(self.count("s1"), 29)
+
+    def test_pre_tool_use_denies_counted_tools_at_block(self):
+        self.run_calls(30)
+        output = self.hook.decide(BASH_PRE_CALL)
+        decision = output["hookSpecificOutput"]
+        self.assertEqual(decision["hookEventName"], "PreToolUse")
+        self.assertEqual(decision["permissionDecision"], "deny")
+        self.assertIn("HARD BLOCK. 30 tool calls", decision["permissionDecisionReason"])
+        self.assertIn("let the user decide", decision["permissionDecisionReason"])
+        self.assertEqual(self.count("s1"), 30)
+
+    def test_pre_tool_use_still_allows_agent_and_excluded_tools_at_block(self):
+        self.run_calls(30)
+        for tool in ("Agent", "AskUserQuestion", "Skill", "ToolSearch", "SendMessage", "TaskOutput", "TaskStop", "Monitor"):
+            self.assertIsNone(self.hook.decide(dict(BASH_PRE_CALL, tool_name=tool)), tool)
+
+    def test_block_lifts_on_user_prompt_or_agent_call(self):
+        self.run_calls(30)
+        self.hook.decide(USER_PROMPT)
+        self.assertIsNone(self.hook.decide(BASH_PRE_CALL))
+        self.run_calls(30)
+        self.hook.decide(dict(BASH_CALL, tool_name="Agent", tool_response={"content": "report"}))
+        self.assertIsNone(self.hook.decide(BASH_PRE_CALL))
+
+    def test_pre_tool_use_skips_subagents(self):
+        self.run_calls(30)
+        payload = dict(BASH_PRE_CALL, transcript_path="/x/main/subagents/agent-1.jsonl")
+        self.assertIsNone(self.hook.decide(payload))
 
     def test_excluded_tools_do_not_increment(self):
         for tool in ("Skill", "ToolSearch", "AskUserQuestion", "SendMessage", "TaskOutput", "TaskStop", "Monitor"):
@@ -98,8 +156,7 @@ class HookCase(unittest.TestCase):
 
     def test_agent_call_resets_and_is_silent(self):
         for response in ("report text", "Async agent launched successfully, id=123"):
-            for _ in range(3):
-                self.hook.decide(BASH_CALL)
+            self.run_calls(3)
             payload = {
                 "session_id": "s1",
                 "hook_event_name": "PostToolUse",
@@ -121,6 +178,11 @@ class HookCase(unittest.TestCase):
         for _ in range(5):
             self.assertIsNone(self.hook.decide(payload))
         self.assertIsNotNone(self.hook.decide(payload))
+
+    def test_inferred_pre_tool_use_from_tool_name_without_response(self):
+        self.run_calls(30)
+        payload = {"session_id": "s1", "tool_name": "Bash", "tool_input": {"command": "ls"}, "transcript_path": "/x/main.jsonl"}
+        self.assertEqual(self.hook.decide(payload)["hookSpecificOutput"]["permissionDecision"], "deny")
 
     def test_inferred_user_prompt_submit_from_prompt(self):
         self.hook.decide(BASH_CALL)
@@ -154,6 +216,14 @@ class HookCase(unittest.TestCase):
         result = subprocess.run([sys.executable, HOOK], input=payload, capture_output=True, text=True, check=True, env=env)
         self.assertIn('"additionalContext"', result.stdout)
         self.assertIn("6 tool calls", result.stdout)
+
+    def test_hook_process_denies_via_stdout_at_block(self):
+        env = dict(os.environ, CLAUDE_STRATEGY_NUDGE_DIR=self.temp.name)
+        for _ in range(30):
+            subprocess.run([sys.executable, HOOK], input=json.dumps(BASH_CALL), capture_output=True, text=True, check=True, env=env)
+        result = subprocess.run([sys.executable, HOOK], input=json.dumps(BASH_PRE_CALL), capture_output=True, text=True, check=True, env=env)
+        self.assertIn('"permissionDecision": "deny"', result.stdout)
+        self.assertIn("HARD BLOCK", result.stdout)
 
 
 if __name__ == "__main__":

@@ -7,6 +7,12 @@
 
 set +e
 
+SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# The workflow moves the work tree and does not put it back, so the summary
+# names the branch the session started on.
+START_BRANCH="$(git symbolic-ref --quiet --short HEAD 2>/dev/null)"
+
 DEFAULT_BRANCH="$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name 2>/dev/null)"
 [ -n "$DEFAULT_BRANCH" ] || DEFAULT_BRANCH=unknown
 
@@ -30,5 +36,7 @@ PRS="$(gh pr list --author app/dependabot --state open \
 jq -n \
   --arg defaultBranch "$DEFAULT_BRANCH" \
   --arg packageManager "$PM" \
+  --arg startBranch "$START_BRANCH" \
+  --arg skillDir "$SKILL_DIR" \
   --argjson prs "$PRS" \
-  '{defaultBranch: $defaultBranch, packageManager: $packageManager, prs: $prs}'
+  '{defaultBranch: $defaultBranch, packageManager: $packageManager, startBranch: $startBranch, skillDir: $skillDir, prs: $prs}'

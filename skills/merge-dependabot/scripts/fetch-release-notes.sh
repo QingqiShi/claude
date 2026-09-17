@@ -87,7 +87,7 @@ else:
     kind = "npm"
 
 with open(out_path, "w") as f:
-    json.dump([{"name": name, "from": frm, "to": to, "kind": kind}], f)
+    json.dump([{"name": name, "from": frm, "to": to, "kind": kind, "lookup": name}], f)
 PYEOF
 else
   DIFF_FILE="$TMPDIR/pr.diff"
@@ -125,6 +125,13 @@ MANIFEST_LINE_RE = re.compile(r'^([-+])\s*"([^"]+)":\s*"[^"0-9]*([0-9][^"]*)"\s*
 WORKFLOW_LINE_RE = re.compile(
     r'^([-+])\s*(?:-\s*)?uses:\s*([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@(\S+)(?:\s+#\s*(\S+))?'
 )
+HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@(?: (.*))?$")
+YAML_LINE_RE = re.compile(r"^([-+ ])(\s*)(\S.*)$")
+YAML_KEY_RE = re.compile(r'^(?:"([^"]+)"|\'([^\']+)\'|([^\s#][^:]*?))\s*:\s*(.*?)\s*$')
+YAML_VERSION_RE = re.compile(r"^[^0-9]*([0-9]\S*)$")
+ALIAS_RE = re.compile(r"^(?:npm|jsr):(@[^@/\s]+/[^@\s]+|[^@/\s]+)@(.+)$")
+CATALOG_KEYS = ("catalog", "catalogs")
+RESULT_KIND = {"npm": "npm", "catalog": "npm", "action": "action"}
 
 def is_workflow_path(path):
     return bool(re.search(r"\.github/workflows/.*\.ya?ml$", path))
@@ -132,45 +139,115 @@ def is_workflow_path(path):
 def is_manifest_path(path):
     return path.endswith("package.json")
 
+def is_catalog_path(path):
+    return path.endswith("pnpm-workspace.yaml")
+
+def yaml_key_value(text):
+    m = YAML_KEY_RE.match(text)
+    if not m:
+        return None
+    quoted, single_quoted, bare, value = m.groups()
+    return (quoted or single_quoted or bare).strip(), value
+
+def catalog_version(value):
+    """Version and aliased package name of a catalog value, or None when the
+    value is not a version: pnpm-workspace.yaml also holds other settings."""
+    if len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]:
+        value = value[1:-1]
+    else:
+        value = re.sub(r"\s+#.*$", "", value)
+    value = value.strip()
+    lookup = None
+    alias = ALIAS_RE.match(value)
+    if alias:
+        lookup, value = alias.groups()
+    m = YAML_VERSION_RE.match(value)
+    if not m:
+        return None
+    return m.group(1), lookup
+
+def hunk_section(text):
+    """True inside a catalog block, False inside another block, None when the
+    hunk header gives no usable context."""
+    if not text or text[:1].isspace():
+        return None
+    kv = yaml_key_value(text)
+    if kv is None:
+        return None
+    return kv[0] in CATALOG_KEYS
+
 results = []
 
 def flush(kind, removed, added, sink):
-    for pkg_name, from_ver in removed.items():
-        to_ver = added.get(pkg_name)
-        if to_ver is None or to_ver == from_ver:
+    for pkg_name, (from_ver, _) in removed.items():
+        entry = added.get(pkg_name)
+        if entry is None:
             continue
-        sink.append((pkg_name, from_ver, to_ver, kind))
+        to_ver, lookup = entry
+        if to_ver == from_ver:
+            continue
+        sink.append((pkg_name, from_ver, to_ver, kind, lookup))
 
-current_kind = None
+current_parser = None
 removed = {}
 added = {}
+in_catalog = None
 
 with open(diff_path, "r", errors="replace") as fh:
     for line in fh:
         line = line.rstrip("\n")
         header = FILE_HEADER_RE.match(line)
         if header:
-            if current_kind:
-                flush(current_kind, removed, added, results)
+            if current_parser:
+                flush(RESULT_KIND[current_parser], removed, added, results)
             path = header.group(1)
             removed = {}
             added = {}
+            in_catalog = None
             if is_manifest_path(path):
-                current_kind = "npm"
+                current_parser = "npm"
+            elif is_catalog_path(path):
+                current_parser = "catalog"
             elif is_workflow_path(path):
-                current_kind = "action"
+                current_parser = "action"
             else:
-                current_kind = None
+                current_parser = None
             continue
 
-        if current_kind == "npm":
+        if current_parser == "npm":
             if line.startswith("---") or line.startswith("+++"):
                 continue
             m = MANIFEST_LINE_RE.match(line)
             if m:
                 sign, pkg_name, ver = m.groups()
-                (removed if sign == "-" else added)[pkg_name] = ver
-        elif current_kind == "action":
+                (removed if sign == "-" else added)[pkg_name] = (ver, None)
+        elif current_parser == "catalog":
+            if line.startswith("---") or line.startswith("+++"):
+                continue
+            hunk = HUNK_HEADER_RE.match(line)
+            if hunk:
+                in_catalog = hunk_section(hunk.group(1))
+                continue
+            m = YAML_LINE_RE.match(line)
+            if not m:
+                continue
+            sign, indent, text = m.groups()
+            kv = yaml_key_value(text)
+            if kv is None:
+                continue
+            key, value = kv
+            if not indent:
+                in_catalog = key in CATALOG_KEYS
+                continue
+            # A hunk can start below the block header. Then the block is not
+            # known, and only the shape of the value shows a version. Keep
+            # those lines, because a missed bump is worse than one more section.
+            if in_catalog is False or sign == " ":
+                continue
+            parsed = catalog_version(value)
+            if parsed:
+                (removed if sign == "-" else added)[key] = parsed
+        elif current_parser == "action":
             if line.startswith("---") or line.startswith("+++"):
                 continue
             m = WORKFLOW_LINE_RE.match(line)
@@ -183,30 +260,32 @@ with open(diff_path, "r", errors="replace") as fh:
                 if comment_ver and re.match(r"^[vV]?\d+(\.\d+)*$", comment_ver):
                     if not re.match(r"^[vV]?\d+(\.\d+)*$", ref):
                         version = comment_ver
-                (removed if sign == "-" else added)[action_name] = version
+                (removed if sign == "-" else added)[action_name] = (version, None)
 
-if current_kind:
-    flush(current_kind, removed, added, results)
+if current_parser:
+    flush(RESULT_KIND[current_parser], removed, added, results)
 
 # Merge duplicate package names seen across multiple manifests (e.g. a
 # monorepo with several package.json files bumping the same dependency):
 # keep the widest observed range.
 merged = {}
-for pkg_name, from_ver, to_ver, kind in results:
+for pkg_name, from_ver, to_ver, kind, lookup in results:
     key = (pkg_name, kind)
     if key not in merged:
-        merged[key] = [from_ver, to_ver]
+        merged[key] = [from_ver, to_ver, lookup]
         continue
-    cur_from, cur_to = merged[key]
+    cur_from, cur_to, cur_lookup = merged[key]
     fk, ck = semver_key(from_ver), semver_key(cur_from)
     if fk is not None and (ck is None or fk < ck):
         merged[key][0] = from_ver
     tk, ck2 = semver_key(to_ver), semver_key(cur_to)
     if tk is not None and (ck2 is None or tk > ck2):
         merged[key][1] = to_ver
+    if lookup and not cur_lookup:
+        merged[key][2] = lookup
 
 out = [
-    {"name": name, "from": v[0], "to": v[1], "kind": kind}
+    {"name": name, "from": v[0], "to": v[1], "kind": kind, "lookup": v[2] or name}
     for (name, kind), v in merged.items()
 ]
 
@@ -214,8 +293,11 @@ with open(out_path, "w") as f:
     json.dump(out, f)
 PYEOF
 
-  if [ "$MODE" = "pr" ]; then
-    gh pr view "$PR_NUMBER" --json body --jq '.body // ""' > "$TMPDIR/prbody.txt" 2>/dev/null || : > "$TMPDIR/prbody.txt"
+  : > "$TMPDIR/prtitle.txt"
+  : > "$TMPDIR/prbody.txt"
+  if gh pr view "$PR_NUMBER" --json title,body > "$TMPDIR/pr.json" 2>/dev/null; then
+    jq -r '.title // ""' "$TMPDIR/pr.json" > "$TMPDIR/prtitle.txt" 2>/dev/null
+    jq -r '.body // ""' "$TMPDIR/pr.json" > "$TMPDIR/prbody.txt" 2>/dev/null
   fi
 fi
 
@@ -240,6 +322,9 @@ urlencode_npm_name() {
 for i in $(seq 0 $((NUM_PACKAGES - 1))); do
   name="$(jq -r ".[$i].name" "$PKG_LIST")"
   kind="$(jq -r ".[$i].kind" "$PKG_LIST")"
+  # A pnpm catalog entry can alias a different registry package. Look up that
+  # package, not the name the catalog gives it.
+  lookup="$(jq -r ".[$i].lookup // .[$i].name" "$PKG_LIST")"
   repo_file="$TMPDIR/repo_$i.json"
   releases_file="$TMPDIR/releases_$i.json"
   echo '{}' > "$repo_file"
@@ -250,10 +335,10 @@ for i in $(seq 0 $((NUM_PACKAGES - 1))); do
   directory=""
 
   if [ "$kind" = "action" ]; then
-    owner="${name%%/*}"
-    repo="${name#*/}"
+    owner="${lookup%%/*}"
+    repo="${lookup#*/}"
   else
-    encoded="$(urlencode_npm_name "$name")"
+    encoded="$(urlencode_npm_name "$lookup")"
     # The full registry doc for a popular package (e.g. vite) can run to
     # tens of MB and occasionally blow the timeout; "latest" is a single
     # version's doc (small, has repository) and the abbreviated Accept
@@ -383,6 +468,49 @@ def slice_changelog(text, frm, to):
     return sections
 
 
+NAMED_PACKAGE_RE = re.compile(
+    r"^(?:Bumps|Updates)\s+(?:\[([^\]]+)\]\([^)]*\)|`([^`]+)`|([^\s`\[]+))"
+    r"\s+from\s+(\S+)\s+to\s+(\S+)",
+    re.MULTILINE | re.IGNORECASE,
+)
+TITLE_PACKAGE_RE = re.compile(
+    r"\bbump\s+(?:\[([^\]]+)\]\([^)]*\)|`([^`]+)`|([^\s`\[]+))"
+    r"\s+from\s+(\S+)\s+to\s+(\S+)",
+    re.IGNORECASE,
+)
+DETAILS_RE = re.compile(r"<details>.*?</details>", re.DOTALL | re.IGNORECASE)
+
+
+def read_text(path):
+    if not os.path.exists(path):
+        return ""
+    try:
+        with open(path, errors="replace") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def named_packages(title, body):
+    """The packages a Dependabot PR names, as (name, from, to). The details
+    blocks are dropped first: they quote an upstream changelog, which names
+    packages this PR does not bump."""
+    found = []
+    seen = set()
+    for pattern, text in (
+        (TITLE_PACKAGE_RE, title),
+        (NAMED_PACKAGE_RE, DETAILS_RE.sub("", body)),
+    ):
+        for m in pattern.finditer(text):
+            linked, ticked, bare, frm, to = m.groups()
+            pkg_name = (linked or ticked or bare).replace("​", "").strip()
+            if not pkg_name or pkg_name.lower() in seen:
+                continue
+            seen.add(pkg_name.lower())
+            found.append((pkg_name, frm.rstrip(".,;:"), to.rstrip(".,;:")))
+    return found
+
+
 def extract_pr_body_section(body, pkg_name):
     if not body:
         return None
@@ -407,10 +535,14 @@ packages_with_notes = 0
 sections_md = []
 coverage_lines = []
 
+pr_title = read_text(os.path.join(tmpdir, "prtitle.txt"))
+pr_body = read_text(os.path.join(tmpdir, "prbody.txt"))
+
 per_pkg_budget = max(1000, (CAP_BYTES - OVERHEAD_BYTES) // max(1, num_packages))
 
 for i, pkg in enumerate(packages):
     name, frm, to, kind = pkg["name"], pkg["from"], pkg["to"], pkg["kind"]
+    lookup = pkg.get("lookup") or name
     repo_info = load_json(os.path.join(tmpdir, f"repo_{i}.json"), {})
     owner = repo_info.get("owner", "")
     repo = repo_info.get("repo", "")
@@ -435,7 +567,7 @@ for i, pkg in enumerate(packages):
 
         chosen_prefix = None
         if kind == "npm":
-            unscoped = name.split("/")[-1]
+            unscoped = lookup.split("/")[-1]
             dirbase = os.path.basename(directory) if directory else ""
             for cand in (dirbase, unscoped):
                 if cand and cand.lower() in prefixes_lower:
@@ -503,27 +635,23 @@ for i, pkg in enumerate(packages):
                         f"### {v}\n{txt}\n" for v, txt in sections
                     )
 
-            if source is None and pr_number:
-                prbody_path = os.path.join(tmpdir, "prbody.txt")
-                if os.path.exists(prbody_path):
-                    with open(prbody_path, errors="replace") as f:
-                        pr_body_text = f.read()
-                    excerpt = extract_pr_body_section(pr_body_text, name)
-                    if excerpt and excerpt.strip():
-                        source = "PR body"
-                        source_url = f"https://github.com/{owner}/{repo}"
-                        sections = slice_changelog(excerpt, frm, to)
-                        if sections:
-                            found_versions = len(sections)
-                            body_md = "\n".join(
-                                f"### {v}\n{txt}\n" for v, txt in sections
-                            )
-                        else:
-                            unstructured = True
-                            found_versions = 0
-                            body_md = excerpt.strip()
-                        if total_versions is None:
-                            total_versions = found_versions if sections else 1
+            if source is None and pr_body:
+                excerpt = extract_pr_body_section(pr_body, name)
+                if excerpt and excerpt.strip():
+                    source = "PR body"
+                    source_url = f"https://github.com/{owner}/{repo}"
+                    sections = slice_changelog(excerpt, frm, to)
+                    if sections:
+                        found_versions = len(sections)
+                        body_md = "\n".join(
+                            f"### {v}\n{txt}\n" for v, txt in sections
+                        )
+                    else:
+                        unstructured = True
+                        found_versions = 0
+                        body_md = excerpt.strip()
+                    if total_versions is None:
+                        total_versions = found_versions if sections else 1
 
     if total_versions is not None and found_versions > total_versions:
         # A source (e.g. GitHub Releases) can list a version the registry
@@ -569,10 +697,33 @@ else:
     p = packages[0] if packages else {"name": "?", "from": "?", "to": "?"}
     title = f"# Release notes for {p['name']} {p['from']} -> {p['to']}\n"
 
-if packages:
-    coverage_block = "## Coverage\n" + "\n".join(coverage_lines) + "\n"
-else:
-    coverage_block = "## Coverage\nNo package.json or workflow version bumps were found in this PR's manifest changes.\n"
+named = named_packages(pr_title, pr_body)
+parsed_names = {p["name"].lower() for p in packages}
+parsed_names |= {(p.get("lookup") or p["name"]).lower() for p in packages}
+missing = [entry for entry in named if entry[0].lower() not in parsed_names]
+
+if not packages:
+    coverage_lines.append(
+        "- no package.json, pnpm-workspace.yaml catalog or workflow version bump was found in this PR's changes"
+    )
+if pr_number:
+    if named:
+        coverage_lines.append(
+            f"- packages named by this PR with a section in this file: {len(named) - len(missing)} of {len(named)}"
+        )
+    else:
+        coverage_lines.append(
+            "- no package name could be read from this PR's title or body, so this file cannot be confirmed complete"
+        )
+    if missing:
+        coverage_lines.append(
+            "- NOT IN THIS FILE: "
+            + ", ".join(f"{n} ({f} -> {t})" for n, f, t in missing)
+            + ". The PR names each of these, but no version change for it was found in"
+            " the PR's package.json, pnpm-workspace.yaml or workflow changes."
+        )
+
+coverage_block = "## Coverage\n" + "\n".join(coverage_lines) + "\n"
 
 doc = title + "\n" + coverage_block + "\n" + "\n".join(final_sections)
 
@@ -584,5 +735,13 @@ if len(raw_doc) > CAP_BYTES:
 with open(out_path, "w") as f:
     f.write(doc)
 
-print(f"{packages_with_notes} of {len(packages)} packages have notes")
+prefix = f"PR #{pr_number}: " if pr_number else ""
+summary = f"{packages_with_notes} of {len(packages)} packages have notes"
+if missing:
+    names = ", ".join(entry[0] for entry in missing)
+    print(f"{prefix}WARNING: no version change found for {names}; {summary}")
+elif not packages:
+    print(f"{prefix}WARNING: no version bump found in this PR's diff; {summary}")
+else:
+    print(f"{prefix}{summary}")
 PYEOF

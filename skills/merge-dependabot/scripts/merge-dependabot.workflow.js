@@ -1,258 +1,165 @@
 export const meta = {
   name: 'merge-dependabot',
-  description: 'Scout every open Dependabot PR in parallel, write a brief for each, then execute the briefs one PR at a time',
+  description: 'Merge or park each open Dependabot PR, one at a time; release notes are fetched separately, before this workflow runs',
   phases: [
-    { title: 'Scout', detail: 'one read-only agent per PR' },
-    { title: 'Decide', detail: 'one brief per PR, on the session model' },
-    { title: 'Execute', detail: 'one PR at a time, because the work tree is shared' },
+    { title: 'Merge', detail: 'one agent per PR, one at a time, because the work tree is shared' },
+    { title: 'Hand over', detail: 'leave the work tree where the user needs it' },
   ],
 }
 
 const { prs, defaultBranch, packageManager } = args
-const MAX_EXECUTE_ROUNDS = 2
 
-// Schemas: the output contract of each role.
+const NOTES_DIR = '/tmp/merge-dependabot'
+const notesPath = (pr) => `${NOTES_DIR}/notes-pr-${pr.number}.md`
 
-const SCOUT_SCHEMA = {
+const MERGE_SCHEMA = {
   type: 'object',
   properties: {
-    packages: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { name: { type: 'string' }, from: { type: 'string' }, to: { type: 'string' } },
-        required: ['name', 'from', 'to'],
-      },
-    },
-    dependencyType: { type: 'string', enum: ['production', 'dev', 'github-action', 'mixed'] },
-    usedIn: { type: 'string' },
-    releaseNotes: { type: 'string' },
-    runtimeGates: { type: 'string' },
-    unknowns: { type: 'string' },
-  },
-  required: ['packages', 'dependencyType', 'usedIn', 'releaseNotes', 'runtimeGates', 'unknowns'],
-}
-
-const DECIDE_SCHEMA = {
-  type: 'object',
-  properties: {
-    action: { type: 'string', enum: ['proceed', 'skip', 'needs_attention'] },
-    reason: { type: 'string' },
-    brief: { type: 'string' },
-  },
-  required: ['action', 'reason', 'brief'],
-}
-
-const EXECUTE_SCHEMA = {
-  type: 'object',
-  properties: {
-    status: { type: 'string', enum: ['merged', 'skipped', 'stopped'] },
+    status: { type: 'string', enum: ['merged', 'parked', 'skipped'] },
     reason: { type: 'string' },
     detail: { type: 'string' },
   },
   required: ['status', 'reason', 'detail'],
 }
 
-// Instructions: the standing text of each role, with this PR's values filled in.
+const CHECKOUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    ok: { type: 'boolean' },
+    head: { type: 'string' },
+  },
+  required: ['ok', 'head'],
+}
 
-const preamble = (pr, task) =>
-  `You are a sub-agent in a larger orchestration. Your only task is to ${task} Dependabot PR #${pr.number} (${pr.title}) on branch ${pr.headBranch}. The default branch is ${defaultBranch} and the package manager is ${packageManager}.`
+const mergeInstructions = (pr) => `You are a sub-agent in a larger orchestration, and you own Dependabot PR #${pr.number} (${pr.title}) on branch ${pr.headBranch} from end to end. The default branch is ${defaultBranch} and the package manager is ${packageManager}.
 
-const scoutInstructions = (pr) => `${preamble(pr, 'scout')}
+Get this bump merged with a reason to believe it works, or park it for the user with a clear account of what stopped you. Every call in between is yours, and nobody runs behind you to pick up what you leave.
 
-You gather the facts the orchestrator needs to decide whether and how to merge this PR. You decide nothing, and you leave the work tree untouched: read the PR through gh, the release notes on the web, and the repository as it is checked out.
+## How much research the bump warrants
 
-## What to find
+Read the diff first, with \`gh pr diff ${pr.number}\`. Take the versions from the lockfile or manifest change rather than from the title, which can be stale, and find where the manifest declares each package.
 
-Real versions and dependency type. Read the PR diff with "gh pr diff ${pr.number}". Take the from and to versions from the lockfile or manifest change, not the title, which can be stale. For each package, find where the manifest declares it: dependencies, devDependencies, or a workflow file for a GitHub Action. Dependabot's own labels get this wrong, so trust the manifest.
+A patch or minor bump of a dev dependency or a GitHub Action carries its risk in the checks, so go straight to the work below. A major bump, or anything in \`dependencies\`, can change what the app does at runtime, so find out what the maintainers said before you touch it.
 
-Release notes between the two versions. Look wherever the maintainers publish: GitHub Releases, a CHANGELOG file in the package or its repository, the docs site, a release blog post. Cover every release from the old version up to and including the new one.
+The release notes are already gathered for you at ${notesPath(pr)}, fetched deterministically before this workflow started. The file may be missing, or its coverage line may say no notes were found for a package — both are normal and not a reason to stop; gather what you need yourself when that happens.
 
-How the repository uses the package. Search for imports and the APIs called. Note anything that gates the code path at runtime, such as an environment variable that has to be set or a service that has to be reachable, because the orchestrator uses that to plan a runtime check.
+Read that file when the bump warrants it. When it is large, give a sub-agent on haiku the path and the question you need answered — which entries touch the APIs this repository calls — instead of pulling the whole file into your own context; a group bump's notes run to hundreds of kilobytes. Migration guides on docs sites are not in the file, so search the web for one when a major bump points at it.
 
-## Report
-
-Quote a release-note entry when it mentions a breaking change, a deprecation, a behaviour change, or an API this repository calls; summarise the rest in a line. Write "none found" rather than leave a field empty.
-
-- packages: one entry per package with name, from, to.
-- dependencyType: production, dev, github-action, or mixed when the packages differ, per the manifest.
-- usedIn: the files and the APIs called, or "not imported directly".
-- releaseNotes: the links, then the quoted entries and the one-line summary.
-- runtimeGates: what must be true locally for the code path to run.
-- unknowns: what you looked for and could not find.`
-
-const decideInstructions = (pr) => `${preamble(pr, 'decide how to handle')}
-
-You hold the judgement for this PR. The scout report below gives the facts. The executor that follows does exactly what your brief says and stops on anything the brief does not cover, so settle in writing everything it would otherwise have to judge. You may read the repository to check a usage the scout described. You do not install, rebase, or run anything.
-
-## Skip, proceed, or hand to the human
-
-- Skip a major bump whose maintainers published nothing about it. Silence at that scale means the risk is unknown, not absent.
-- Skip when the notes show a behaviour change and the repository's usage leaves the outcome unclear.
-- Needs attention when the call is the human's: a fix with several plausible forms that differ in user-facing behaviour, a fix that needs a project-rule violation, or a runtime proof the local environment cannot deliver because the code path is gated on credentials or a service the scout found absent. Say exactly what the human has to decide or supply.
-- Proceed otherwise, with a brief.
-
-## The brief
-
-Migrations. Name each documented migration to apply, deprecations included, even when nothing fails yet. A deprecation breaks the build at a later removal, and migrating now is cheaper than tracing that regression. Scale is not a reason to skip: a documented rename across a hundred files is a brief, not a blocker.
-
-Runtime proof, for a production dependency. Name the page or flow that runs the upgraded code, and the evidence that shows it ran: a network request, a rendered result, a value on window. A page that never reaches the new code proves nothing. A dev dependency or a GitHub Action needs no runtime proof; the executor's checks cover it. Say so in the brief.
-
-Expected fallout. List the check failures the migration will cause and how to fix each, so the executor can carry on instead of stopping.
-
-## When the executor has stopped
-
-Your prompt then also carries your previous brief and the executor's report. The executor stops at the first surprise and does not investigate, so expect small stops, and answer each with the specific instruction it lacked. Extend the brief when the right fix is clear, whatever its scale. Otherwise choose needs attention and say exactly what is unclear.
-
-## Output
-
-- action: proceed, skip, or needs_attention.
-- reason: one sentence. It appears in the final report next to the PR.
-- brief: for proceed, the full brief the executor follows. Empty otherwise.`
-
-const executeInstructions = (pr) => `${preamble(pr, 'carry out the brief below for')}
-
-The brief has settled what to migrate, what proves the upgrade at runtime, and which check failures to expect. Everything else is settled by stopping.
-
-## Stop at the first surprise
-
-Stopping is the normal outcome when anything is not in the brief, and it is cheap: your report goes to the decide agent, which has the judgement and the context to extend the brief or hand the PR to a human, and a fresh executor continues from the branch you leave behind. Working it out yourself is the expensive path. A fix you improvise lands in production without anyone having judged it, and an innocent-looking changelog is exactly where a regression hides.
-
-So stop the first time something the brief did not list happens: a check fails, a migration does not apply the way the notes describe, an install, a server, or a test run does not finish, the runtime evidence does not appear, an element you need is not on the page. Running the same command a second time to confirm what you saw is fine. Changing what you run, editing a test, a snapshot, a type, or a config to make a check pass, or looking for another way to reach the evidence, is not. Report what you ran, what you saw, and which step you were on.
-
-The one thing you may fix unasked is formatter output, because it carries no meaning. A changed snapshot or generated file is information about behaviour and belongs in the report.
-
-## The work tree is shared
-
-The PRs before and after yours use the same checkout. Write scratch output, such as browser snapshots, outside the repository. When you finish or stop, shut down any dev server you started. When you stop with work in progress, commit it on the head branch locally and unpushed, so nothing is lost and the next PR starts from a clean tree.
-
-## Steps
-
-1. Rebase locally.
+## Get the branch onto ${defaultBranch}
 
     git fetch origin
     git checkout origin/${defaultBranch}
     git checkout -B ${pr.headBranch} origin/${pr.headBranch}
     git rebase origin/${defaultBranch}
 
-A conflict in a generated file, such as the lockfile, resolves by taking the default branch's version and running the install again. Any other conflict: stop and report the files. Do not push until step 5, so the remote only ever sees a validated branch.
+A lockfile conflict is yours to resolve: take the ${defaultBranch} version of the lockfile, finish the rebase, and run a plain install to regenerate it against the new manifest. Do not comment \`@dependabot rebase\` and do not wait on the bot — it costs minutes and hands back the same conflict. Any other conflict is a park.
 
-2. Apply the brief's migrations. Only those. If the notes mention something the brief does not, report it at the end rather than act on it.
+Push nothing before the merge step, so the remote only ever sees a branch you have validated.
 
-3. Install with ${packageManager} and run every check the project uses to gate development: lint, format, type-check, tests, build, and whatever else is wired up. Fix the fallout the brief lists, and formatter output. Any other failure: stop and report the output.
+## Install and check
 
-4. Runtime proof, when the brief names one. Start the app, drive the named flow with browser automation, and capture the evidence the brief describes together with the console. If the evidence is absent or a related console error appears, stop and report what you saw. Passing checks and green CI do not stand in for the evidence; the brief named it because they cannot show it.
+Install with ${packageManager}, plainly. No frozen or immutable lockfile flag: the rebase above is expected to move the lockfile, and a frozen install fails on exactly the state you just made.
 
-5. Push, watch CI, squash-merge.
+Then run every check the project gates development with — lint, format, type-check, tests, build, and whatever else is wired up.
+
+A failure you can attribute to the bump is yours to fix: formatter output, a renamed export, a changed signature, a snapshot that moved for a documented reason. Fix it, re-run the check, and say so in your report. A failure you cannot attribute to the bump is a park, because an unexplained red check is the shape a regression arrives in.
+
+## Prove it works
+
+Nothing merges without a signal of confidence. Which signal that is, is your call, and it follows what this dependency can break. Anything the user sees gets driven in a browser, on the page or flow that runs the upgraded code, with the console watched. A logic utility, a build tool or an Action is covered by the checks you have already run. Name the signal you chose in your report.
+
+Green checks do not stand in for a runtime signal when the dependency renders something.
+
+## Merge
 
     git push --force origin ${pr.headBranch}
     gh pr checks ${pr.number} --watch
-    gh pr merge ${pr.number} --squash
+    gh pr merge ${pr.number} --squash --match-head-commit "$(git rev-parse HEAD)"
 
-Force-push is safe on a bot-owned branch. If the push is rejected because Dependabot rebased while you worked, skip the PR; the next run picks it up cleanly. If CI fails or the merge is blocked, stop and report.
+Force-push is safe on a bot-owned branch. \`--match-head-commit\` makes GitHub refuse the merge if the branch moved under you, and it checks that atomically, so nothing before it needs to test the head. If the push is rejected because Dependabot rebased while you worked, skip the PR; the next run picks it up cleanly.
+
+## Park
+
+Park whenever you cannot get to a confident merge. It is a normal outcome and it costs the user one look, where a merge on a guess costs a regression. Commit your work in progress on ${pr.headBranch}, locally and unpushed, so the next PR starts from a clean tree and nothing you did is lost. The user may read your report standing in that branch, so write it as the account of where you got to.
+
+## The work tree is shared
+
+The PRs before and after yours use the same checkout. Write scratch output, such as browser snapshots, outside the repository, and shut down any dev server you started before you finish.
 
 ## Output
 
-- status: merged, skipped, or stopped.
+- status: merged, parked, or skipped.
 - reason: one sentence. It appears in the final report next to the PR.
-- detail: for stopped, the step you were on, the command you ran, and its exact output or the missing evidence. For any status, anything from the release notes that the brief did not cover.`
+- detail: what you researched and what it said, what you fixed, and the signal that convinced you. For a park, what stopped you and what it would take to finish.`
 
-// Agents.
+const checkoutInstructions = (target) => `You are a sub-agent with one mechanical task: run \`git checkout ${target}\` in the repository, then report whether it exited zero and what \`git rev-parse --abbrev-ref HEAD\` prints afterwards. Change nothing else, and commit nothing.`
 
-const scout = (pr) =>
-  agent(scoutInstructions(pr), {
-    label: `scout:#${pr.number}`,
-    phase: 'Scout',
-    schema: SCOUT_SCHEMA,
-    model: 'sonnet',
+const mergeOne = (pr) =>
+  agent(mergeInstructions(pr), {
+    label: `merge:#${pr.number}`,
+    phase: 'Merge',
+    schema: MERGE_SCHEMA,
     agentType: 'general-purpose',
   })
 
-const decide = (pr, report, previous) =>
-  agent(
-    [
-      decideInstructions(pr),
-      `## Scout report\n\n${JSON.stringify(report, null, 2)}`,
-      previous
-        ? `## The executor stopped on your previous brief\n\nPrevious brief:\n${previous.brief}\n\nExecutor report:\n${previous.report}`
-        : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n'),
-    { label: `decide:#${pr.number}`, phase: 'Decide', schema: DECIDE_SCHEMA, agentType: 'general-purpose' },
-  )
-
-const execute = (pr, brief) =>
-  agent(`${executeInstructions(pr)}\n\n## Brief\n\n${brief}`, {
-    label: `execute:#${pr.number}`,
-    phase: 'Execute',
-    schema: EXECUTE_SCHEMA,
-    model: 'sonnet',
+const checkout = (target) =>
+  agent(checkoutInstructions(target), {
+    label: `checkout:${target}`,
+    phase: 'Hand over',
+    schema: CHECKOUT_SCHEMA,
+    model: 'haiku',
     agentType: 'general-purpose',
   })
 
-const attention = (reason) => ({ action: 'needs_attention', reason, brief: '' })
-
-// Run.
-
-const decided = await pipeline(
-  prs,
-  (pr) => scout(pr),
-  (report, pr) =>
-    report
-      ? decide(pr, report).then((decision) => ({ report, decision: decision || attention('the decide agent returned nothing') }))
-      : { report: null, decision: attention('the scout agent returned nothing') },
-)
-
+phase('Merge')
 const rows = []
 for (let i = 0; i < prs.length; i++) {
   const pr = prs[i]
-  const item = decided[i] || { report: null, decision: attention('the scout or decide agent failed') }
-  let decision = item.decision
-  let status = null
-  let rounds = 0
+  const result = await mergeOne(pr)
+  const status = !result
+    ? 'Parked — the agent for this PR returned nothing'
+    : result.status === 'merged'
+      ? 'Merged'
+      : result.status === 'skipped'
+        ? `Skipped — ${result.reason}`
+        : `Parked — ${result.reason}`
 
-  while (decision.action === 'proceed' && rounds < MAX_EXECUTE_ROUNDS) {
-    rounds++
-    log(`#${pr.number}: executing, round ${rounds}`)
-    const result = await execute(pr, decision.brief)
-    if (!result) {
-      decision = attention('the executor agent returned nothing')
-      break
-    }
-    if (result.status === 'merged') {
-      status = 'Merged'
-      break
-    }
-    if (result.status === 'skipped') {
-      status = `Skipped — ${result.reason}`
-      break
-    }
-    if (rounds >= MAX_EXECUTE_ROUNDS) {
-      decision = attention(result.reason)
-      break
-    }
-    log(`#${pr.number}: executor stopped, deciding again`)
-    decision =
-      (await decide(pr, item.report, { brief: decision.brief, report: `${result.reason}\n\n${result.detail}` })) ||
-      attention(result.reason)
-  }
-
-  if (!status) {
-    status = decision.action === 'skip' ? `Skipped — ${decision.reason}` : `Needs attention — ${decision.reason}`
-  }
-  rows.push({ number: pr.number, title: pr.title, url: pr.url, status })
+  rows.push({ number: pr.number, title: pr.title, url: pr.url, headBranch: pr.headBranch, status })
   log(`#${pr.number}: ${status}`)
 }
 
-const needsAttention = rows.filter((r) => r.status.startsWith('Needs attention'))
+const parked = rows.filter((r) => r.status.startsWith('Parked'))
+const reasonOf = (r) => r.status.replace(/^(Parked|Skipped) — /, '')
+
+let standingIn = null
+if (parked.length === 1) {
+  phase('Hand over')
+  log(`parked #${parked[0].number}: checking out ${parked[0].headBranch}`)
+  const done = await checkout(parked[0].headBranch)
+  if (done && done.ok) standingIn = parked[0]
+} else if (parked.length > 1) {
+  phase('Hand over')
+  log(`${parked.length} PRs parked: leaving the work tree on ${defaultBranch}`)
+  await checkout(`origin/${defaultBranch}`)
+}
+
 const lines = ['## Dependabot PR Summary', '']
-if (needsAttention.length) {
-  lines.push('**Needs attention:**')
-  for (const r of needsAttention) lines.push(`- [#${r.number}](${r.url}) — ${r.status.replace('Needs attention — ', '')}`)
+if (standingIn) {
+  lines.push(
+    `**You are standing in \`${standingIn.headBranch}\`**, parked at [#${standingIn.number}](${standingIn.url}) — ${reasonOf(standingIn)} The work so far is committed on that branch and unpushed.`,
+    '',
+  )
+} else if (parked.length === 1) {
+  lines.push(
+    `**Parked:** [#${parked[0].number}](${parked[0].url}) — ${reasonOf(parked[0])} The checkout failed, so continue with \`git checkout ${parked[0].headBranch}\`.`,
+    '',
+  )
+} else if (parked.length > 1) {
+  lines.push('**Parked — the work tree is back on the default branch. Check one out to continue:**')
+  for (const r of parked) lines.push(`- [#${r.number}](${r.url}) — ${reasonOf(r)} \`git checkout ${r.headBranch}\``)
   lines.push('')
 }
 lines.push('| PR | Title | Status |', '|----|-------|--------|')
 for (const r of rows) lines.push(`| [#${r.number}](${r.url}) | ${r.title.replace(/\|/g, '\\|')} | ${r.status} |`)
 
-return { rows, markdown: lines.join('\n') }
+return { rows, parked: parked.map((r) => ({ number: r.number, headBranch: r.headBranch })), markdown: lines.join('\n') }

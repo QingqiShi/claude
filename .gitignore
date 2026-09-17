@@ -27,5 +27,11 @@ skills/**/evals/results/
 skills/vercel-cli
 skills/playwright-cli
 
+# Skills synced down from the claude.ai account, and the undo buffer the sync
+# writes when it replaces one. Both are machine-local and come back on the next
+# sync. (Must come after the !skills/** allow-list to override it.)
+skills/synced/
+skills/.trash/
+
 # Python writes these next to the hooks and their tests; must come after the !hooks/** allow-list.
 __pycache__/

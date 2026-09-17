@@ -30,20 +30,20 @@
         ]
       },
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f ~/.claude/hooks/nudge-delegation.py ] && python3 ~/.claude/hooks/nudge-delegation.py || true"
+          }
+        ]
+      },
+      {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
             "command": "if [ -n \"$PASEO_TERMINAL_ID\" ]; then \"${PASEO_HOOK_CLI:-paseo}\" hooks claude UserPromptSubmit; fi",
             "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "[ -f ~/.claude/hooks/nudge-delegation.py ] && python3 ~/.claude/hooks/nudge-delegation.py || true"
           }
         ]
       }

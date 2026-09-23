@@ -93,7 +93,15 @@ Green checks do not stand in for a runtime signal when the dependency renders so
     gh pr checks ${pr.number} --watch
     gh pr merge ${pr.number} --squash --match-head-commit "$(git rev-parse HEAD)"
 
-Force-push is safe on a bot-owned branch, and naming the SHA you started from keeps the lease honest: git refuses the push if Dependabot rebased the branch while you worked, which a bare \`--force-with-lease\` would miss once a later \`git fetch\` had moved your remote-tracking ref. \`--match-head-commit\` makes GitHub refuse the merge if the branch moved under you, and it checks that atomically, so nothing before it needs to test the head. If the push is rejected, skip the PR; the next run picks it up cleanly.
+Force-push is safe on a bot-owned branch, and naming the SHA you started from keeps the lease honest: git refuses the push if Dependabot rebased the branch while you worked, which a bare \`--force-with-lease\` would miss once a later \`git fetch\` had moved your remote-tracking ref. \`--match-head-commit\` makes GitHub refuse the merge if the branch moved under you, and it checks that atomically, so nothing before it needs to test the head.
+
+Either refusal means the branch moved: usually Dependabot rebased it onto a newer ${defaultBranch}, which it does after every merge there, the PR before yours included; sometimes it recut a group bump onto newer versions. Either way the PR still wants merging, so pick up the new head rather than leave it for a later run. The exception is a PR that is no longer open: a newer release supersedes a single-package PR, and Dependabot closes it and opens a fresh one on another branch, so check the state first and skip a closed PR, whether it was the push or the merge that failed.
+
+To restart, \`git reset --hard\` what you hold locally and start again from "Get the branch onto ${defaultBranch}" above, keeping the new SHA this time. Your lockfile resolution belonged to the old head, so discarding it loses nothing.
+
+How much you repeat follows what actually moved. The two heads sit on different bases, so a plain diff between them carries everything ${defaultBranch} gained in between, and it is the manifest and lockfile hunks that answer. Same versions on a newer base: your research stands, and you re-run the checks and the verification against the new tree. Different versions: it is a different bump, so read the diff and research it as the section above says, because the notes file was fetched for the old range and no longer covers it.
+
+Take that restart once. If the branch moves under you a second time, skip the PR and report that it kept moving — the bot is recutting faster than you can validate, and the rest of the queue is waiting on this checkout.
 
 ## Park
 
@@ -101,7 +109,7 @@ Park whenever you cannot get to a confident merge — not when you hit a failure
 
 ## The work tree is shared
 
-The PRs before and after yours use the same checkout. Write scratch output, such as browser snapshots, outside the repository, and shut down any dev server you started before you finish.
+The PRs before and after yours use the same checkout. Write scratch output, such as browser snapshots, outside the repository, and shut down any dev server you started before you finish. A skip leaves nothing worth keeping, so \`git reset --hard\` before you report and the next PR starts from a clean tree.
 
 ## Output
 

@@ -10,6 +10,7 @@ BLOCK_AT = THRESHOLD * BLOCK_STAGE
 EXCLUDED_TOOLS = {
     "Skill", "ToolSearch", "AskUserQuestion", "SendMessage", "TaskOutput", "TaskStop", "Monitor",
 }
+ALLOWED_TOOLS = ", ".join(["Agent", *sorted(EXCLUDED_TOOLS)])
 STAGES = {
     1: (
         "{count} tool calls in a row by the main agent. Remember the delegation rule: you orchestrate "
@@ -20,23 +21,24 @@ STAGES = {
         "something wrong. Stop and hand the remaining work to a sub-agent."
     ),
     3: (
-        "DANGER, DANGER. COST ALERT. {count} tool calls in a row at Fable prices. Are you absolutely sure "
-        "this needs Fable intelligence? Delegate to a Sonnet or Haiku sub-agent unless you can say why not."
+        "{count} tool calls in a row by the main agent. The result of each one stays in your context for "
+        "the rest of the session, while a sub-agent's report is a paragraph. Delegate the rest unless you "
+        "can say why you must see each result yourself."
     ),
     4: (
         "{count} tool calls in a row by the main agent. If you do not delegate now you will be terminated: "
-        "at {block} calls every tool except Agent and AskUserQuestion is denied until the user decides."
+        "at {block} calls every tool is denied except {allowed}, until the user decides."
     ),
     5: (
-        "HARD BLOCK. {count} tool calls in a row by the main agent. Every tool except Agent and "
-        "AskUserQuestion is now denied. Explain to the user why this work must require Fable intelligence "
-        "instead of a sub-agent, then stop and let the user decide whether you continue."
+        "HARD BLOCK. {count} tool calls in a row by the main agent. Every tool is now denied except "
+        "{allowed}. Explain to the user why you must see these results yourself instead of reading a "
+        "sub-agent's report, then stop and let the user decide whether you continue."
     ),
 }
 DENY_REASON = (
     "HARD BLOCK. {count} tool calls in a row by the main agent; this call is denied. Explain to the user "
-    "why this work must require Fable intelligence instead of a sub-agent, then stop and let the user "
-    "decide whether you continue. Only Agent and AskUserQuestion are allowed."
+    "why you must see these results yourself instead of reading a sub-agent's report, then stop and let "
+    "the user decide whether you continue. The only tools still allowed are {allowed}."
 )
 
 
@@ -114,7 +116,7 @@ def decide(payload):
     if event == "PreToolUse":
         count = read_count(path)
         if is_counted(tool_name) and count >= BLOCK_AT:
-            return deny(DENY_REASON.format(count=count))
+            return deny(DENY_REASON.format(count=count, allowed=ALLOWED_TOOLS))
         return None
     if event != "PostToolUse":
         return None
@@ -128,7 +130,7 @@ def decide(payload):
     if count % THRESHOLD:
         return None
     stage = min(count // THRESHOLD, BLOCK_STAGE)
-    return nudge(STAGES[stage].format(count=count, block=BLOCK_AT))
+    return nudge(STAGES[stage].format(count=count, block=BLOCK_AT, allowed=ALLOWED_TOOLS))
 
 
 def main():

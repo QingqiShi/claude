@@ -105,11 +105,20 @@ class HookCase(unittest.TestCase):
 
     def test_stages_escalate_to_hard_block(self):
         self.run_calls(12)
-        self.assertIn("DANGER, DANGER. COST ALERT. 18 tool calls", nudge_text(self.run_calls(6)))
+        eighteenth = nudge_text(self.run_calls(6))
+        self.assertIn("18 tool calls", eighteenth)
+        self.assertIn("stays in your context", eighteenth)
         self.assertIn("you will be terminated", nudge_text(self.run_calls(6)))
         thirtieth = nudge_text(self.run_calls(6))
         self.assertIn("HARD BLOCK. 30 tool calls", thirtieth)
         self.assertIn("let the user decide", thirtieth)
+
+    def test_hard_block_texts_name_every_allowed_tool(self):
+        stage_five = nudge_text(self.run_calls(30))
+        reason = self.hook.decide(BASH_PRE_CALL)["hookSpecificOutput"]["permissionDecisionReason"]
+        for tool in ("Agent", *self.hook.EXCLUDED_TOOLS):
+            self.assertIn(tool, stage_five)
+            self.assertIn(tool, reason)
 
     def test_beyond_block_keeps_hard_block_wording(self):
         self.run_calls(30)

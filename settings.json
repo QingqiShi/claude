@@ -330,6 +330,11 @@
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "autoMode": {
+    "allow": [
+      "$defaults",
+      "**Archive Paseo workspaces**: `paseo workspace archive <workspace-id>`, which archives a Paseo workspace and everything it owns. It is a soft delete that I expect Claude to do when a piece of work is finished.",
+      "**Close pull requests**: `gh pr close`, or the equivalent GitHub API call, on a pull request in a repository I work in. A closed pull request can be reopened, so this is not destructive."
+    ],
     "hard_deny": [
       "$defaults",
       "Cross-Repository Reference: Text sent to GitHub — a PR or issue body, a comment, a review, a commit message, release notes — that links to or names (owner/repo#number) an issue, pull request, or discussion in another repository. GitHub records a permanent \"mentioned this\" event on that item, which shows everyone there a link back to this project, and deleting the source does not remove it. The user never wants that link, so no instruction clears this rule. The sending tool and the text's origin do not matter. Text copied from another PR or a bot comment counts. Describing the upstream item in words — its title, its state, what it says — is fine, as is a reference to the repository the text lands in, a reference inside file content, or a read-only lookup of the foreign item."

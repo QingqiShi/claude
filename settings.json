@@ -344,5 +344,10 @@
       "**Repository visibility**: public. Every repository I work in is public, so a commit or push anywhere publishes to the internet. Treat a repository as private only when the transcript shows it."
     ]
   },
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  }
 }

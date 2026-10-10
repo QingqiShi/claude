@@ -51,7 +51,7 @@ The goal is to hold the concept yourself, not to transcribe the user's words: a 
 2. Find the discriminating question — the boundary case, lifecycle moment, or relationship where the interpretations disagree ("when an Allocation is cancelled, does stock return to the Pool, or was the Pool only ever a view?").
 3. Ask via AskUserQuestion with the interpretations as concrete options, each citing its evidence.
 4. Follow what the answer opens — edge cases, near-synonyms, what the term is _not_ — until you can predict how the term would be used in a sentence you haven't seen.
-5. Restate the definition plus one boundary-case prediction; once confirmed, write it.
+5. Restate the definition plus one boundary-case prediction; once confirmed, write the definition. The boundary case and the behaviour the alignment uncovered test your understanding; they do not go in the glossary.
 
 Only truly proprietary or contradictory terms earn this conversation — a handful per sweep. Clear picks need only a batched confirmation.
 
@@ -74,7 +74,7 @@ Read the glossary (the format spec says which glossaries to load when there are 
 
 - CLAUDE.md files first: an avoid-term in session context seeds drift into every future session's output, so it outranks any fix in code
 - usages of `_Avoid_` terms in identifiers, comments, docs, and strings
-- product copy that contradicts the glossary or is internally inconsistent — except divergences the glossary deliberately records
+- product copy that names a concept differently from the glossary, or inconsistently with itself — except divergences the glossary deliberately records
 - new terms with competing synonyms that have appeared since the last sweep → run learning steps 2–3 on just those and add them to CONTEXT.md, marked as new in the PR description; their renames wait for the next sweep. In `diff` scope there is no sweep PR to carry glossary edits — list the candidates in the report instead of editing CONTEXT.md.
 
 ### 3. Fix

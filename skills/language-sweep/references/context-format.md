@@ -3,7 +3,7 @@
 CONTEXT.md is the durable artifact of the language-sweep loop. It has three readers, and each dictates part of the format:
 
 - **Humans** skim it to learn the domain — so definitions must be short and say what a thing *is*.
-- **Future AI sessions** load it as standing context — so it must stay small and high-signal; every weak entry dilutes the strong ones.
+- **Future AI sessions** load it as standing context to learn what words mean — so it must stay small and high-signal; every weak entry dilutes the strong ones.
 - **The convergence sweep** enforces it mechanically — so every entry must be checkable: a winning term plus greppable losers.
 
 The structure is shared with the wider CONTEXT.md convention (after Matt Pocock's domain-modeling format), so other tools can read our glossaries and we can read theirs.
@@ -30,11 +30,13 @@ A flat list is fine while the glossary is small. Subheadings can group terms wit
 
 ## The rules, and why each exists
 
-**Every entry decides something.** This file is arbitration, not documentation. An entry earns its place one of two ways: it settles a fight between synonyms (the `_Avoid_` list is the record of who lost), or it defines a proprietary term a newcomer couldn't infer. A word that is both obvious and uncontested decides nothing — leave it out.
+**Every entry decides something about a word.** This file arbitrates which word names a concept and what that word means; it never states how the product behaves or what it must do. An entry earns its place one of two ways: it settles a fight between synonyms (the `_Avoid_` list is the record of who lost), or it defines a proprietary term a newcomer couldn't infer. A word that is both obvious and uncontested decides nothing — leave it out.
 
 **`_Avoid_` entries are enforcement commitments.** The convergence sweep will hunt every avoid-word down — identifiers, comments, docs, product copy. Don't list a loser you don't actually want renamed; an avoid-list nobody enforces teaches readers the whole file is advisory.
 
 **Definitions say what a thing IS, not what the code does with it.** One or two sentences that draw the concept's boundary. The test: a reader should be able to predict whether a borderline case is or isn't this thing. Needing a third sentence usually means you're describing behavior or implementation — cut it.
+
+**A rule is not a definition.** Who owns a thing, who may act on it, what must always hold, and what happens to it over time are product rules, even when they mention the term. They live in the code and its docs, never here: a glossary that states rules gets cited as policy, and a word list cannot carry that authority.
 
 **A term belongs when it means something here that general knowledge would not give you.** Whether it sounds like domain or like engineering does not matter. Words the industry already defines (handler, retry, cache, timeout) stay out however often the repo uses them, because nothing was decided here. A general word this project has loaded with its own meaning — a "Snapshot" that is one specific artifact, a "Sync" that is one particular pipeline — belongs even though it sounds technical.
 

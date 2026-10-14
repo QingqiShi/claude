@@ -95,4 +95,4 @@ Keep each paragraph on one line, because GitHub turns a line break inside a para
 
 ## Screenshots
 
-For a change to what a user sees rendered in a browser, show a before/after comparison directly under the WHY, so it reads as evidence rather than an appendix. `references/pr-media.md` has the gate (public repo, production URL), the capture and upload steps, and the embed format. When you edit a description, keep the `<img>` tags already in it: the URLs stay live and re-uploading is waste.
+For a change to what a user sees rendered in a browser, show a before/after comparison directly under the WHY, so it reads as evidence rather than an appendix. `references/pr-media.md` has the gate, how to serve the base code, the capture and upload steps, and the embed format. When you edit a description, keep the `<img>` tags already in it: the URLs stay live and re-uploading is waste.

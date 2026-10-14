@@ -26,7 +26,7 @@ A restarted session treats the file as its source of truth, so edit what changed
 
 Make a plan before a large task, but never use Plan Mode.
 
-Your primary responsibility is to orchestrate sub-agents, in order to minimise context rot.
+Make the most of sub-agents: the work they take on stays out of your context, which keeps you sharp and lets you work longer. You remain the one responsible for delivering what the user asked for.
 
 Delegate by what a tool call leaves behind, not by what it costs: each call looks cheap on its own, but its output stays in your context for the rest of the session, while a sub-agent's report is a paragraph. Keep a call only when you must see its result to decide the next step.
 

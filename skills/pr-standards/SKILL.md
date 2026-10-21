@@ -1,6 +1,6 @@
 ---
 name: pr-standards
-description: My standards for a pull request: the title and branch convention, what the description must say and must not, and how to attach before/after screenshots. Use whenever you write or edit a PR title, branch, or description, or push more work to an open PR.
+description: My standards for a pull request: the title and branch convention, what the description must say and must not, and how to attach before/after screenshots or screen recordings. Use whenever you write or edit a PR title, branch, or description, or push more work to an open PR.
 ---
 
 # Pull request standards
@@ -93,6 +93,6 @@ sequenceDiagram
 
 Keep each paragraph on one line, because GitHub turns a line break inside a paragraph into a hard break. When the change closes an issue, `Closes #<n>` is the last line.
 
-## Screenshots
+## Screenshots and recordings
 
-For a change to what a user sees rendered in a browser, show a before/after comparison directly under the WHY, so it reads as evidence rather than an appendix. `references/pr-media.md` has the gate, how to serve the base code, the capture and upload steps, and the embed format. When you edit a description, keep the `<img>` tags already in it: the URLs stay live and re-uploading is waste.
+For a change to what a user sees rendered in a browser, show a before/after comparison directly under the WHY, so it reads as evidence rather than an appendix. Prefer a recording to screenshots when the change lives in motion or across steps — a user flow, an animation, a transition — because a still frame cannot show what changed. `references/pr-media.md` has the gate, how to choose between the two, how to serve the base code, the capture steps, and how to attach and embed the files. When you edit a description, keep the media already in it: the URLs stay live and re-uploading is waste.

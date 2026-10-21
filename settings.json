@@ -244,7 +244,8 @@
     "frontend-design@claude-plugins-official": true,
     "skill-creator@claude-plugins-official": true,
     "codex@openai-codex": true,
-    "neon-postgres@neon": true
+    "neon-postgres@neon": true,
+    "typesafe@typesafe-ai": true
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
@@ -257,6 +258,12 @@
       "source": {
         "source": "github",
         "repo": "neondatabase/agent-skills"
+      }
+    },
+    "typesafe-ai": {
+      "source": {
+        "source": "github",
+        "repo": "typesafe-ai/skills"
       }
     }
   },
@@ -299,6 +306,11 @@
     ]
   },
   "effortLevel": "xhigh",
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    }
+  },
   "promptSuggestionEnabled": false,
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
@@ -325,10 +337,5 @@
       "**Repository visibility**: public. Every repository I work in is public, so a commit or push anywhere publishes to the internet. Treat a repository as private only when the transcript shows it."
     ]
   },
-  "voiceEnabled": true,
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "high"
-    }
-  }
+  "voiceEnabled": true
 }

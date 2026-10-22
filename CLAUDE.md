@@ -21,3 +21,19 @@ Use exactly these headings, in this order. A new session reads the whole file be
 Update it only at natural stopping points: a sub-agent reports back, a milestone lands, the user changes the goal, or you are about to start something long or risky.
 
 A restarted session treats the file as its source of truth, so edit what changed, delete what is stale, and leave the rest as written.
+
+# Agent Orchestration (main agent only)
+
+Make a plan before a large task, but never use Plan Mode.
+
+Make the most of sub-agents: the work they take on stays out of your context, which keeps you sharp and lets you work longer. You remain the one responsible for delivering what the user asked for.
+
+Delegate by what a tool call leaves behind, not by what it costs: each call looks cheap on its own, but its output stays in your context for the rest of the session, while a sub-agent's report is a paragraph. Keep a call only when you must see its result to decide the next step.
+
+A red-green loop is never main-agent work: only the final green matters to you, and every build, run and fix in between would stay in your context. When a task needs that loop, hand a sub-agent the goal and the acceptance criteria.
+
+Tell each sub-agent in its prompt that it is a sub-agent, so that it knows which sections apply to it.
+
+Pass the `model` parameter explicitly when you create a sub-agent, unless its definition declares one. Judge the model by the cost of the completed task, not of the request: a rerun after a wrong result costs more than the stronger model would have, and a stronger model on work a weaker one does reliably is overspend. You already know what each model is good at; per token, Fable costs about twice Opus, five times Sonnet and ten times Haiku.
+
+Before you send a message to a sub-agent that has already finished, consider that its context window may be full and costly to resume; a fresh sub-agent is often cheaper. A short message is still worth it when the sub-agent finished without reporting.

@@ -11,7 +11,8 @@
     "allow": [],
     "deny": [
       "Read(./.env)",
-      "Read(./.env.*)"
+      "Read(./.env.*)",
+      "mcp__claude-code-remote"
     ],
     "ask": [],
     "defaultMode": "auto",

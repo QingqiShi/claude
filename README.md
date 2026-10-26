@@ -14,10 +14,11 @@ Git-backed so a new machine can be restored from scratch. The guiding rule:
 | **My custom skills** — `auto-improve`, `pr-standards`, `merge-dependabot`, `language-sweep`, `prepare-for-pr` | ✅ committed | this repo | `git clone` |
 | **Marketplace plugins** — `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | ❌ ignored | `settings.json` → `enabledPlugins` + `extraKnownMarketplaces` | `bootstrap.sh` → `claude plugin install` |
 | **`vercel-cli`** skill | ❌ ignored | `npx skills add github.com/vercel/vercel --skill vercel-cli` | `bootstrap.sh` |
+| **`improve-codebase-architecture`** skill, plus the skills it calls: `codebase-design`, `domain-modeling`, `grilling` | ❌ ignored | `npx skills add github.com/mattpocock/skills --skill <name>` | `bootstrap.sh` |
 | **`playwright-cli`** skill (binary-generated) | ❌ ignored | `@playwright/cli` npm pkg → `playwright-cli install --skills` | `bootstrap.sh` |
 
-The two third-party skill folders (`skills/vercel-cli/`, `skills/playwright-cli/`)
-are `.gitignore`d — present on disk, absent from git.
+The third-party skill folders (`skills/vercel-cli/`, `skills/playwright-cli/`, and the
+four `mattpocock/skills` ones) are `.gitignore`d — present on disk, absent from git.
 
 ## New machine setup
 
@@ -39,7 +40,7 @@ Updating is decoupled from git — the third-party skills are ignored, so refres
 them changes nothing to commit; it just pulls the latest bits onto this machine.
 
 ```sh
-./update.sh             # updates plugins, vercel-cli, and playwright-cli to latest
+./update.sh             # updates plugins, skills-CLI skills, and playwright-cli to latest
 ```
 
 `update.sh` writes `.last-skill-update` (timestamp + versions) so you can see how

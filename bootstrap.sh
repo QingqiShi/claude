@@ -17,6 +17,10 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 #   format: "<github-repo-url>|<skill-name>"   (npx skills add <url> --skill <name>)
 SKILLS_CLI_PACKAGES=(
   "https://github.com/vercel/vercel|vercel-cli"
+  "https://github.com/mattpocock/skills|improve-codebase-architecture"
+  "https://github.com/mattpocock/skills|codebase-design"
+  "https://github.com/mattpocock/skills|domain-modeling"
+  "https://github.com/mattpocock/skills|grilling"
 )
 
 # --- Pinned npm-package skills (binary-generated skill trees) --------------

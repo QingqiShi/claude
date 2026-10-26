@@ -15,7 +15,7 @@ CLAUDE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETTINGS="$CLAUDE_DIR/settings.json"
 STAMP="$CLAUDE_DIR/.last-skill-update"
 
-SKILLS_CLI_INSTALLED=(vercel-cli)      # skills managed by `npx skills`
+SKILLS_CLI_INSTALLED=(vercel-cli improve-codebase-architecture codebase-design domain-modeling grilling)  # skills managed by `npx skills`
 PLAYWRIGHT_CLI_PKG="@playwright/cli@latest"
 
 log()  { printf '\033[1;34m▸ %s\033[0m\n' "$*"; }

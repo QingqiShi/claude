@@ -26,6 +26,10 @@ skills/**/evals/results/
 # (Must come after the !skills/** allow-list to override it.)
 skills/vercel-cli
 skills/playwright-cli
+skills/improve-codebase-architecture
+skills/codebase-design
+skills/domain-modeling
+skills/grilling
 
 # Skills synced down from the claude.ai account, and the undo buffer the sync
 # writes when it replaces one. Both are machine-local and come back on the next

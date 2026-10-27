@@ -6,8 +6,6 @@ In a worktree, use `git checkout origin/main` instead of `git checkout main`, be
 
 Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained, and write it in ASD-STE100 Simplified Technical English.
 
-A CONTEXT.md or CONTEXT-MAP.md is a repository's glossary: it says what a word means, so that you and the user mean the same thing by the same word. Use its terms in code, comments, copy, and replies. It is not a spec: never cite it as the source of how something behaves, who owns or may do what, or why a decision is right. Those come from the code and the user.
-
 # Session Memory (main agent only)
 
 Keep a HANDOFF.md file current so that a new session after `/clear` can continue where this one stopped. It holds what that session cannot read from the code: where the work is heading, how far it has come, and what is in flight. A sub-agent can read the file when you tell it to.

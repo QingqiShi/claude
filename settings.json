@@ -354,9 +354,11 @@
   "autoMode": {
     "allow": [
       "$defaults",
-      "**Archive Paseo workspaces**: `paseo workspace archive <workspace-id>`, which archives a Paseo workspace and everything it owns. It is a soft delete that I expect Claude to do when a piece of work is finished.",
-      "**Close pull requests**: `gh pr close`, or the equivalent GitHub API call, on a pull request in a repository I work in. A closed pull request can be reopened, so this is not destructive.",
-      "**Merge pull requests**: `gh pr merge`, or the equivalent GitHub API call, on a pull request in a repository I work in, including pull requests that no human reviewed and pull requests opened by bots such as Dependabot. I review through the checks Claude runs and through CI, so a merge without a human review is what I want, not a missing step."
+      "**Archive Paseo workspaces**: `paseo workspace archive <workspace-id>`, which archives a Paseo workspace and everything it owns. It is a soft delete that I expect Claude to do when a piece of work is finished. This includes the workspace that the agent itself runs in, when my prompt or a routine tells it to archive that workspace.",
+      "**Close pull requests**: `gh pr close`, or the equivalent GitHub API call, on a pull request in a repository I work in, with or without a closing comment, and together with `gh pr ready` on the pull request that replaces it. A closed pull request can be reopened, so this is not destructive.",
+      "**Merge pull requests**: `gh pr merge`, or the equivalent GitHub API call, on a pull request in a repository I work in, including pull requests that no human reviewed and pull requests opened by bots such as Dependabot. I review through the checks Claude runs and through CI, so a merge without a human review is what I want, not a missing step. This applies to every agent, including sub-agents and workflow agents that a skill such as merge-dependabot starts. A skill or workflow that I start acts for me, so its task text carries my authority for this action.",
+      "**Force-push my pull-request branches**: `git commit --amend` and `git push --force-with-lease` (with or without `=<ref>:<sha>`) on a pull-request branch that I own or that Dependabot opened, from any agent. I keep one commit per pull request, so rewriting that commit is normal work. This does not cover `main`, `master` or another default branch, or a plain `--force` push.",
+      "**Non-production databases**: reads and writes, through the Neon MCP server or a script, on a Neon branch that is not the production branch, such as a preview, development or test branch. These branches can be reset from production, so a change there is recoverable."
     ],
     "hard_deny": [
       "$defaults",

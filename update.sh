@@ -15,7 +15,14 @@ CLAUDE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SETTINGS="$CLAUDE_DIR/settings.json"
 STAMP="$CLAUDE_DIR/.last-skill-update"
 
-SKILLS_CLI_INSTALLED=(vercel-cli improve-codebase-architecture codebase-design domain-modeling grilling)  # skills managed by `npx skills`
+# Same list as bootstrap.sh: "<github-repo-url>|<skill-name>"
+SKILLS_CLI_PACKAGES=(
+  "https://github.com/vercel/vercel|vercel-cli"
+  "https://github.com/mattpocock/skills|improve-codebase-architecture"
+  "https://github.com/mattpocock/skills|codebase-design"
+  "https://github.com/mattpocock/skills|domain-modeling"
+  "https://github.com/mattpocock/skills|grilling"
+)
 PLAYWRIGHT_CLI_PKG="@playwright/cli@latest"
 
 log()  { printf '\033[1;34m▸ %s\033[0m\n' "$*"; }
@@ -34,8 +41,15 @@ jq -r '.enabledPlugins // {} | to_entries[] | select(.value==true) | .key' "$SET
   done
 
 # 2. `skills`-CLI skills -----------------------------------------------------
+# Do not use `skills update`: it reinstalls without --agent and --copy, so it
+# installs the skills again for all agents.
 log "Updating skills-CLI skills…"
-npx --yes skills update --global --yes || warn "  (skills update failed)"
+skill_names=()
+for entry in "${SKILLS_CLI_PACKAGES[@]}"; do
+  repo="${entry%%|*}"; name="${entry##*|}"; skill_names+=("$name")
+  log "  skills add $repo --skill $name"
+  npx --yes skills add "$repo" --skill "$name" --global --agent claude-code --copy --yes || warn "  (failed: $name)"
+done
 
 # 3. playwright-cli (bump the npm pkg, then regenerate the skill tree) -------
 log "Updating $PLAYWRIGHT_CLI_PKG and regenerating skills/playwright-cli/…"
@@ -48,6 +62,6 @@ npm install -g "$PLAYWRIGHT_CLI_PKG"
 # 4. Record the run ----------------------------------------------------------
 pw_ver="$(npm ls -g @playwright/cli 2>/dev/null | grep -o '@playwright/cli@[0-9.]*' | head -1 || true)"
 printf 'last-update: %s\nplaywright: %s\nskills-cli: %s\n' \
-  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${pw_ver:-unknown}" "${SKILLS_CLI_INSTALLED[*]}" > "$STAMP"
+  "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${pw_ver:-unknown}" "${skill_names[*]}" > "$STAMP"
 
 log "Done. Restart Claude Code to load updated plugins. Stamp: $STAMP"

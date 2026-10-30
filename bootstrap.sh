@@ -15,6 +15,8 @@ SETTINGS="$CLAUDE_DIR/settings.json"
 
 # --- Third-party skills installed via the `skills` CLI --------------------
 #   format: "<github-repo-url>|<skill-name>"   (npx skills add <url> --skill <name>)
+#   Without --agent, the CLI installs for every agent it finds and for every agent that reads ~/.agents/skills.
+#   Without --copy, the CLI keeps the skill in ~/.agents/skills, where those agents also read it.
 SKILLS_CLI_PACKAGES=(
   "https://github.com/vercel/vercel|vercel-cli"
   "https://github.com/mattpocock/skills|improve-codebase-architecture"
@@ -63,7 +65,7 @@ log "Installing skills-CLI skills…"
 for entry in "${SKILLS_CLI_PACKAGES[@]}"; do
   repo="${entry%%|*}"; name="${entry##*|}"
   log "  skills add $repo --skill $name"
-  npx --yes skills add "$repo" --skill "$name" --global --yes || warn "  (failed: $name)"
+  npx --yes skills add "$repo" --skill "$name" --global --agent claude-code --copy --yes || warn "  (failed: $name)"
 done
 
 # 4. playwright-cli (binary-generated — must flow in from the install command)
@@ -73,5 +75,13 @@ npm install -g "$PLAYWRIGHT_CLI_PKG"
 # <cwd>/.claude, so running inside ~/.claude would nest a second .claude/.
 ( cd "$(dirname "$CLAUDE_DIR")" && playwright-cli install --skills ) \
   || warn "  (playwright-cli install --skills failed)"
+
+# 5. Global git ignore for HANDOFF.md (session memory required by CLAUDE.md) --
+GLOBAL_IGNORE="$(git config --global --get core.excludesfile || true)"
+GLOBAL_IGNORE="${GLOBAL_IGNORE/#\~/$HOME}"
+GLOBAL_IGNORE="${GLOBAL_IGNORE:-${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore}"
+log "Ignoring HANDOFF.md globally in ${GLOBAL_IGNORE}…"
+mkdir -p "$(dirname "$GLOBAL_IGNORE")"
+grep -qxF 'HANDOFF.md' "$GLOBAL_IGNORE" 2>/dev/null || echo 'HANDOFF.md' >> "$GLOBAL_IGNORE"
 
 log "Done. Restart Claude Code to load newly-installed plugins."

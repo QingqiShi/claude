@@ -73,7 +73,7 @@ node/claude PATH). Remove with `launchctl unload …` then delete the plist.
 ## Adding a new third-party skill/plugin later
 
 - **Plugin:** install as usual; it lands in `settings.json` → nothing else to do.
-- **`skills`-CLI skill:** `npx skills add <repo> --skill <name> -g`, then add the
-  `"<url>|<name>"` line to `SKILLS_CLI_PACKAGES` in `bootstrap.sh` and the name to
-  `SKILLS_CLI_INSTALLED` in `update.sh`.
+- **`skills`-CLI skill:** `npx skills add <repo> --skill <name> -g --agent claude-code --copy`,
+  then add the `"<url>|<name>"` line to `SKILLS_CLI_PACKAGES` in both `bootstrap.sh`
+  and `update.sh`.
 - Confirm it's ignored (not vendored): `git check-ignore skills/<name>`.

@@ -341,6 +341,7 @@
     }
   },
   "promptSuggestionEnabled": false,
+  "awaySummaryEnabled": false,
   "tui": "fullscreen",
   "autoMemoryEnabled": false,
   "skipDangerousModePermissionPrompt": true,
@@ -349,6 +350,7 @@
   "autoCompactEnabled": true,
   "teammateMode": "auto",
   "remoteControlAtStartup": false,
+  "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true,
   "autoMode": {
@@ -369,5 +371,6 @@
       "**Repository visibility**: public. Every repository I work in is public, so a commit or push anywhere publishes to the internet. Treat a repository as private only when the transcript shows it."
     ]
   },
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "language": "中文"
 }

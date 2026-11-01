@@ -30,6 +30,7 @@ skills/improve-codebase-architecture
 skills/codebase-design
 skills/domain-modeling
 skills/grilling
+skills/gh-stack
 
 # Skills synced down from the claude.ai account, and the undo buffer the sync
 # writes when it replaces one. Both are machine-local and come back on the next

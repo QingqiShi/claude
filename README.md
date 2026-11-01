@@ -15,10 +15,11 @@ Git-backed so a new machine can be restored from scratch. The guiding rule:
 | **Marketplace plugins** — `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | ❌ ignored | `settings.json` → `enabledPlugins` + `extraKnownMarketplaces` | `bootstrap.sh` → `claude plugin install` |
 | **`vercel-cli`** skill | ❌ ignored | `npx skills add github.com/vercel/vercel --skill vercel-cli` | `bootstrap.sh` |
 | **`improve-codebase-architecture`** skill, plus the skills it calls: `codebase-design`, `domain-modeling`, `grilling` | ❌ ignored | `npx skills add github.com/mattpocock/skills --skill <name>` | `bootstrap.sh` |
+| **`gh-stack`** skill, plus the `gh stack` extension it drives | ❌ ignored | `gh skill install github/gh-stack gh-stack` + `gh extension install github/gh-stack` | `bootstrap.sh` |
 | **`playwright-cli`** skill (binary-generated) | ❌ ignored | `@playwright/cli` npm pkg → `playwright-cli install --skills` | `bootstrap.sh` |
 
 The third-party skill folders (`skills/vercel-cli/`, `skills/playwright-cli/`, and the
-four `mattpocock/skills` ones) are `.gitignore`d — present on disk, absent from git.
+four `mattpocock/skills` ones, and `skills/gh-stack/`) are `.gitignore`d — present on disk, absent from git.
 
 ## New machine setup
 
@@ -76,4 +77,7 @@ node/claude PATH). Remove with `launchctl unload …` then delete the plist.
 - **`skills`-CLI skill:** `npx skills add <repo> --skill <name> -g --agent claude-code --copy`,
   then add the `"<url>|<name>"` line to `SKILLS_CLI_PACKAGES` in both `bootstrap.sh`
   and `update.sh`.
+- **`gh skill` skill:** `gh skill install <owner/repo> <name> --agent claude-code --scope user`,
+  then add the `"<owner/repo>|<name>"` line to `GH_SKILL_PACKAGES` in both `bootstrap.sh`
+  and `update.sh`, and the `skills/<name>` line to `.gitignore`.
 - Confirm it's ignored (not vendored): `git check-ignore skills/<name>`.

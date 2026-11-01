@@ -23,6 +23,10 @@ SKILLS_CLI_PACKAGES=(
   "https://github.com/mattpocock/skills|domain-modeling"
   "https://github.com/mattpocock/skills|grilling"
 )
+# Same list as bootstrap.sh: "<owner/repo>|<skill-name>"
+GH_SKILL_PACKAGES=(
+  "github/gh-stack|gh-stack"
+)
 PLAYWRIGHT_CLI_PKG="@playwright/cli@latest"
 
 log()  { printf '\033[1;34m▸ %s\033[0m\n' "$*"; }
@@ -51,7 +55,20 @@ for entry in "${SKILLS_CLI_PACKAGES[@]}"; do
   npx --yes skills add "$repo" --skill "$name" --global --agent claude-code --copy --yes || warn "  (failed: $name)"
 done
 
-# 3. playwright-cli (bump the npm pkg, then regenerate the skill tree) -------
+# 3. `gh skill` skills (and the gh extensions they drive) -------------------
+# Use `gh skill install --force`, not `gh skill update`: update scans every
+# agent directory, and install puts the skill only in the Claude Code directory.
+log "Updating gh-skill skills…"
+gh_skill_names=()
+for entry in "${GH_SKILL_PACKAGES[@]}"; do
+  repo="${entry%%|*}"; name="${entry##*|}"; gh_skill_names+=("$name")
+  log "  gh extension upgrade ${repo##*/}"
+  gh extension upgrade "${repo##*/}" || warn "  (extension upgrade failed: $repo)"
+  log "  gh skill install $repo $name"
+  gh skill install "$repo" "$name" --agent claude-code --scope user --force || warn "  (failed: $name)"
+done
+
+# 4. playwright-cli (bump the npm pkg, then regenerate the skill tree) -------
 log "Updating $PLAYWRIGHT_CLI_PKG and regenerating skills/playwright-cli/…"
 npm install -g "$PLAYWRIGHT_CLI_PKG"
 # Run from the parent of ~/.claude: playwright-cli creates its workspace at
@@ -59,7 +76,7 @@ npm install -g "$PLAYWRIGHT_CLI_PKG"
 ( cd "$(dirname "$CLAUDE_DIR")" && playwright-cli install --skills ) \
   || warn "  (playwright-cli install --skills failed)"
 
-# 4. Record the run ----------------------------------------------------------
+# 5. Record the run ----------------------------------------------------------
 pw_ver="$(npm ls -g @playwright/cli 2>/dev/null | grep -o '@playwright/cli@[0-9.]*' | head -1 || true)"
 printf 'last-update: %s\nplaywright: %s\nskills-cli: %s\n' \
   "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${pw_ver:-unknown}" "${skill_names[*]}" > "$STAMP"

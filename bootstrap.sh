@@ -25,6 +25,13 @@ SKILLS_CLI_PACKAGES=(
   "https://github.com/mattpocock/skills|grilling"
 )
 
+# --- Third-party skills installed via `gh skill` -------------------------
+#   format: "<owner/repo>|<skill-name>"   (gh skill install <repo> <name>)
+#   The gh extension of the same repo supplies the command that the skill drives.
+GH_SKILL_PACKAGES=(
+  "github/gh-stack|gh-stack"
+)
+
 # --- Pinned npm-package skills (binary-generated skill trees) --------------
 #   @playwright/cli regenerates skills/playwright-cli/ via `playwright-cli install --skills`
 PLAYWRIGHT_CLI_PKG="@playwright/cli@latest"
@@ -40,6 +47,7 @@ require jq   "Install: brew install jq"
 require node "Install Node.js (nvm recommended)."
 require npm  "Comes with Node.js."
 require claude "Install the Claude Code CLI first."
+require gh   "Install: brew install gh"
 
 # 1. Plugin marketplaces (built-in 'claude-plugins-official' needs no add) ---
 log "Registering plugin marketplaces from settings.json…"
@@ -68,7 +76,17 @@ for entry in "${SKILLS_CLI_PACKAGES[@]}"; do
   npx --yes skills add "$repo" --skill "$name" --global --agent claude-code --copy --yes || warn "  (failed: $name)"
 done
 
-# 4. playwright-cli (binary-generated — must flow in from the install command)
+# 4. `gh skill` third-party skills (and the gh extensions they drive) -------
+log "Installing gh-skill skills…"
+for entry in "${GH_SKILL_PACKAGES[@]}"; do
+  repo="${entry%%|*}"; name="${entry##*|}"
+  log "  gh extension install $repo"
+  gh extension install "$repo" || warn "  (already installed or failed: $repo)"
+  log "  gh skill install $repo $name"
+  gh skill install "$repo" "$name" --agent claude-code --scope user --force || warn "  (failed: $name)"
+done
+
+# 5. playwright-cli (binary-generated — must flow in from the install command)
 log "Installing $PLAYWRIGHT_CLI_PKG and regenerating skills/playwright-cli/…"
 npm install -g "$PLAYWRIGHT_CLI_PKG"
 # Run from the parent of ~/.claude: playwright-cli creates its workspace at
@@ -76,7 +94,7 @@ npm install -g "$PLAYWRIGHT_CLI_PKG"
 ( cd "$(dirname "$CLAUDE_DIR")" && playwright-cli install --skills ) \
   || warn "  (playwright-cli install --skills failed)"
 
-# 5. Global git ignore for HANDOFF.md (session memory required by CLAUDE.md) --
+# 6. Global git ignore for HANDOFF.md (session memory required by CLAUDE.md) --
 GLOBAL_IGNORE="$(git config --global --get core.excludesfile || true)"
 GLOBAL_IGNORE="${GLOBAL_IGNORE/#\~/$HOME}"
 GLOBAL_IGNORE="${GLOBAL_IGNORE:-${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore}"

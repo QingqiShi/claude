@@ -167,6 +167,14 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f ~/.claude/hooks/clear-stale-handoff.py ] && python3 ~/.claude/hooks/clear-stale-handoff.py || true"
+          }
+        ]
       }
     ],
     "PermissionRequest": [

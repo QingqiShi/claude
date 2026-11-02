@@ -10,6 +10,8 @@ Code should be self-documenting. Only add a comment for something truly unexpect
 
 Keep a HANDOFF.md file current so that a new session after `/clear` can continue where this one stopped. It holds what that session cannot read from the code: where the work is heading, how far it has come, and what is in flight. A sub-agent can read the file when you tell it to.
 
+The app can reuse a worktree for a new session, so a SessionStart hook moves a HANDOFF.md found at a new start (not after `/clear`, compaction, resume or fork) into the git dir, and tells that session where it is.
+
 Use exactly these headings, in this order. A new session reads the whole file before it starts, so keep it short: when it grows, shorten `## Done` first, because `## Now` is what that session works from.
 
 - `## North Star` — what the user is trying to achieve, in a sentence or two, close to their own words. It is the purpose behind the tasks, not a task, so that the user's next prompt still fits under it: "make checkout faster", not "add an index to the orders table". A new task, the next phase, or feedback on delivered work changes `## Now` and leaves the north star as it is. It changes only when the user changes what they want, or when a prompt shows that it was written too narrow.

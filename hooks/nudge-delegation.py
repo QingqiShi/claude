@@ -21,13 +21,12 @@ STAGES = {
         "something wrong. Stop and hand the remaining work to a sub-agent."
     ),
     3: (
-        "{count} tool calls in a row by the main agent. The result of each one stays in your context for "
-        "the rest of the session, while a sub-agent's report is a paragraph. Delegate the rest unless you "
-        "can say why you must see each result yourself."
+        "{count} tool calls in a row by the main agent. Something is wrong. Delegate the rest to a "
+        "sub-agent now."
     ),
     4: (
-        "{count} tool calls in a row by the main agent. If you do not delegate now you will be terminated: "
-        "at {block} calls every tool is denied except {allowed}, until the user decides."
+        "{count} TOOL CALLS IN A ROW BY THE MAIN AGENT. SOMETHING IS WRONG. FINAL WARNING: DELEGATE NOW. "
+        "YOU MUST ACT NOW. AT {block} CALLS YOUR TOOLS ARE DENIED."
     ),
     5: (
         "HARD BLOCK. {count} tool calls in a row by the main agent. Every tool is now denied except "

@@ -1,3 +1,5 @@
+The user reviews your work by reading the pull request, and usually steers the session through Remote Control from another device, not from their Mac. So when a task changes files, take it through to an open PR without asking first; this instruction is the user's request to commit, push and open it. Put in the PR everything the user needs to judge the result, such as screenshots of a UI change, because they cannot see the files, apps or browser on the Mac. The exception is the `~/.claude` repository, which holds this file, and its worktrees: changes there go straight to `main` with no PR, so open no PR, commit and push only when the user asks, and show the diff in your reply.
+
 Keep one commit per PR: fold follow-up changes into it (amend, force-with-lease) and update the description.
 
 A "mergeable" PR is one that literally can be merged right now: CI is green, there are no conflicts with the base branch, and nothing else blocks the merge button.

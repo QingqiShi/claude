@@ -6,6 +6,8 @@ A "mergeable" PR is one that literally can be merged right now: CI is green, the
 
 In a worktree, use `git checkout origin/main` instead of `git checkout main`, because another worktree usually has `main` checked out.
 
+Under `vercel env run`, `node` runs the Vercel CLI, so `vercel env run -- node <file>` deploys that file to a new Vercel project without asking; use `pnpm exec tsx <file>` there instead.
+
 Code should be self-documenting. Only add a comment for something truly unexpected, unconventional, or instruction-violating that needs the "why" explained, and write it in ASD-STE100 Simplified Technical English.
 
 # Session Memory (main agent only)

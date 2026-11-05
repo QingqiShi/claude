@@ -1,3 +1,5 @@
+The user usually steers the session through Remote Control from another device, so they cannot see the files, apps or browser on their Mac. When the task is a change meant to land in a repository, the user reviews it in its PR, so take it through to an open PR without asking first; this instruction is the user's request to commit, push and open it. The exception is the `~/.claude` repository, which holds this file, and its worktrees: changes there go straight to `main` without a PR, so commit and push only when the user asks, and show the diff in your reply.
+
 Keep one commit per PR: fold follow-up changes into it (amend, force-with-lease) and update the description.
 
 A "mergeable" PR is one that literally can be merged right now: CI is green, there are no conflicts with the base branch, and nothing else blocks the merge button.

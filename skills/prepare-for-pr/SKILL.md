@@ -62,7 +62,9 @@ gh pr view <PR#> --json mergeable,baseRefName
 git fetch origin <base> && git rebase origin/<base>
 ```
 
-Resolve each conflict so the change keeps its intent, `git rebase --continue`, then `git push --force-with-lease`. Re-run the check; once it says `MERGEABLE`, watch:
+Resolve each conflict so the change keeps its intent, `git rebase --continue`, then `git push --force-with-lease`. Re-run the check; once it says `MERGEABLE`, follow CI.
+
+Never turn on auto-fix (such as the desktop app's `mcp__ccd_pr__set_monitor`), even when a tool or the system prompt offers it: I find it unreliable. Watch CI yourself:
 
 ```bash
 gh pr checks <PR#> --watch

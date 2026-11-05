@@ -21,6 +21,8 @@ skills/**/evals/results/
 !README.md
 !bootstrap.sh
 !update.sh
+!mods/
+!mods/**
 
 # Third-party skills: reinstalled via bootstrap.sh, never vendored here.
 # (Must come after the !skills/** allow-list to override it.)
@@ -40,3 +42,6 @@ skills/.trash/
 
 # Python writes these next to the hooks and their tests; must come after the !hooks/** allow-list.
 __pycache__/
+
+# The engine writes these types when it loads a mod; must come after the !mods/** allow-list.
+mods/**/.claude-plugin/types/

@@ -26,6 +26,19 @@ const GLYPH_EM: Record<string, number> = {
   '<': 0.62,
   k: 0.52,
   M: 0.86,
+  ':': 0.28,
+  a: 0.54,
+  c: 0.5,
+  d: 0.58,
+  e: 0.54,
+  h: 0.57,
+  i: 0.24,
+  l: 0.24,
+  m: 0.86,
+  o: 0.56,
+  p: 0.58,
+  r: 0.36,
+  x: 0.5,
 }
 
 function level(percent: number) {
@@ -35,9 +48,9 @@ function level(percent: number) {
   return LEVELS.calm
 }
 
-function textWidth(text: string, size: number) {
+export function textWidth(text: string, size: number) {
   let em = 0
-  for (const ch of text) em += GLYPH_EM[ch] ?? 0.62
+  for (const ch of text) em += GLYPH_EM[ch] ?? ((ch.codePointAt(0) ?? 0) >= 0x2e80 ? 1 : 0.62)
 
   return em * size
 }
@@ -258,6 +271,66 @@ export function pillSvg(label: string, at: number) {
 <rect x="0" y="1" width="${width}" height="${PILL_HEIGHT}" rx="${PILL_HEIGHT / 2}" fill="rgba(217,119,87,0.16)"/>
 <text class="label-${id}" font-family="${FONT}" x="${width / 2}" y="14" text-anchor="middle">${escapeXml(label)}</text>
 </g>
+</svg>`
+}
+
+const CACHE_HEIGHT = 20
+const CACHE_FONT_SIZE = 11.5
+const CACHE_RING_R = 6
+const CACHE_RING_C = 2 * Math.PI * CACHE_RING_R
+const CACHE_LABEL = '缓存'
+const CACHE_LABEL_X = 20
+const CACHE_GAP = 4.5
+
+export type CacheDrawing = {
+  kind: 'warm' | 'low' | 'refreshing' | 'expired' | 'cold'
+  value: string
+  fraction: number
+  seconds: number
+  hasLabel?: boolean
+}
+
+function cacheValueX(hasLabel: boolean) {
+  return hasLabel ? CACHE_LABEL_X + textWidth(CACHE_LABEL, CACHE_FONT_SIZE) + CACHE_GAP : CACHE_LABEL_X
+}
+
+export function cacheSize(value: string, hasLabel = true) {
+  return { width: Math.ceil(cacheValueX(hasLabel) + textWidth(value, CACHE_FONT_SIZE) + 1), height: CACHE_HEIGHT }
+}
+
+export function cacheSvg({ kind, value, fraction, seconds, hasLabel = true }: CacheDrawing) {
+  const { width, height } = cacheSize(value, hasLabel)
+  const start = Number((CACHE_RING_C * (1 - Math.min(1, Math.max(0, fraction)))).toFixed(2))
+  const id = uid('cache', kind, value, start, Math.round(seconds), hasLabel ? 1 : 0)
+  const isDim = kind === 'expired' || kind === 'cold'
+  const ring = `cx="9" cy="10" r="${CACHE_RING_R}" fill="none" stroke-width="2.2"`
+  const arc = isDim
+    ? `<circle class="dash-${id}" ${ring} stroke-dasharray="2 2.71"/>`
+    : `<circle class="arc-${id}" ${ring} stroke-linecap="round" stroke-dasharray="${CACHE_RING_C.toFixed(2)}" stroke-dashoffset="${kind === 'refreshing' ? 0 : start}" transform="rotate(-90 9 10)"/>`
+  const motion =
+    kind === 'refreshing'
+      ? `.arc-${id}{animation:pulse-${id} 1.6s ease-in-out infinite}
+@keyframes pulse-${id}{50%{opacity:0.35}}`
+      : `.arc-${id}{animation:drain-${id} ${Math.max(1, Math.round(seconds))}s linear 1 forwards}
+@keyframes drain-${id}{from{stroke-dashoffset:${start}}to{stroke-dashoffset:${CACHE_RING_C.toFixed(2)}}}`
+  const isLow = kind === 'low'
+
+  return `${SVG_OPEN(width, height)}
+<style>
+.track-${id}{stroke:rgba(255,255,255,0.14)}
+.arc-${id}{stroke:${isLow ? '#F59E0B' : '#34D399'}}
+.dash-${id}{stroke:rgba(255,255,255,0.3)}
+.label-${id}{fill:rgba(255,255,255,${isDim ? '0.4' : '0.55'})}
+.value-${id}{fill:${isLow ? '#FCD34D' : `rgba(255,255,255,${isDim ? '0.4' : '0.88'})`}}
+@media (prefers-color-scheme: light){.track-${id}{stroke:rgba(0,0,0,0.12)}.arc-${id}{stroke:${isLow ? '#D97706' : '#10B981'}}.dash-${id}{stroke:rgba(0,0,0,0.3)}.label-${id}{fill:rgba(0,0,0,${isDim ? '0.4' : '0.55'})}.value-${id}{fill:${isLow ? '#B45309' : `rgba(0,0,0,${isDim ? '0.4' : '0.78'})`}}}
+${isDim ? '' : motion}
+@media (prefers-reduced-motion: reduce){.arc-${id}{animation:none}}
+text{font-variant-numeric:tabular-nums}
+</style>
+${isDim ? '' : `<circle class="track-${id}" ${ring}/>`}
+${arc}
+${hasLabel ? `<text class="label-${id}" x="${CACHE_LABEL_X}" y="14" font-family="${FONT}" font-size="${CACHE_FONT_SIZE}">${CACHE_LABEL}</text>` : ''}
+<text class="value-${id}" x="${cacheValueX(hasLabel).toFixed(2)}" y="14" font-family="${FONT}" font-size="${CACHE_FONT_SIZE}" font-weight="500">${escapeXml(value)}</text>
 </svg>`
 }
 

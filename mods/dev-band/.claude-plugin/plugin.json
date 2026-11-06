@@ -1,6 +1,6 @@
 {
   "name": "dev-band",
-  "version": "0.1.0",
-  "description": "A band above the prompt: context used against the auto-compact window, running subagents, and the session cost per turn.",
+  "version": "0.1.2",
+  "description": "A band above the prompt: context used against the auto-compact window, the prompt cache's time left before it expires, running subagents, and the session cost per turn.",
   "types": "./types/index.d.ts"
 }

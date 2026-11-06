@@ -23,6 +23,8 @@ skills/**/evals/results/
 !update.sh
 !mods/
 !mods/**
+!docs/
+!docs/**
 
 # Third-party skills: reinstalled via bootstrap.sh, never vendored here.
 # (Must come after the !skills/** allow-list to override it.)

@@ -334,6 +334,10 @@ async function introsFor($: EngineInterface, today: string, drawings: Record<Spr
   return intro
 }
 
+function rangeWord(model: Model) {
+  return model.range === '30' ? '30 天' : '累计'
+}
+
 function tilesInputFor(model: Model, width: number) {
   const { scan, totals } = model
   if (scan === null || totals === null) return null
@@ -342,6 +346,7 @@ function tilesInputFor(model: Model, width: number) {
 
   return {
     width,
+    tokensLabel: `${rangeWord(model)} token`,
     tokens: totals.tokens,
     costUsd: totals.costUsd,
     todayUsd: last7.at(-1)?.costUsd ?? 0,
@@ -463,7 +468,7 @@ export const register: Register = on => {
                 <Button key="range-30" label="30 天" plain dimColor={model.range !== '30'} onPress={() => void setRange($, '30')} />
                 <Button key="range-all" label="全部" plain dimColor={model.range !== 'all'} onPress={() => void setRange($, 'all')} />
               </Box>
-              <Text>累计 {statsText(model.totals, model.streak)}</Text>
+              <Text>{rangeWord(model)} {statsText(model.totals, model.streak)}</Text>
             </Box>
           )}
           {trend.length < 2 ? null : <Text dimColor>每日 token {trendText(trend)}</Text>}

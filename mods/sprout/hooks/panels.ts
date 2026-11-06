@@ -89,6 +89,7 @@ function rollText(id: string, x: number, y: number, size: number, text: string, 
 
 export type TilesInput = {
   width: number
+  tokensLabel: string
   tokens: number
   costUsd: number
   todayUsd: number
@@ -164,7 +165,7 @@ export function tilesSvg(input: TilesInput) {
   }
 
   const body =
-    tile(0, 0, '累计 token', tokens, prev === null ? null : formatTokens(prev.tokens), '', bars, 0) +
+    tile(0, 0, input.tokensLabel, tokens, prev === null ? null : formatTokens(prev.tokens), '', bars, 0) +
     tile(1, 0, '按 API 价估算', cost, prev === null ? null : formatUsd(prev.costUsd), '', pill, 0.1) +
     tile(0, 1, '连续使用', String(input.streak), null, '天', week, 0.2) +
     tile(1, 1, '缓存命中', hit, prev === null ? null : `${(prev.cacheHitRate * 100).toFixed(1)}%`, '', ring, 0.3)

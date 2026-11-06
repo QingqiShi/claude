@@ -209,7 +209,7 @@ test('the tiles, the token trend and the merges follow the one range, and the ch
     if (surface === 'desktop') {
       expect(await ui.find({ type: 'Text', text: '最近 30 天' })).toBeTruthy()
     } else {
-      expect(await ui.find({ type: 'Text', text: /累计 500 token · \$5\.00 · .*缓存命中 88\.9%/})).toBeTruthy()
+      expect(await ui.find({ type: 'Text', text: /30 天 500 token · \$5\.00 · .*缓存命中 88\.9%/})).toBeTruthy()
     }
 
     await ui.press({ key: 'range-all' })
@@ -226,6 +226,22 @@ test('the tiles, the token trend and the merges follow the one range, and the ch
     expect(store.get('range')).toBe('30')
     await ui.unmount()
   }
+})
+
+test('the first tile names the range it adds up', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  mock.store(on, {})
+  on('state.get', (_, e, next) => (e.key in SEEDED ? { value: { value: SEEDED[e.key], version: 1 } } : next(e)))
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const sources = async () => (await ui.findAll({ type: 'Svg' })).map(svg => String(svg.props.source))
+  expect((await sources()).some(source => source.includes('>30 天 token<'))).toBe(true)
+  expect((await sources()).some(source => source.includes('>累计 token<'))).toBe(false)
+
+  await ui.press({ key: 'range-all' })
+  expect((await sources()).some(source => source.includes('>累计 token<'))).toBe(true)
+  expect((await sources()).some(source => source.includes('>30 天 token<'))).toBe(false)
+  await ui.unmount()
 })
 
 test('a new session starts on the range chosen last', async ($, on) => {

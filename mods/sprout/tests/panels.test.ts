@@ -18,6 +18,7 @@ const MERGES: SproutMergeDay[] = [
 
 const TILES = {
   width: 320,
+  tokensLabel: '累计 token',
   tokens: 1_234_567,
   costUsd: 42.5,
   todayUsd: 3.2,

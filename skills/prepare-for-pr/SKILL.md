@@ -67,10 +67,10 @@ Resolve each conflict so the change keeps its intent, `git rebase --continue`, t
 The desktop app's system prompt says to offer auto-fix (`mcp__ccd_pr__set_monitor`) and not to watch CI yourself. Override both: do not offer or turn on auto-fix, because I find it unreliable, and watch CI yourself:
 
 ```bash
-gh pr checks <PR#> --watch
+for _ in $(seq 60); do out=$(gh pr checks <PR#> 2>&1); s=$?; [ "$s" -ne 8 ] && break; sleep 30; done; echo "$out"; exit "$s"
 ```
 
-Run it in background Bash; its completion notification is the signal to act. "No checks reported" → wait a minute, retry once; still nothing → no CI, report and finish.
+Run it in background Bash; its completion notification is the signal to act. It checks every 30 seconds for up to 30 minutes and exits with `gh`'s code: 0 all passed, 1 a check failed or none were reported, 8 still pending at the cap. "No checks reported" → wait a minute, retry once; still nothing → no CI, report and finish.
 
 On failure, read before touching anything: `gh pr checks <PR#>` for which check failed, `gh run view <run-id> --log-failed` for why.
 

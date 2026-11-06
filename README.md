@@ -12,7 +12,8 @@ Git-backed so a new machine can be restored from scratch. The guiding rule:
 |---|---|---|---|
 | `settings.json`, `CLAUDE.md`, `statusline-command.sh`, `hooks/` | ✅ committed | this repo | `git clone` |
 | **My custom skills** — `auto-improve`, `pr-standards`, `merge-dependabot`, `prepare-for-pr`, `agent-instructions` | ✅ committed | this repo | `git clone` |
-| **My mods** — `mods/dev-band` (the band above the prompt), loaded in every session through `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json` | ✅ committed | this repo | `git clone` |
+| **My mods** — `mods/dev-band` (the band above the prompt) and `mods/sprout` (芽团, a pane with a pixel pet and usage stats across sessions), loaded in every session through `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json`, hot-reloaded on desktop through `CLAUDE_CODE_PLUGIN_DIR_WATCH` | ✅ committed | this repo | `git clone` |
+| `sprout-cache/` (sprout's scan cache) and `sprout-imports/<device>/` (transcripts copied from other machines, counted by sprout) | ❌ ignored | this machine | re-created by sprout; imports copied by hand |
 | **Marketplace plugins** — `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | ❌ ignored | `settings.json` → `enabledPlugins` + `extraKnownMarketplaces` | `bootstrap.sh` → `claude plugin install` |
 | **`vercel-cli`** skill | ❌ ignored | `npx skills add github.com/vercel/vercel --skill vercel-cli` | `bootstrap.sh` |
 | **`improve-codebase-architecture`** skill, plus the skills it calls: `codebase-design`, `domain-modeling`, `grilling` | ❌ ignored | `npx skills add github.com/mattpocock/skills --skill <name>` | `bootstrap.sh` |

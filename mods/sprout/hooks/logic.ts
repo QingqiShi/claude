@@ -1,0 +1,312 @@
+import type { SproutBucket, SproutDay, SproutLimit, SproutSample } from '../types'
+import { LEVELS, MAX_LEVEL, levelInfo } from './levels'
+
+export const MINUTE_MS = 60_000
+export const HOUR_MS = 60 * MINUTE_MS
+export const DAY_MS = 24 * HOUR_MS
+
+export const FIVE_HOUR = { windowMs: 5 * HOUR_MS, lookbackMs: HOUR_MS }
+export const SEVEN_DAY = { windowMs: 7 * DAY_MS, lookbackMs: 24 * HOUR_MS }
+
+const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+
+export type LocalTime = {
+  year: number
+  month: number
+  date: number
+  hour: number
+  minute: number
+  weekday: number
+  day: string
+}
+
+export function localTime(ms: number, tzOffsetMin: number): LocalTime {
+  const d = new Date(ms + tzOffsetMin * MINUTE_MS)
+  const year = d.getUTCFullYear()
+  const month = d.getUTCMonth() + 1
+  const date = d.getUTCDate()
+
+  return {
+    year,
+    month,
+    date,
+    hour: d.getUTCHours(),
+    minute: d.getUTCMinutes(),
+    weekday: d.getUTCDay(),
+    day: `${year}-${String(month).padStart(2, '0')}-${String(date).padStart(2, '0')}`,
+  }
+}
+
+export function dayNumber(day: string) {
+  return Math.round(Date.parse(`${day}T00:00:00Z`) / DAY_MS)
+}
+
+export function dayFromNumber(n: number) {
+  return new Date(n * DAY_MS).toISOString().slice(0, 10)
+}
+
+export function addDays(day: string, n: number) {
+  return dayFromNumber(dayNumber(day) + n)
+}
+
+/** Monday is 0. */
+export function weekdayOf(day: string) {
+  return (new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7
+}
+
+export function clock(ms: number, tzOffsetMin: number) {
+  const t = localTime(ms, tzOffsetMin)
+
+  return `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`
+}
+
+export function weekdayClock(ms: number, tzOffsetMin: number) {
+  const t = localTime(ms, tzOffsetMin)
+
+  return `${WEEKDAYS[t.weekday]} ${clock(ms, tzOffsetMin)}`
+}
+
+export function whenText(ms: number, now: number, tzOffsetMin: number) {
+  const isToday = localTime(ms, tzOffsetMin).day === localTime(now, tzOffsetMin).day
+
+  return isToday ? clock(ms, tzOffsetMin) : weekdayClock(ms, tzOffsetMin)
+}
+
+export function untilText(ms: number, now: number) {
+  const minutes = Math.max(0, Math.round((ms - now) / MINUTE_MS))
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  if (h === 0) return `${m} 分`
+  if (m === 0) return `${h} 小时`
+
+  return `${h} 小时 ${m} 分`
+}
+
+export function agoText(ms: number, now: number) {
+  const minutes = Math.max(0, Math.round((now - ms) / MINUTE_MS))
+  if (minutes < 60) return `${Math.max(1, minutes)} 分钟前`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `${hours} 小时前`
+
+  return `${Math.round(hours / 24)} 天前`
+}
+
+export function streakOf(activeDays: readonly string[], today: string) {
+  const active = new Set(activeDays)
+  let day = active.has(today) ? today : addDays(today, -1)
+  let streak = 0
+  while (active.has(day)) {
+    streak += 1
+    day = addDays(day, -1)
+  }
+
+  return streak
+}
+
+export const PIPS = 7
+const LOST_LOOKBACK_DAYS = 6
+
+/** The streak that ended, when it ran more than 3 days and the current streak is 0 or 1. */
+export function lostStreakOf(activeDays: readonly string[], today: string) {
+  const active = new Set(activeDays)
+  const streak = streakOf(activeDays, today)
+  if (streak > 1) return null
+  let day = streak === 1 && !active.has(today) ? addDays(today, -2) : addDays(today, -1)
+  for (let i = 0; i < LOST_LOOKBACK_DAYS && !active.has(day); i++) day = addDays(day, -1)
+  const lost = streakOf(activeDays, addDays(day, 1))
+
+  return lost > 3 ? lost : null
+}
+
+export function levelForTokens(tokens: number) {
+  let lv = 1
+  for (const level of LEVELS) if (tokens >= level.thresholdB * 1e9) lv = level.lv
+
+  return lv
+}
+
+/** Filled pips, rounded down, for the way from this level's threshold to the next. */
+export function pipsFor(level: number, tokens: number) {
+  if (level >= MAX_LEVEL) return PIPS
+  const from = levelInfo(level).thresholdB * 1e9
+  const to = levelInfo(level + 1).thresholdB * 1e9
+  const share = Math.min(1, Math.max(0, (tokens - from) / (to - from)))
+
+  return Math.min(PIPS, Math.floor(share * PIPS))
+}
+
+/** `stored` is the highest level kept so far, or null on the first run, which records the level without a level-up. */
+export function growthStep(stored: number | null, tokens: number) {
+  const level = levelForTokens(tokens)
+  if (stored === null) return { highest: level, isLevelUp: false }
+  if (level > stored) return { highest: level, isLevelUp: true }
+
+  return { highest: stored, isLevelUp: false }
+}
+
+export type Forecast = {
+  projected: number
+  fullAt: number | null
+  basis: 'recent' | 'average'
+}
+
+export function forecast(
+  samples: readonly { at: number; pct: number }[],
+  reading: { pct: number; at: number; resetsAt: number },
+  window: { windowMs: number; lookbackMs: number },
+): Forecast {
+  const start = reading.resetsAt - window.windowMs
+  const from = Math.max(start, reading.at - window.lookbackMs)
+  const points = samples
+    .filter(s => s.at >= from && s.at <= reading.at)
+    .concat(samples.some(s => s.at === reading.at) ? [] : [{ at: reading.at, pct: reading.pct }])
+    .sort((a, b) => a.at - b.at)
+  const first = points[0]
+  const last = points.at(-1)
+  let rate: number
+  let basis: Forecast['basis']
+  if (first && last && last.at - first.at >= window.lookbackMs / 4) {
+    rate = Math.max(0, (last.pct - first.pct) / (last.at - first.at))
+    basis = 'recent'
+  } else {
+    const elapsed = reading.at - start
+    rate = elapsed > MINUTE_MS ? Math.max(0, reading.pct / elapsed) : 0
+    basis = 'average'
+  }
+  const left = Math.max(0, reading.resetsAt - reading.at)
+  const projected = reading.pct + rate * left
+  let fullAt: number | null = null
+  if (reading.pct >= 100) fullAt = reading.at
+  else if (projected > 100 && rate > 0) fullAt = reading.at + (100 - reading.pct) / rate
+
+  return { projected, fullAt, basis }
+}
+
+export function samplesOf(samples: readonly SproutSample[], kind: 'five' | 'week') {
+  const out: { at: number; pct: number }[] = []
+  for (const s of samples) {
+    const pct = s[kind]
+    if (pct !== undefined) out.push({ at: s.at, pct })
+  }
+
+  return out
+}
+
+export type Mood = 'sleep' | 'party' | 'worry' | 'happy'
+
+export type MoodInput = {
+  five: number | null
+  week: number | null
+  isOverForecast: boolean
+  isCelebrating: boolean
+}
+
+export function moodOf(input: MoodInput): Mood {
+  if (input.five !== null && input.five >= 100) return 'sleep'
+  if (input.isCelebrating) return 'party'
+  const isTight =
+    input.isOverForecast || (input.five !== null && input.five >= 85) || (input.week !== null && input.week >= 90)
+  if (isTight) return 'worry'
+
+  return 'happy'
+}
+
+export function bucketsFor(
+  mood: Mood,
+  hour: number,
+  streak: number,
+  extra: { isLevelUp: boolean; lost: number | null },
+): SproutBucket[] {
+  if (mood === 'party' && extra.isLevelUp) return ['levelup']
+  if (mood !== 'happy') return [mood]
+  if (hour < 5) return ['night']
+  if (extra.lost !== null) return ['broken']
+  if (streak >= 7) return ['happy', 'streak']
+
+  return ['happy']
+}
+
+export function liveLimit(limit: SproutLimit | null, now: number): SproutLimit | null {
+  if (limit === null) return null
+  if (limit.resetsAt !== null && limit.resetsAt <= now) return { pct: 0, resetsAt: null }
+
+  return limit
+}
+
+export function formatTokens(n: number) {
+  if (n >= 1e9) return `${(n / 1e9).toFixed(n >= 1e10 ? 1 : 2)}B`
+  if (n >= 1e6) return `${(n / 1e6).toFixed(n >= 1e7 ? 0 : 1)}M`
+  if (n >= 1e3) return `${Math.round(n / 1e3)}k`
+
+  return String(Math.round(n))
+}
+
+export function formatUsd(usd: number) {
+  if (usd < 10) return `$${usd.toFixed(2)}`
+
+  return `$${withCommas(usd)}`
+}
+
+export function withCommas(value: number) {
+  return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+export function dayTotals(days: readonly SproutDay[]) {
+  const map = new Map<string, SproutDay>()
+  for (const d of days) map.set(d.day, d)
+
+  return map
+}
+
+export function calendar(days: readonly SproutDay[], from: string, to: string): SproutDay[] {
+  const map = dayTotals(days)
+  const out: SproutDay[] = []
+  for (let n = dayNumber(from); n <= dayNumber(to); n++) {
+    const day = dayFromNumber(n)
+    out.push(map.get(day) ?? { day, tokens: 0, costUsd: 0 })
+  }
+
+  return out
+}
+
+const NO_LINE_START = new Set('，。、？！；：…）」』”’,.?!;:)'.split(''))
+
+function unitsOf(ch: string) {
+  const code = ch.codePointAt(0) ?? 0
+  if (ch === ' ') return 0.3
+  if (code < 0x2e80) return 0.56
+
+  return 1
+}
+
+export function wrapText(text: string, maxUnits: number, maxLines: number) {
+  const tokens = text.match(/[A-Za-z0-9_#$%.,:+\-/@'"`]+|\s|./gu) ?? []
+  const rows: string[] = []
+  let row = ''
+  let units = 0
+  for (const token of tokens) {
+    const w = [...token].reduce((sum, ch) => sum + unitsOf(ch), 0)
+    const isMark = NO_LINE_START.has(token)
+    if (units + w > maxUnits && row.trim() !== '' && !isMark) {
+      rows.push(row.trimEnd())
+      row = token === ' ' ? '' : token
+      units = token === ' ' ? 0 : w
+    } else {
+      row += token
+      units += w
+    }
+  }
+  if (row.trim() !== '') rows.push(row.trimEnd())
+  if (rows.length <= maxLines) return { rows, isCut: false }
+  const kept = rows.slice(0, maxLines)
+  kept[maxLines - 1] = `${[...(kept[maxLines - 1] ?? '')].slice(0, -1).join('')}…`
+
+  return { rows: kept, isCut: true }
+}
+
+export function hashOf(...parts: Array<string | number>) {
+  let hash = 0
+  for (const ch of parts.join('|')) hash = (Math.imul(hash, 31) + ch.charCodeAt(0)) | 0
+
+  return (hash >>> 0).toString(36)
+}

@@ -1,0 +1,469 @@
+import { atom, read, update } from 'claude-code'
+import type { EngineInterface, SessionRateLimit } from 'claude-code'
+
+import type { SproutGithub, SproutLevelUp, SproutLimit, SproutParty, SproutQuota, SproutSample, SproutScan } from '../types'
+import { DAY_MS, HOUR_MS, MINUTE_MS, growthStep } from './logic'
+
+// The engine reads state keys off each file's own source, so these atoms are written here and again in register.tsx.
+const scanState = atom({ plugin: 'sprout', key: 'scan' } as const, null, { shape: 'scan-1' })
+const quotaState = atom(
+  { plugin: 'sprout', key: 'quota' } as const,
+  { at: null, five: null, week: null, samples: [] },
+  { shape: 'quota-1' },
+)
+const githubState = atom({ plugin: 'sprout', key: 'github' } as const, null, { shape: 'github-1' })
+const partyState = atom({ plugin: 'sprout', key: 'party' } as const, null)
+const petState = atom(
+  { plugin: 'sprout', key: 'pet' } as const,
+  { action: null, actionAt: 0, line: null, fed: 0, patted: 0 },
+  { shape: 'pet-1' },
+)
+const envState = atom({ plugin: 'sprout', key: 'env' } as const, { repo: null, tzOffsetMin: null })
+const growthState = atom({ plugin: 'sprout', key: 'growth' } as const, { highest: null, levelUp: null })
+
+const POLL_MS = 5 * MINUTE_MS
+const CALENDAR_MS = 6 * HOUR_MS
+export const PARTY_MS = 10 * MINUTE_MS
+const SAMPLE_KEEP_MS = 8 * DAY_MS
+const SAMPLE_CAP = 1500
+const SCAN_TIMEOUT_MS = 9 * MINUTE_MS
+const TOOL_RETRY_MS = HOUR_MS
+
+type Tool = { path: string | null; checkedAt: number }
+
+let node: Tool | null = null
+let gh: Tool | null = null
+let isScanning = false
+let quotaSavedAt = 0
+let timers: Array<{ cancel: () => void }> = []
+
+function note($: EngineInterface, text: string) {
+  try {
+    $.ui.log(`sprout: ${text}`, { to: 'debug' })
+  } catch {}
+}
+
+async function runs($: EngineInterface, argv: string[], check: (stdout: string) => boolean) {
+  try {
+    const result = await $.process.run(argv, { timeoutMs: 10_000 })
+    return result.exitCode === 0 && check(result.stdout)
+  } catch {
+    return false
+  }
+}
+
+function versionDesc(a: string, b: string) {
+  const pa = a.replace(/^v/, '').split('.').map(Number)
+  const pb = b.replace(/^v/, '').split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const d = (pb[i] ?? 0) - (pa[i] ?? 0)
+    if (d !== 0) return d
+  }
+
+  return 0
+}
+
+async function homeDir($: EngineInterface) {
+  return (await $.env.get('HOME')) ?? null
+}
+
+/** The desktop app does not always have the person's shell PATH, so look where version managers put node. */
+async function findNode($: EngineInterface, now: number) {
+  if (node !== null && (node.path !== null || now - node.checkedAt < TOOL_RETRY_MS)) return node.path
+  const home = await homeDir($)
+  const candidates: string[] = []
+  const remembered = await $.store.get('nodePath')
+  if (typeof remembered === 'string') candidates.push(remembered)
+  candidates.push('node', '/opt/homebrew/bin/node', '/usr/local/bin/node')
+  if (home !== null) {
+    try {
+      const listed = await $.fs.list(`${home}/.nvm/versions/node`)
+      const versions = listed.filter(entry => entry.kind === 'dir').map(entry => entry.name)
+      for (const version of versions.sort(versionDesc)) candidates.push(`${home}/.nvm/versions/node/${version}/bin/node`)
+    } catch {}
+    candidates.push(`${home}/.volta/bin/node`, `${home}/.local/share/mise/shims/node`, `${home}/.asdf/shims/node`)
+  }
+  candidates.push('/usr/bin/node')
+  const isModern = (stdout: string) => Number(/^v(\d+)/.exec(stdout.trim())?.[1] ?? 0) >= 18
+  for (const path of [...new Set(candidates)]) {
+    if (await runs($, [path, '--version'], isModern)) {
+      node = { path, checkedAt: now }
+      if (path !== remembered) await $.store.set('nodePath', path)
+      return path
+    }
+  }
+  node = { path: null, checkedAt: now }
+  note($, 'no node found; usage stats are off')
+
+  return null
+}
+
+async function findGh($: EngineInterface, now: number) {
+  if (gh !== null && (gh.path !== null || now - gh.checkedAt < TOOL_RETRY_MS)) return gh.path
+  for (const path of ['gh', '/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh']) {
+    if (await runs($, [path, '--version'], stdout => stdout.includes('gh version'))) {
+      gh = { path, checkedAt: now }
+      return path
+    }
+  }
+  gh = { path: null, checkedAt: now }
+
+  return null
+}
+
+async function graphql($: EngineInterface, query: string): Promise<unknown> {
+  const now = await $.clock.now()
+  const path = await findGh($, now)
+  if (path === null) return null
+  try {
+    const result = await $.process.run([path, 'api', 'graphql', '-f', `query=${query}`], { timeoutMs: 30_000 })
+    if (result.exitCode !== 0) return null
+    return JSON.parse(result.stdout) as unknown
+  } catch {
+    return null
+  }
+}
+
+type RawScan = {
+  version?: number
+  firstDay?: string | null
+  days?: Array<{ day?: string; input?: number; output?: number; cacheRead?: number; cacheWrite?: number; costUsd?: number }>
+  totals?: { tokens?: number; costUsd?: number; cacheHitRate?: number }
+}
+
+export function parseScan(stdout: string, ranAt: number): SproutScan | null {
+  const line = stdout.trim().split('\n').at(-1)
+  if (line === undefined || line === '') return null
+  let raw: RawScan
+  try {
+    raw = JSON.parse(line) as RawScan
+  } catch {
+    return null
+  }
+  if (raw.version !== 1 || !Array.isArray(raw.days)) return null
+  const days = raw.days
+    .filter(d => typeof d.day === 'string')
+    .map(d => ({
+      day: d.day as string,
+      tokens: (d.input ?? 0) + (d.output ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
+      costUsd: d.costUsd ?? 0,
+    }))
+
+  return {
+    ranAt,
+    firstDay: raw.firstDay ?? days[0]?.day ?? null,
+    days,
+    totals: {
+      tokens: raw.totals?.tokens ?? days.reduce((sum, d) => sum + d.tokens, 0),
+      costUsd: raw.totals?.costUsd ?? days.reduce((sum, d) => sum + d.costUsd, 0),
+      cacheHitRate: raw.totals?.cacheHitRate ?? 0,
+    },
+    previous: null,
+  }
+}
+
+export async function runScan($: EngineInterface) {
+  if (isScanning) return
+  isScanning = true
+  try {
+    const now = await $.clock.now()
+    const home = await homeDir($)
+    if (home === null) return
+    const config = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${home}/.claude`
+    const script = `${$.plugin.root}/scripts/scan.mjs`
+    if (!(await $.fs.exists(script))) return
+    const path = await findNode($, now)
+    if (path === null) return
+    const roots = [`${config}/projects`]
+    try {
+      const imports = await $.fs.list(`${config}/sprout-imports`)
+      for (const entry of imports.filter(item => item.kind === 'dir').sort((a, b) => a.name.localeCompare(b.name))) {
+        const dir = `${config}/sprout-imports/${entry.name}`
+        roots.push((await $.fs.exists(`${dir}/projects`)) ? `${dir}/projects` : dir)
+      }
+    } catch {}
+    const result = await $.process.run(
+      [path, script, ...roots.flatMap(root => ['--projects', root]), '--cache', `${config}/sprout-cache/scan.json`],
+      { timeoutMs: SCAN_TIMEOUT_MS },
+    )
+    if (result.exitCode !== 0) {
+      note($, `scan exited ${result.exitCode}: ${result.stderr.slice(0, 300)}`)
+      return
+    }
+    const scan = parseScan(result.stdout, await $.clock.now())
+    if (scan === null) {
+      note($, 'scan printed no usable result')
+      return
+    }
+    const old = await read($, scanState)
+    const isSame =
+      old !== null && JSON.stringify([old.days, old.totals, old.firstDay]) === JSON.stringify([scan.days, scan.totals, scan.firstDay])
+    if (!isSame) {
+      await update($, scanState, previous => ({
+        ...scan,
+        previous: previous === null ? null : previous.totals,
+      }))
+    }
+    await $.store.set('scan', scan)
+  } catch (error) {
+    note($, `scan failed: ${String(error)}`)
+  } finally {
+    isScanning = false
+  }
+}
+
+function toLimit(limit: SessionRateLimit | undefined): SproutLimit | null {
+  if (limit === undefined) return null
+  const resetsAt = limit.resetsAt === undefined ? NaN : Date.parse(limit.resetsAt)
+
+  return { pct: limit.percentUsed, resetsAt: Number.isNaN(resetsAt) ? null : resetsAt }
+}
+
+function mergeSamples(a: readonly SproutSample[], b: readonly SproutSample[], now: number) {
+  const byAt = new Map<number, SproutSample>()
+  for (const s of [...a, ...b]) byAt.set(s.at, { ...byAt.get(s.at), ...s })
+
+  return [...byAt.values()]
+    .filter(s => s.at >= now - SAMPLE_KEEP_MS)
+    .sort((x, y) => x.at - y.at)
+    .slice(-SAMPLE_CAP)
+}
+
+function isQuota(value: unknown): value is SproutQuota {
+  return typeof value === 'object' && value !== null && Array.isArray((value as SproutQuota).samples)
+}
+
+async function syncQuota($: EngineInterface, now: number) {
+  const stored = await $.store.get('quota')
+  const theirs = isQuota(stored) ? stored : null
+  const mine = await read($, quotaState)
+  const isTheirsNewer = theirs !== null && (theirs.at ?? 0) > (mine.at ?? 0)
+  const merged: SproutQuota = {
+    at: isTheirsNewer ? theirs.at : mine.at,
+    five: isTheirsNewer ? theirs.five : mine.five,
+    week: isTheirsNewer ? theirs.week : mine.week,
+    samples: mergeSamples(mine.samples, theirs?.samples ?? [], now),
+  }
+  await $.store.set('quota', merged)
+  quotaSavedAt = now
+  if (JSON.stringify(merged) !== JSON.stringify(mine)) await update($, quotaState, () => merged)
+}
+
+export async function recordLimits($: EngineInterface, limits: readonly SessionRateLimit[]) {
+  const five = toLimit(limits.find(limit => limit.kind === 'five_hour'))
+  const week = toLimit(limits.find(limit => limit.kind === 'seven_day'))
+  if (five === null && week === null) return
+  const at = await $.clock.now()
+  const current = await read($, quotaState)
+  const last = current.samples.at(-1)
+  if (last !== undefined && last.five === five?.pct && last.week === week?.pct && current.at !== null && at - current.at < 2 * MINUTE_MS) return
+  await update($, quotaState, quota => {
+    const sample: SproutSample = { at }
+    if (five !== null) sample.five = five.pct
+    if (week !== null) sample.week = week.pct
+    const previous = quota.samples.at(-1)
+    const isRepeat = previous !== undefined && previous.five === sample.five && previous.week === sample.week && at - previous.at < 10 * MINUTE_MS
+
+    return {
+      at,
+      five: five ?? quota.five,
+      week: week ?? quota.week,
+      samples: isRepeat ? quota.samples : mergeSamples(quota.samples, [sample], at),
+    }
+  })
+  if (at - quotaSavedAt > MINUTE_MS) await syncQuota($, at)
+}
+
+const LEVEL: Record<string, string> = { NONE: '0', FIRST_QUARTILE: '1', SECOND_QUARTILE: '2', THIRD_QUARTILE: '3', FOURTH_QUARTILE: '4' }
+
+type CalendarReply = {
+  data?: {
+    viewer?: {
+      contributionsCollection?: {
+        contributionCalendar?: {
+          totalContributions?: number
+          weeks?: Array<{ contributionDays?: Array<{ date?: string; contributionLevel?: string }> }>
+        }
+      }
+    }
+  }
+}
+
+export function parseCalendar(reply: unknown, fetchedAt: number): SproutGithub | null {
+  const calendar = (reply as CalendarReply | null)?.data?.viewer?.contributionsCollection?.contributionCalendar
+  if (calendar?.weeks === undefined) return null
+  const days = calendar.weeks.flatMap(week => week.contributionDays ?? [])
+  const start = days[0]?.date
+  if (start === undefined) return null
+
+  return {
+    fetchedAt,
+    total: calendar.totalContributions ?? 0,
+    start,
+    levels: days.map(day => LEVEL[day.contributionLevel ?? 'NONE'] ?? '0').join(''),
+  }
+}
+
+async function refreshCalendar($: EngineInterface, now: number) {
+  const current = await read($, githubState)
+  if (current !== null && now - current.fetchedAt < CALENDAR_MS) return
+  const reply = await graphql(
+    $,
+    'query{viewer{contributionsCollection{contributionCalendar{totalContributions weeks{contributionDays{date contributionLevel}}}}}}',
+  )
+  const calendar = parseCalendar(reply, now)
+  if (calendar === null) return
+  await update($, githubState, () => calendar)
+  await $.store.set('github', calendar)
+}
+
+type SearchReply = {
+  data?: { search?: { nodes?: Array<{ number?: number; title?: string; mergedAt?: string; repository?: { nameWithOwner?: string } }> } }
+}
+
+function isParty(value: unknown): value is SproutParty {
+  return typeof value === 'object' && value !== null && typeof (value as SproutParty).until === 'number'
+}
+
+async function pollMerges($: EngineInterface, now: number) {
+  const reply = (await graphql(
+    $,
+    'query{search(query:"author:@me is:pr is:merged sort:updated-desc",type:ISSUE,first:5){nodes{... on PullRequest{number title mergedAt repository{nameWithOwner}}}}}',
+  )) as SearchReply | null
+  const merged = (reply?.data?.search?.nodes ?? [])
+    .map(pr => ({ ...pr, at: pr.mergedAt === undefined ? NaN : Date.parse(pr.mergedAt) }))
+    .filter(pr => !Number.isNaN(pr.at) && typeof pr.number === 'number')
+    .sort((a, b) => b.at - a.at)
+  const newest = merged[0]
+  const seen = Number((await $.store.get('lastMergeAt')) ?? 0)
+  if (newest !== undefined && newest.at > seen) {
+    await $.store.set('lastMergeAt', newest.at)
+    const isFresh = seen === 0 ? now - newest.at < PARTY_MS : now - newest.at < 6 * HOUR_MS
+    if (isFresh) {
+      const party: SproutParty = {
+        number: newest.number ?? 0,
+        title: newest.title ?? '',
+        repo: newest.repository?.nameWithOwner ?? '',
+        until: now + PARTY_MS,
+      }
+      await $.store.set('party', party)
+    }
+  }
+  const stored = await $.store.get('party')
+  const party = isParty(stored) && stored.until > now ? stored : null
+  const mine = await read($, partyState)
+  if (JSON.stringify(mine) !== JSON.stringify(party)) {
+    await update($, partyState, () => party)
+    if (party !== null) $.clock.after(party.until - now + 500, () => $.ui.invalidate('ui.render'))
+  }
+}
+
+function isLevelUp(value: unknown): value is SproutLevelUp {
+  return typeof value === 'object' && value !== null && typeof (value as SproutLevelUp).until === 'number'
+}
+
+async function syncGrowth($: EngineInterface, now: number) {
+  const stored = await $.store.get('highestLevel')
+  let highest = typeof stored === 'number' ? stored : null
+  const scan = await read($, scanState)
+  if (scan !== null) {
+    const step = growthStep(highest, scan.totals.tokens)
+    if (step.highest !== highest) await $.store.set('highestLevel', step.highest)
+    if (step.isLevelUp) await $.store.set('levelUp', { level: step.highest, until: now + PARTY_MS })
+    highest = step.highest
+  }
+  const raw = await $.store.get('levelUp')
+  const levelUp = isLevelUp(raw) && raw.until > now ? raw : null
+  const next = { highest, levelUp }
+  const mine = await read($, growthState)
+  if (JSON.stringify(mine) !== JSON.stringify(next)) {
+    await update($, growthState, () => next)
+    if (levelUp !== null) $.clock.after(levelUp.until - now + 500, () => $.ui.invalidate('ui.render'))
+  }
+}
+
+function parseOffset(text: string) {
+  const match = /^([+-])(\d{2})(\d{2})$/.exec(text.trim())
+  if (match === null) return null
+  const minutes = Number(match[2]) * 60 + Number(match[3])
+
+  return match[1] === '-' ? -minutes : minutes
+}
+
+export function repoName(remote: string | null) {
+  if (remote === null) return null
+  const name = remote.replace(/\/+$/, '').replace(/\.git$/, '').split(/[/:]/).at(-1)
+
+  return name === undefined || name === '' ? null : name
+}
+
+async function refreshEnv($: EngineInterface, cwd: string) {
+  let tzOffsetMin: number | null = null
+  try {
+    const result = await $.process.run(['date', '+%z'], { timeoutMs: 5000 })
+    if (result.exitCode === 0) tzOffsetMin = parseOffset(result.stdout)
+  } catch {}
+  if (tzOffsetMin === null) tzOffsetMin = -new Date().getTimezoneOffset()
+  let repo: string | null = null
+  try {
+    const found = await $.session.repo()
+    repo = repoName(found?.remote ?? null) ?? (found === null ? null : (found.root.split('/').at(-1) ?? null))
+  } catch {}
+  if (repo === null) repo = cwd.split('/').filter(Boolean).at(-1) ?? null
+  const env = { repo, tzOffsetMin }
+  const current = await read($, envState)
+  if (JSON.stringify(current) !== JSON.stringify(env)) await update($, envState, () => env)
+}
+
+async function hydrate($: EngineInterface) {
+  const scan = await $.store.get('scan')
+  if ((await read($, scanState)) === null && typeof scan === 'object' && scan !== null && Array.isArray((scan as SproutScan).days)) {
+    await update($, scanState, () => ({ ...(scan as SproutScan), previous: null }))
+  }
+  const github = await $.store.get('github')
+  if ((await read($, githubState)) === null && typeof github === 'object' && github !== null && typeof (github as SproutGithub).levels === 'string') {
+    await update($, githubState, () => github as SproutGithub)
+  }
+  const counters = (await $.store.get('counters')) as { fed?: number; patted?: number } | undefined
+  if (counters !== undefined) {
+    await update($, petState, pet => ({ ...pet, fed: Math.max(pet.fed, counters.fed ?? 0), patted: Math.max(pet.patted, counters.patted ?? 0) }))
+  }
+}
+
+async function safely($: EngineInterface, what: string, work: () => Promise<void>) {
+  try {
+    await work()
+  } catch (error) {
+    note($, `${what} failed: ${String(error)}`)
+  }
+}
+
+export function stopSprout() {
+  for (const timer of timers) timer.cancel()
+  timers = []
+}
+
+export function startSprout($: EngineInterface, cwd: string) {
+  stopSprout()
+  const cycle = async (isFirst: boolean) => {
+    const now = await $.clock.now()
+    await safely($, 'usage', async () => {
+      const usage = await $.session.usage()
+      await recordLimits($, usage.rateLimits)
+      await syncQuota($, now)
+    })
+    if (isFirst) await safely($, 'env', () => refreshEnv($, cwd))
+    await safely($, 'merges', () => pollMerges($, now))
+    await safely($, 'calendar', () => refreshCalendar($, now))
+    await safely($, 'growth', () => syncGrowth($, now))
+    await runScan($)
+    await safely($, 'growth', async () => syncGrowth($, await $.clock.now()))
+  }
+  void (async () => {
+    await safely($, 'hydrate', () => hydrate($))
+    await cycle(true)
+  })()
+  timers.push($.clock.every(POLL_MS, () => void cycle(false)))
+  timers.push($.clock.every(30 * MINUTE_MS, () => void safely($, 'env', () => refreshEnv($, cwd))))
+  timers.push($.clock.every(MINUTE_MS, () => $.ui.invalidate('ui.render')))
+}

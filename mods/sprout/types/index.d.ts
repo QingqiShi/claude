@@ -56,6 +56,11 @@ export type SproutRange = '30' | 'all'
 
 export type SproutEnv = { repo: string | null; tzOffsetMin: number | null }
 
+export type SproutIntroKind = 'tiles' | 'trend' | 'clay'
+
+/** Kept in the store as `introPlayed`: the local day each drawing last played its entrance, in any session. */
+export type SproutIntroPlayed = Partial<Record<SproutIntroKind, string>>
+
 declare module 'claude-code' {
   interface PluginState {
     sprout: {

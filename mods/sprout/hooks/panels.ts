@@ -63,7 +63,7 @@ ${end === '' ? '' : `<text x="${W - 10}" y="15.5" text-anchor="end" font-size="1
 
 type RollFrom = string | null
 
-function rollText(id: string, x: number, y: number, size: number, text: string, from: RollFrom, cls: string, delay: number) {
+function rollText(id: string, x: number, y: number, size: number, text: string, from: RollFrom, cls: string, delay: number, isIntro: boolean) {
   const lh = Math.round(size * 1.25)
   const fromChars = from !== null && from.length === text.length ? [...from] : null
   let cx = x
@@ -71,7 +71,7 @@ function rollText(id: string, x: number, y: number, size: number, text: string, 
   let digitIndex = 0
   for (const [i, ch] of [...text].entries()) {
     const w = textWidth(ch, size)
-    if (/\d/.test(ch)) {
+    if (isIntro && /\d/.test(ch)) {
       const to = Number(ch)
       const start = fromChars !== null && /\d/.test(fromChars[i] ?? '') ? Number(fromChars[i]) : 0
       const column = Array.from({ length: 10 }, (_, d) => `<text x="${n(cx)}" y="${y + d * lh}" class="${cls}">${d}</text>`).join('')
@@ -84,7 +84,7 @@ function rollText(id: string, x: number, y: number, size: number, text: string, 
     cx += w
   }
 
-  return { svg: out, width: cx - x, clip: `<clipPath id="line-${id}-${Math.round(y)}"><rect x="0" y="${n(y - size)}" width="10000" height="${n(size * 1.3)}"/></clipPath>` }
+  return { svg: out, width: cx - x, clip: isIntro ? `<clipPath id="line-${id}-${Math.round(y)}"><rect x="0" y="${n(y - size)}" width="10000" height="${n(size * 1.3)}"/></clipPath>` : '' }
 }
 
 export type TilesInput = {
@@ -97,6 +97,7 @@ export type TilesInput = {
   cacheHitRate: number
   bars: number[]
   previous: { tokens: number; costUsd: number; cacheHitRate: number } | null
+  isIntro: boolean
 }
 
 export const TILE_HEIGHT = 54
@@ -109,6 +110,7 @@ export function tilesSvg(input: TilesInput) {
   const W = input.width
   const H = tilesHeight()
   const id = uid('tiles', JSON.stringify(input))
+  const { isIntro } = input
   const tw = (W - 8) / 2
   const th = TILE_HEIGHT
   const tokens = formatTokens(input.tokens)
@@ -119,7 +121,7 @@ export function tilesSvg(input: TilesInput) {
   const tile = (col: number, row: number, label: string, value: string, from: RollFrom, suffix: string, extra: (x: number, y: number) => string, delay: number) => {
     const x = col * (tw + 8)
     const y = row * (th + 8)
-    const rolled = rollText(id, x + 10, y + th - 12, 20, value, from, `num-${id}`, delay)
+    const rolled = rollText(id, x + 10, y + th - 12, 20, value, from, `num-${id}`, delay, isIntro)
     clips.push(rolled.clip)
     const tail = suffix === '' ? '' : `<text x="${n(x + 10 + rolled.width + 3)}" y="${y + th - 12}" font-size="12" class="t3-${id}">${suffix}</text>`
 
@@ -133,7 +135,9 @@ export function tilesSvg(input: TilesInput) {
         const h = Math.max(1.5, (v / max) * 22)
         const x = right - (input.bars.length - i) * 4 + 1
         const isToday = i === input.bars.length - 1
-        return `<rect class="${isToday ? `today-${id}` : `bar-${id}`} grow-${id}" style="animation-delay:${(0.3 + i * 0.04).toFixed(2)}s" x="${x}" y="${n(bottom - h)}" width="3" height="${n(h)}" rx="1"/>`
+        const grow = isIntro ? ` grow-${id}` : ''
+        const delay = isIntro ? ` style="animation-delay:${(0.3 + i * 0.04).toFixed(2)}s"` : ''
+        return `<rect class="${isToday ? `today-${id}` : `bar-${id}`}${grow}"${delay} x="${x}" y="${n(bottom - h)}" width="3" height="${n(h)}" rx="1"/>`
       })
       .join('')
   }
@@ -141,7 +145,7 @@ export function tilesSvg(input: TilesInput) {
     if (input.todayUsd <= 0) return ''
     const label = `+$${input.todayUsd < 10 ? input.todayUsd.toFixed(2) : withCommas(input.todayUsd)}`
     const w = textWidth(label, 12) + 14
-    return `<g class="fade-${id}"><rect x="${n(right - w)}" y="${bottom - 18}" width="${n(w)}" height="18" rx="9" fill="rgba(217,119,87,0.16)"/><text x="${n(right - w / 2)}" y="${bottom - 5}" text-anchor="middle" font-size="12" class="clay-${id}">${esc(label)}</text></g>`
+    return `<g${isIntro ? ` class="fade-${id}"` : ''}><rect x="${n(right - w)}" y="${bottom - 18}" width="${n(w)}" height="18" rx="9" fill="rgba(217,119,87,0.16)"/><text x="${n(right - w / 2)}" y="${bottom - 5}" text-anchor="middle" font-size="12" class="clay-${id}">${esc(label)}</text></g>`
   }
   const week = (right: number, bottom: number) =>
     input.week
@@ -156,7 +160,7 @@ export function tilesSvg(input: TilesInput) {
     const cy = bottom - 15
     const c = 2 * Math.PI * 12
     const off = c * (1 - Math.max(0, Math.min(1, input.cacheHitRate)))
-    return `<circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke-width="4" class="str-${id}"/><circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke="url(#rg-${id})" stroke-width="4" stroke-linecap="round" stroke-dasharray="${n(c)}" stroke-dashoffset="${n(off)}" transform="rotate(-90 ${cx} ${cy})" class="ring-${id}"/>`
+    return `<circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke-width="4" class="str-${id}"/><circle cx="${cx}" cy="${cy}" r="12" fill="none" stroke="url(#rg-${id})" stroke-width="4" stroke-linecap="round" stroke-dasharray="${n(c)}" stroke-dashoffset="${n(off)}" transform="rotate(-90 ${cx} ${cy})"${isIntro ? ` class="ring-${id}"` : ''}/>`
   }
 
   const body =
@@ -165,24 +169,27 @@ export function tilesSvg(input: TilesInput) {
     tile(0, 1, '连续使用', String(input.streak), null, '天', week, 0.2) +
     tile(1, 1, '缓存命中', hit, prev === null ? null : `${(prev.cacheHitRate * 100).toFixed(1)}%`, '', ring, 0.3)
   const c = 2 * Math.PI * 12
-
-  return `${svgOpen(W, H)}<style>${paletteCss(id)}
-.num-${id}{fill:#ececec;font-size:20px;font-weight:500}@media (prefers-color-scheme: light){.num-${id}{fill:#1f1e1d}}
-.today-${id}{fill:#D97757}.on-${id}{fill:#3F8F4A}.clay-${id}{fill:#E8906F}@media (prefers-color-scheme: light){.clay-${id}{fill:#B4532F}}
+  const intro = isIntro
+    ? `
 .roll-${id}{animation:roll-${id} 1.2s cubic-bezier(.2,.8,.2,1) both}
 @keyframes roll-${id}{from{transform:translateY(var(--f))}to{transform:translateY(var(--t))}}
 .grow-${id}{transform-box:fill-box;transform-origin:center bottom;animation:grow-${id} .5s cubic-bezier(.3,1.3,.5,1) both}
 @keyframes grow-${id}{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 .fade-${id}{animation:fade-${id} .5s ease-out .6s both}@keyframes fade-${id}{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.ring-${id}{animation:ring-${id} 1.4s cubic-bezier(.2,.8,.2,1)}@keyframes ring-${id}{from{stroke-dashoffset:${n(c)}}}`
+    : ''
+
+  return `${svgOpen(W, H)}<style>${paletteCss(id)}
+.num-${id}{fill:#ececec;font-size:20px;font-weight:500}@media (prefers-color-scheme: light){.num-${id}{fill:#1f1e1d}}
+.today-${id}{fill:#D97757}.on-${id}{fill:#3F8F4A}.clay-${id}{fill:#E8906F}@media (prefers-color-scheme: light){.clay-${id}{fill:#B4532F}}${intro}
 .pulse-${id}{animation:pulse-${id} 1.2s infinite}@keyframes pulse-${id}{0%,100%{opacity:1}50%{opacity:.25}}
-.ring-${id}{animation:ring-${id} 1.4s cubic-bezier(.2,.8,.2,1)}@keyframes ring-${id}{from{stroke-dashoffset:${n(c)}}}
-@media (prefers-reduced-motion: reduce){.roll-${id},.grow-${id},.fade-${id},.pulse-${id},.ring-${id}{animation:none}}
+@media (prefers-reduced-motion: reduce){${isIntro ? `.roll-${id},.grow-${id},.fade-${id},.ring-${id},` : ''}.pulse-${id}{animation:none}}
 </style><defs><linearGradient id="rg-${id}" x1="0" x2="1"><stop offset="0" stop-color="#34D399"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>${clips.join('')}</defs>${body}</svg>`
 }
 
 export const TREND_HEIGHT = 84
 
-export function trendSvg(width: number, days: readonly SproutDay[]) {
+export function trendSvg(width: number, days: readonly SproutDay[], isIntro: boolean) {
   const W = width
   const H = TREND_HEIGHT
   const T = 18
@@ -204,24 +211,29 @@ export function trendSvg(width: number, days: readonly SproutDay[]) {
     .map((v, i) => {
       const h = H - Y(v)
       if (h <= 0) return ''
-      return `<rect class="bar-${id} pop-${id}" style="animation-delay:${i * step}ms" x="${n(i * bw + bw * 0.2)}" y="${n(Y(v))}" width="${n(Math.max(0.6, bw * 0.6))}" height="${n(h)}" rx="${bw > 4 ? 1 : 0}"/>`
+      const attrs = isIntro ? ` class="bar-${id} pop-${id}" style="animation-delay:${i * step}ms"` : ` class="bar-${id}"`
+      return `<rect${attrs} x="${n(i * bw + bw * 0.2)}" y="${n(Y(v))}" width="${n(Math.max(0.6, bw * 0.6))}" height="${n(h)}" rx="${bw > 4 ? 1 : 0}"/>`
     })
     .join('')
   const peak = `峰值 ${formatTokens(max)}`
   const now = `7 日均线 ${formatTokens(avg.at(-1) ?? 0)}`
-
-  return `${svgOpen(W, H)}<style>${paletteCss(id)}
+  const draw = isIntro ? ` class="draw-${id}"` : ''
+  const intro = isIntro
+    ? `
 .pop-${id}{transform-box:fill-box;transform-origin:center bottom;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) backwards}
 @keyframes pop-${id}{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-.draw-${id}{stroke-dasharray:1;animation:draw-${id} 1.3s ease-out backwards}@keyframes draw-${id}{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+.draw-${id}{stroke-dasharray:1;animation:draw-${id} 1.3s ease-out backwards}@keyframes draw-${id}{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}`
+    : ''
+
+  return `${svgOpen(W, H)}<style>${paletteCss(id)}${intro}
 .pulse-${id}{animation:pulse-${id} 1.6s ease-out infinite}@keyframes pulse-${id}{0%{r:3;opacity:1}100%{r:10;opacity:0}}
 .clay-${id}{fill:#E8906F}@media (prefers-color-scheme: light){.clay-${id}{fill:#B4532F}}
-@media (prefers-reduced-motion: reduce){.pop-${id},.draw-${id},.pulse-${id}{animation:none}.pulse-${id}{opacity:0}}
+@media (prefers-reduced-motion: reduce){${isIntro ? `.pop-${id},.draw-${id},` : ''}.pulse-${id}{animation:none}.pulse-${id}{opacity:0}}
 </style><defs><linearGradient id="ar-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D97757" stop-opacity=".45"/><stop offset="1" stop-color="#D97757" stop-opacity="0"/></linearGradient></defs>
 ${bars}
 <path d="M${n(pts[0]?.[0] ?? 0)},${H} L${line} L${n(last[0])},${H}Z" fill="url(#ar-${id})"/>
-<path class="draw-${id}" d="M${line}" fill="none" stroke="#F0997B" stroke-width="5" stroke-opacity=".25" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
-<path class="draw-${id}" d="M${line}" fill="none" stroke="#D97757" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
+<path${draw} d="M${line}" fill="none" stroke="#F0997B" stroke-width="5" stroke-opacity=".25" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
+<path${draw} d="M${line}" fill="none" stroke="#D97757" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
 <circle class="pulse-${id}" cx="${n(Math.min(W - 4, last[0]))}" cy="${n(last[1])}" r="3" fill="none" stroke="#D97757"/><circle cx="${n(Math.min(W - 4, last[0]))}" cy="${n(last[1])}" r="3" fill="#D97757"/>
 <text x="0" y="11" font-size="11" class="t3-${id}">${peak}</text><text x="${W}" y="11" text-anchor="end" font-size="11" class="clay-${id}">${now}</text>
 </svg>`
@@ -229,7 +241,7 @@ ${bars}
 
 const CLAY = ['', '#F5C4B3', '#F0997B', '#D97757', '#993C1D']
 
-export function usageHeatmapSvg(width: number, days: readonly SproutDay[], firstDay: string, today: string) {
+export function usageHeatmapSvg(width: number, days: readonly SproutDay[], firstDay: string, today: string, isIntro: boolean) {
   const W = width
   const firstMonday = addDays(firstDay, -weekdayOf(firstDay))
   const totalWeeks = Math.floor((dayNumber(today) - dayNumber(firstMonday)) / 7) + 1
@@ -265,7 +277,8 @@ export function usageHeatmapSvg(width: number, days: readonly SproutDay[], first
       const x = n(c * pitch)
       const y = n(top + r * pitch)
       const delay = Math.round(c * (weeks > 26 ? 12 : 40) + r * 8)
-      cells += `<rect class="k${k}-${id} pop-${id}" style="animation-delay:${delay}ms" x="${x}" y="${y}" width="${n(cell)}" height="${n(cell)}" rx="${radius}"/>`
+      const attrs = isIntro ? ` class="k${k}-${id} pop-${id}" style="animation-delay:${delay}ms"` : ` class="k${k}-${id}"`
+      cells += `<rect${attrs} x="${x}" y="${y}" width="${n(cell)}" height="${n(cell)}" rx="${radius}"/>`
       if (dn === todayN) {
         cells += `<rect class="ring-${id}" x="${n(c * pitch - 2)}" y="${n(top + r * pitch - 2)}" width="${n(cell + 4)}" height="${n(cell + 4)}" rx="${n(cell * 0.3 + 1.5)}" fill="none" stroke="#D97757" stroke-width="1.5"/>`
       }
@@ -289,16 +302,19 @@ export function usageHeatmapSvg(width: number, days: readonly SproutDay[], first
     .map(k => `<rect class="k${k}-${id}" x="${lx + 14 + k * 12}" y="${ly}" width="10" height="10" rx="2.5"/>`)
     .join('')}<text x="${lx + 14 + 5 * 12 + 2}" y="${ly + 9}" font-size="11" class="t3-${id}">多</text>`
   const kinds = CLAY.map((color, k) => (k === 0 ? '' : `.k${k}-${id}{fill:${color}}`)).join('')
+  const intro = isIntro
+    ? `
+.pop-${id}{transform-box:fill-box;transform-origin:center;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) backwards}
+@keyframes pop-${id}{from{transform:scale(0)}to{transform:scale(1)}}`
+    : ''
 
   return {
     height: H,
     svg: `${svgOpen(W, H)}<style>${paletteCss(id)}
 .k0-${id}{fill:rgba(255,255,255,0.08)}${kinds}
-@media (prefers-color-scheme: light){.k0-${id}{fill:rgba(0,0,0,0.07)}}
-.pop-${id}{transform-box:fill-box;transform-origin:center;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) backwards}
-@keyframes pop-${id}{from{transform:scale(0)}to{transform:scale(1)}}
+@media (prefers-color-scheme: light){.k0-${id}{fill:rgba(0,0,0,0.07)}}${intro}
 .ring-${id}{animation:tw-${id} 1.4s infinite}@keyframes tw-${id}{0%,100%{opacity:1}50%{opacity:.3}}
-@media (prefers-reduced-motion: reduce){.pop-${id},.ring-${id}{animation:none}}
+@media (prefers-reduced-motion: reduce){${isIntro ? `.pop-${id},` : ''}.ring-${id}{animation:none}}
 </style>${months}${cells}${legend}</svg>`,
   }
 }

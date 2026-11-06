@@ -144,6 +144,31 @@ export function growthStep(stored: number | null, tokens: number) {
   return { highest: stored, isLevelUp: false }
 }
 
+/** `seen` keeps, for each kind drawn so far, the data its entrance played with, or null once it draws without one. `played` is the day each kind last played it in any session. */
+export function introStep<K extends string>(
+  seen: Map<K, string | null>,
+  drawings: Partial<Record<K, string | null>>,
+  played: Partial<Record<K, string>>,
+  today: string,
+) {
+  const intro = new Set<K>()
+  const started: K[] = []
+  for (const kind of Object.keys(drawings) as K[]) {
+    const data = drawings[kind]
+    if (data === null || data === undefined) continue
+    if (!seen.has(kind)) {
+      const isFirstToday = played[kind] !== today
+      seen.set(kind, isFirstToday ? data : null)
+      if (isFirstToday) started.push(kind)
+    } else if (seen.get(kind) !== data) {
+      seen.set(kind, null)
+    }
+    if (seen.get(kind) === data) intro.add(kind)
+  }
+
+  return { intro, started }
+}
+
 export type Forecast = {
   projected: number
   fullAt: number | null

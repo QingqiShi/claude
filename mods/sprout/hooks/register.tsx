@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { SproutBucket, SproutLimit, SproutPet, SproutRange } from '../types'
+import type { SproutBucket, SproutIntroKind, SproutIntroPlayed, SproutLimit, SproutPet, SproutRange } from '../types'
 import { recordLimits, startSprout } from './data'
 import type { LineContext } from './lines'
 import { linesFor } from './lines'
@@ -19,6 +19,7 @@ import {
   formatTokens,
   formatUsd,
   hashOf,
+  introStep,
   liveLimit,
   localTime,
   moodOf,
@@ -66,6 +67,8 @@ const AUTO_LINE_MS = 10 * MINUTE_MS
 const STALE_QUOTA_MS = 15 * MINUTE_MS
 const CELL_PX = 7.2
 const MOOD_KEYS = new Set<SproutBucket>(['happy', 'worry', 'sleep', 'party', 'night', 'streak', 'levelup', 'broken'])
+const INTRO_KEY = 'introPlayed'
+const introSeen = new Map<SproutIntroKind, string | null>()
 
 /** On desktop a cell is the code font's advance, so the pane's pixel width is about the columns times that. */
 function contentWidth(columns: number) {
@@ -278,12 +281,32 @@ function firstDayText(firstDay: string, today: string) {
   return `自 ${year}${m} 月 ${d} 日起`
 }
 
-function tilesFor(model: Model, width: number) {
+async function introsFor($: EngineInterface, today: string, drawings: Record<SproutIntroKind, string | null>) {
+  const isFirst = (Object.keys(drawings) as SproutIntroKind[]).some(kind => drawings[kind] !== null && !introSeen.has(kind))
+  let played: SproutIntroPlayed = {}
+  if (isFirst) {
+    try {
+      const stored = await $.store.get(INTRO_KEY)
+      if (typeof stored === 'object' && stored !== null) played = stored as SproutIntroPlayed
+    } catch {}
+  }
+  const { intro, started } = introStep(introSeen, drawings, played, today)
+  if (started.length > 0) {
+    try {
+      await $.store.set(INTRO_KEY, { ...played, ...Object.fromEntries(started.map(kind => [kind, today])) })
+    } catch {}
+  }
+
+  return intro
+}
+
+function tilesInputFor(model: Model, width: number) {
   const scan = model.scan
   if (scan === null) return null
   const last10 = calendar(scan.days, addDays(model.today, -9), model.today)
   const last7 = calendar(scan.days, addDays(model.today, -6), model.today)
-  const input = {
+
+  return {
     width,
     tokens: scan.totals.tokens,
     costUsd: scan.totals.costUsd,
@@ -294,8 +317,6 @@ function tilesFor(model: Model, width: number) {
     bars: last10.map(d => d.tokens),
     previous: scan.previous,
   }
-
-  return memoize(`tiles|${JSON.stringify(input)}`, () => tilesSvg(input))
 }
 
 function terminalBar(pct: number) {
@@ -394,19 +415,28 @@ export const register: Register = on => {
     )
 
     const trend = trendDays(model, model.range)
-    const trendSource = trend.length < 2 ? null : memoize(`trend|${width}|${trend.map(d => d.tokens).join(',')}`, () => trendSvg(width, trend) ?? '')
     const firstDay = scan?.firstDay ?? null
+    const tilesInput = tilesInputFor(model, width)
+    const drawings = {
+      tiles: tilesInput === null ? null : `tiles|${JSON.stringify(tilesInput)}`,
+      trend: trend.length < 2 ? null : `trend|${width}|${trend.map(d => d.tokens).join(',')}`,
+      clay: scan === null || firstDay === null ? null : `clay|${width}|${model.today}|${firstDay}|${scan.days.map(d => `${d.day}:${d.tokens}`).join(',')}`,
+    }
+    const intro = await introsFor($, model.today, drawings)
+    const tiles =
+      tilesInput === null
+        ? null
+        : memoize(`${drawings.tiles}|${intro.has('tiles')}`, () => tilesSvg({ ...tilesInput, isIntro: intro.has('tiles') }))
+    const trendSource =
+      drawings.trend === null ? null : memoize(`${drawings.trend}|${intro.has('trend')}`, () => trendSvg(width, trend, intro.has('trend')) ?? '')
     const clayDrawing =
       scan === null || firstDay === null
         ? null
-        : memoize(`clay|${width}|${model.today}|${firstDay}|${scan.days.map(d => `${d.day}:${d.tokens}`).join(',')}`, () =>
-            usageHeatmapSvg(width, scan.days, firstDay, model.today),
-          )
+        : memoize(`${drawings.clay}|${intro.has('clay')}`, () => usageHeatmapSvg(width, scan.days, firstDay, model.today, intro.has('clay')))
     const span = firstDay === null ? 0 : dayNumber(model.today) - dayNumber(firstDay) + 1
     const activeDays = scan === null ? 0 : scan.days.filter(d => d.tokens > 0 && d.day <= model.today).length
     const levels = model.github?.levels ?? null
     const ghDrawing = levels === null ? null : memoize(`gh|${width}|${levels}`, () => githubHeatmapSvg(width, levels))
-    const tiles = tilesFor(model, width)
 
     return (
       <Box flexDirection="column" gap="lg">

@@ -12,7 +12,7 @@ Git-backed so a new machine can be restored from scratch. The guiding rule:
 |---|---|---|---|
 | `settings.json`, `CLAUDE.md`, `statusline-command.sh`, `hooks/` | ✅ committed | this repo | `git clone` |
 | **My custom skills** — `auto-improve`, `pr-standards`, `merge-dependabot`, `prepare-for-pr`, `agent-instructions` | ✅ committed | this repo | `git clone` |
-| **My mods** — `mods/dev-band` (the band above the prompt) and `mods/sprout` (芽团, a pane with a pixel pet and usage stats across sessions), loaded in every session through `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json`, hot-reloaded on desktop through `CLAUDE_CODE_PLUGIN_DIR_WATCH` | ✅ committed | this repo | `git clone` |
+| **My mods** — `mods/dev-band` and `mods/sprout`, see [My mods](#my-mods) | ✅ committed | this repo | `git clone` |
 | `sprout-cache/` (sprout's scan cache) and `sprout-imports/<device>/` (transcripts copied from other machines, counted by sprout) | ❌ ignored | this machine | re-created by sprout; imports copied by hand |
 | **Marketplace plugins** — `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | ❌ ignored | `settings.json` → `enabledPlugins` + `extraKnownMarketplaces` | `bootstrap.sh` → `claude plugin install` |
 | **`vercel-cli`** skill | ❌ ignored | `npx skills add github.com/vercel/vercel --skill vercel-cli` | `bootstrap.sh` |
@@ -22,6 +22,44 @@ Git-backed so a new machine can be restored from scratch. The guiding rule:
 
 The third-party skill folders (`skills/vercel-cli/`, `skills/playwright-cli/`, and the
 four `mattpocock/skills` ones, and `skills/gh-stack/`) are `.gitignore`d — present on disk, absent from git.
+
+## My mods
+
+Claude Code mods are plugins that change Claude Code's own interface. `settings.json` loads both of them in every session:
+- `env.CLAUDE_CODE_PLUGIN_DIRS` names their folders, separated by `:`.
+- `env.CLAUDE_CODE_PLUGIN_DIR_WATCH=1` makes desktop sessions hot-reload them, so an edit to a mod's folder shows up without a new session.
+
+### dev-band: the band above the prompt
+
+![dev-band](mods/dev-band/screenshot.png)
+
+- **Context:** a liquid meter of the context used, measured against the auto-compact window (400k), not the model's 1M.
+- **Cost:** the session cost with a per-turn sparkline, a rolling number and a `+$delta` pill.
+- **Agents:** the running subagents as comets on an orbit, pinned to the right so that they do not shift the layout.
+
+### sprout (芽团): a pane beside the chat
+
+![sprout](mods/sprout/screenshot.webp)
+
+It shows long-lived information that is not tied to one session:
+- **Pet:** a cheeky pixel pet that talks back and has buttons to feed and pat it.
+  - It grows through 9 levels with the cumulative tokens, from Lv1 种子 (0) to Lv9 传说金树 (1000B), and never loses a level.
+  - Its mood follows the quota, the streak, the time of day and merged PRs.
+- **Quota:** the weekly and 5-hour quota, with a forecast of where each will be at its reset.
+- **Usage since the first transcript:** tokens, estimated API cost, streak and cache hit rate, with a daily trend and a heatmap.
+- **GitHub:** the contribution heatmap, from `gh`.
+
+Open it with `/sprout` if it does not open by itself; a narrow window keeps it closed.
+
+`mods/sprout/scripts/scan.mjs` reads every transcript in `projects/` and in each `sprout-imports/<device>/`. It caches what it has read in `sprout-cache/`, so later runs read only new lines. Both folders are git-ignored, because transcripts hold whole conversations.
+
+To count the history of another machine, pack its transcripts there:
+
+```sh
+cd ~/.claude && find projects -name '*.jsonl' | tar czf ~/claude-transcripts.tgz -T -
+```
+
+Then extract the archive here into `~/.claude/sprout-imports/<device>/`. The next scan counts it, and a message that is on both machines counts once.
 
 ## New machine setup
 

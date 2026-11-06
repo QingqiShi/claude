@@ -18,8 +18,11 @@ Mods are plugins that redraw parts of Claude Code. `settings.json` loads both mo
 ![The dev-band above the prompt](mods/dev-band/screenshot.png)
 
 - **Context**: a liquid meter of the context used. It measures against the 400k auto-compact window, not the model's 1M window.
+- **Cache**: a ring that drains until the prompt cache expires, with the time left. It turns amber near the end and reads 已过期 once the cache is gone, so the next turn writes it again. The time is an estimate: the last main-thread response plus the cache TTL.
 - **Cost**: the session cost, with a sparkline of the cost of each turn and a rolling number when it goes up.
 - **Agents**: running subagents circle as comets on the right, so the band does not shift when they start and stop.
+
+The band never wraps. When it is narrow, it drops the least useful parts first and keeps the context percentage and the cache time to the end.
 
 ### sprout (芽团), a pane beside the chat
 
@@ -32,8 +35,9 @@ Long-lived numbers that one session cannot show:
   - Its mood follows the quota, the streak, the time of day and merged PRs.
   - It has buttons to feed it, pat it, or get another line.
 - **Quota**: this week's and the 5-hour quota, each with a forecast for its reset.
-- **Usage**: total tokens, estimated API cost, the streak and the cache hit rate, from the first transcript on. A daily trend and a heatmap go with them.
-- **GitHub**: the PRs merged each day over the last 30 days, with the lines each day added and deleted, and the contribution heatmap.
+- **Usage**: total tokens, estimated API cost, the streak and the cache hit rate, with a daily token trend and a heatmap of the past year.
+- **GitHub**: the PRs merged each day, as one bar of the lines added and deleted, and the contribution heatmap of the past year.
+- **Range**: one `30 天 / 全部` switch sets the range of the usage numbers, the daily trend and the merges. 全部 starts at the first transcript. The pane remembers the choice across sessions.
 
 If the window is too narrow for the pane to open by itself, open it with `/sprout`.
 

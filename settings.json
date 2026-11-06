@@ -1,5 +1,5 @@
 {
-  "cleanupPeriodDays": 365,
+  "cleanupPeriodDays": 3650,
   "env": {
     "CLAUDE_CODE_PLUGIN_DIRS": "~/.claude/mods/dev-band:~/.claude/mods/sprout",
     "CLAUDE_CODE_PLUGIN_DIR_WATCH": "1",

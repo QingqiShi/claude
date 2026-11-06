@@ -1,4 +1,4 @@
-import type { SproutBucket, SproutDay, SproutLimit, SproutSample } from '../types'
+import type { SproutBucket, SproutDay, SproutLimit, SproutMergeChunk, SproutMergeDay, SproutRange, SproutSample } from '../types'
 import { LEVELS, MAX_LEVEL, levelInfo } from './levels'
 
 export const MINUTE_MS = 60_000
@@ -272,6 +272,14 @@ export function formatUsd(usd: number) {
   return `$${withCommas(usd)}`
 }
 
+export function formatLines(n: number) {
+  if (n >= 999_500) return `${(n / 1e6).toFixed(1)}M`
+  if (n >= 9_950) return `${Math.round(n / 1e3)}k`
+  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`
+
+  return String(Math.round(n))
+}
+
 export function withCommas(value: number) {
   return String(Math.round(value)).replace(/\B(?=(\d{3})+(?!\d))/g, ',')
 }
@@ -292,6 +300,99 @@ export function calendar(days: readonly SproutDay[], from: string, to: string): 
   }
 
   return out
+}
+
+export function mergeCalendar(days: readonly SproutMergeDay[], from: string, to: string): SproutMergeDay[] {
+  const map = new Map(days.map(d => [d.day, d]))
+  const out: SproutMergeDay[] = []
+  for (let n = dayNumber(from); n <= dayNumber(to); n++) {
+    const day = dayFromNumber(n)
+    out.push(map.get(day) ?? { day, prs: 0, additions: 0, deletions: 0 })
+  }
+
+  return out
+}
+
+export function mergeTotals(days: readonly SproutMergeDay[]) {
+  return days.reduce((sum, d) => ({ prs: sum.prs + d.prs, additions: sum.additions + d.additions, deletions: sum.deletions + d.deletions }), {
+    prs: 0,
+    additions: 0,
+    deletions: 0,
+  })
+}
+
+export const RECENT_DAYS = 30
+export const MERGE_CHUNK_DAYS = 14
+
+/** The first day a range shows: the last 30 days, or every day since the first day with Claude data. */
+export function rangeFrom(range: SproutRange, today: string, firstDay: string | null) {
+  const recent = addDays(today, -(RECENT_DAYS - 1))
+
+  return range === 'all' && firstDay !== null ? firstDay : recent
+}
+
+/** A day of a scan stored before the cache counts were kept makes the hit rate of a range unknown, so it falls back to the all-time rate. */
+export function rangeTotals(days: readonly SproutDay[], from: string, fallbackHitRate: number) {
+  let tokens = 0
+  let costUsd = 0
+  let cacheRead = 0
+  let promptTokens = 0
+  let isKnown = true
+  for (const d of days) {
+    if (d.day < from) continue
+    tokens += d.tokens
+    costUsd += d.costUsd
+    if (d.cacheRead === undefined || d.promptTokens === undefined) isKnown = false
+    else {
+      cacheRead += d.cacheRead
+      promptTokens += d.promptTokens
+    }
+  }
+  const cacheHitRate = !isKnown ? fallbackHitRate : promptTokens > 0 ? cacheRead / promptTokens : 0
+
+  return { tokens, costUsd, cacheHitRate }
+}
+
+export type ChunkSpan = { from: string; to: string }
+
+/** Fixed 14-day blocks, newest first, so that a chunk keeps its bounds from one day to the next. */
+export function chunksOf(start: string, today: string): ChunkSpan[] {
+  const out: ChunkSpan[] = []
+  const first = Math.floor(dayNumber(start) / MERGE_CHUNK_DAYS)
+  for (let k = Math.floor(dayNumber(today) / MERGE_CHUNK_DAYS); k >= first; k--) {
+    out.push({ from: dayFromNumber(k * MERGE_CHUNK_DAYS), to: dayFromNumber(k * MERGE_CHUNK_DAYS + MERGE_CHUNK_DAYS - 1) })
+  }
+
+  return out
+}
+
+/**
+ * The chunks to fetch, newest first: each one never fetched, each one in the last 30 days when a refresh is due,
+ * and each older one last fetched before the day after its end was over, as a merge late on its last day can be missing.
+ */
+export function planMergeChunks(start: string, today: string, stored: readonly SproutMergeChunk[], isDue: boolean): ChunkSpan[] {
+  const recent = addDays(today, -(RECENT_DAYS - 1))
+  const byFrom = new Map(stored.map(c => [c.from, c]))
+
+  return chunksOf(start, today).filter(chunk => {
+    const old = byFrom.get(chunk.from)
+    if (old === undefined || old.to !== chunk.to) return true
+    if (chunk.to >= recent) return isDue
+
+    return old.asOf <= addDays(chunk.to, 1)
+  })
+}
+
+/** The first day of the unbroken run of chunks that ends at the newest one. */
+export function mergedFrom(chunks: readonly SproutMergeChunk[]): string | null {
+  const sorted = [...chunks].sort((a, b) => b.from.localeCompare(a.from))
+  let from: string | null = null
+  for (const chunk of sorted) {
+    if (from !== null && chunk.to !== addDays(from, -1)) break
+    from = chunk.from
+  }
+
+  return from
 }
 
 const NO_LINE_START = new Set('，。、？！；：…）」』”’,.?!;:)'.split(''))

@@ -51,6 +51,12 @@ export function paletteCss(id: string) {
 @media (prefers-color-scheme: light){.t1-${id}{fill:#1f1e1d}.t2-${id}{fill:#5e5d59}.t3-${id}{fill:#8a8780}.bg-${id}{fill:rgba(0,0,0,0.045)}.tr-${id}{fill:rgba(0,0,0,0.07)}.bar-${id}{fill:rgba(0,0,0,0.12)}.str-${id}{stroke:rgba(0,0,0,0.08)}}`
 }
 
+export function todayCss(id: string) {
+  return `.tdp-${id}{animation:tdp-${id} 1.6s ease-in-out infinite}@keyframes tdp-${id}{0%,100%{opacity:1}50%{opacity:.35}}
+.tdr-${id}{fill:none;animation:tdr-${id} 1.6s ease-out infinite}@keyframes tdr-${id}{0%{r:3;opacity:1}100%{r:9;opacity:0}}
+@media (prefers-reduced-motion: reduce){.tdp-${id}{animation:none}.tdr-${id}{animation:none;opacity:0}}`
+}
+
 const memo = new Map<string, unknown>()
 
 export function memoize<T>(key: string, build: () => T): T {

@@ -1,8 +1,20 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, SessionRateLimit } from 'claude-code'
 
-import type { SproutGithub, SproutLevelUp, SproutLimit, SproutParty, SproutQuota, SproutSample, SproutScan } from '../types'
-import { DAY_MS, HOUR_MS, MINUTE_MS, growthStep } from './logic'
+import type {
+  SproutGithub,
+  SproutLevelUp,
+  SproutLimit,
+  SproutMergeChunk,
+  SproutMergeDay,
+  SproutMerges,
+  SproutParty,
+  SproutQuota,
+  SproutSample,
+  SproutScan,
+} from '../types'
+import type { ChunkSpan } from './logic'
+import { DAY_MS, HOUR_MS, MINUTE_MS, RECENT_DAYS, addDays, growthStep, localTime, mergedFrom, planMergeChunks } from './logic'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in register.tsx.
 const scanState = atom({ plugin: 'sprout', key: 'scan' } as const, null, { shape: 'scan-1' })
@@ -12,6 +24,7 @@ const quotaState = atom(
   { shape: 'quota-1' },
 )
 const githubState = atom({ plugin: 'sprout', key: 'github' } as const, null, { shape: 'github-1' })
+const mergesState = atom({ plugin: 'sprout', key: 'merges' } as const, null, { shape: 'merges-2' })
 const partyState = atom({ plugin: 'sprout', key: 'party' } as const, null)
 const petState = atom(
   { plugin: 'sprout', key: 'pet' } as const,
@@ -23,6 +36,8 @@ const growthState = atom({ plugin: 'sprout', key: 'growth' } as const, { highest
 
 const POLL_MS = 5 * MINUTE_MS
 const CALENDAR_MS = 6 * HOUR_MS
+const MERGES_MS = 30 * MINUTE_MS
+const MERGE_PAGES = 10
 export const PARTY_MS = 10 * MINUTE_MS
 const SAMPLE_KEEP_MS = 8 * DAY_MS
 const SAMPLE_CAP = 1500
@@ -147,6 +162,8 @@ export function parseScan(stdout: string, ranAt: number): SproutScan | null {
       day: d.day as string,
       tokens: (d.input ?? 0) + (d.output ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
       costUsd: d.costUsd ?? 0,
+      cacheRead: d.cacheRead ?? 0,
+      promptTokens: (d.input ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
     }))
 
   return {
@@ -325,7 +342,7 @@ function isParty(value: unknown): value is SproutParty {
   return typeof value === 'object' && value !== null && typeof (value as SproutParty).until === 'number'
 }
 
-async function pollMerges($: EngineInterface, now: number) {
+async function pollMerges($: EngineInterface, now: number): Promise<boolean> {
   const reply = (await graphql(
     $,
     'query{search(query:"author:@me is:pr is:merged sort:updated-desc",type:ISSUE,first:5){nodes{... on PullRequest{number title mergedAt repository{nameWithOwner}}}}}',
@@ -336,7 +353,8 @@ async function pollMerges($: EngineInterface, now: number) {
     .sort((a, b) => b.at - a.at)
   const newest = merged[0]
   const seen = Number((await $.store.get('lastMergeAt')) ?? 0)
-  if (newest !== undefined && newest.at > seen) {
+  const isNew = newest !== undefined && newest.at > seen
+  if (isNew) {
     await $.store.set('lastMergeAt', newest.at)
     const isFresh = seen === 0 ? now - newest.at < PARTY_MS : now - newest.at < 6 * HOUR_MS
     if (isFresh) {
@@ -356,6 +374,120 @@ async function pollMerges($: EngineInterface, now: number) {
     await update($, partyState, () => party)
     if (party !== null) $.clock.after(party.until - now + 500, () => $.ui.invalidate('ui.render'))
   }
+
+  return isNew
+}
+
+type MergeNode = { mergedAt?: string; additions?: number; deletions?: number }
+
+type MergePageReply = {
+  data?: { search?: { pageInfo?: { hasNextPage?: boolean; endCursor?: string | null }; nodes?: MergeNode[] } }
+}
+
+export function mergePage(reply: unknown): { nodes: MergeNode[]; next: string | null } | null {
+  const search = (reply as MergePageReply | null)?.data?.search
+  if (search?.nodes === undefined) return null
+  const next = search.pageInfo?.hasNextPage === true ? (search.pageInfo.endCursor ?? null) : null
+
+  return { nodes: search.nodes, next }
+}
+
+export function mergeDays(nodes: readonly MergeNode[], tzOffsetMin: number, from: string, to = '9999-12-31'): SproutMergeDay[] {
+  const byDay = new Map<string, SproutMergeDay>()
+  for (const pr of nodes) {
+    const at = pr.mergedAt === undefined ? NaN : Date.parse(pr.mergedAt)
+    if (Number.isNaN(at)) continue
+    const day = localTime(at, tzOffsetMin).day
+    if (day < from || day > to) continue
+    const row = byDay.get(day) ?? { day, prs: 0, additions: 0, deletions: 0 }
+    byDay.set(day, {
+      day,
+      prs: row.prs + 1,
+      additions: row.additions + Math.max(0, pr.additions ?? 0),
+      deletions: row.deletions + Math.max(0, pr.deletions ?? 0),
+    })
+  }
+
+  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day))
+}
+
+/** A value stored before merges were fetched in chunks has none, so every chunk is fetched again. */
+export function asMerges(value: unknown): SproutMerges | null {
+  if (typeof value !== 'object' || value === null) return null
+  const v = value as Partial<SproutMerges>
+  if (typeof v.fetchedAt !== 'number' || !Array.isArray(v.days)) return null
+
+  return {
+    fetchedAt: v.fetchedAt,
+    from: typeof v.from === 'string' ? v.from : (v.days[0]?.day ?? ''),
+    tzOffsetMin: typeof v.tzOffsetMin === 'number' ? v.tzOffsetMin : null,
+    chunks: Array.isArray(v.chunks) ? v.chunks : [],
+    days: v.days,
+  }
+}
+
+function isSameMerges(a: SproutMerges | null, b: SproutMerges) {
+  return a !== null && JSON.stringify([a.from, a.chunks, a.days]) === JSON.stringify([b.from, b.chunks, b.days])
+}
+
+/** One day either side of the chunk, as the search reads dates in UTC; mergeDays keeps the local days of the chunk. */
+export function mergeQuery(chunk: ChunkSpan, after: string | null) {
+  const cursor = after === null ? '' : `,after:${JSON.stringify(after)}`
+
+  return `query{search(query:"author:@me is:pr is:merged merged:${addDays(chunk.from, -1)}..${addDays(chunk.to, 1)} sort:created-asc",type:ISSUE,first:100${cursor}){pageInfo{hasNextPage endCursor} nodes{... on PullRequest{mergedAt additions deletions}}}}`
+}
+
+/** Null when a page fails, so that a chunk is saved whole or not at all. */
+export async function fetchChunk(ask: (query: string) => Promise<unknown>, chunk: ChunkSpan, tzOffsetMin: number) {
+  const nodes: MergeNode[] = []
+  let after: string | null = null
+  for (let page = 0; page < MERGE_PAGES; page++) {
+    const parsed = mergePage(await ask(mergeQuery(chunk, after)))
+    if (parsed === null) return null
+    nodes.push(...parsed.nodes)
+    after = parsed.next
+    if (after === null) break
+  }
+
+  return mergeDays(nodes, tzOffsetMin, chunk.from, chunk.to)
+}
+
+export function withChunk(merges: SproutMerges, chunk: SproutMergeChunk, fresh: readonly SproutMergeDay[]): SproutMerges {
+  const chunks = [...merges.chunks.filter(c => c.from !== chunk.from), chunk].sort((a, b) => a.from.localeCompare(b.from))
+  const days = [...merges.days.filter(d => d.day < chunk.from || d.day > chunk.to), ...fresh].sort((a, b) => a.day.localeCompare(b.day))
+
+  return { ...merges, chunks, days, from: mergedFrom(chunks) ?? merges.from }
+}
+
+async function refreshMerges($: EngineInterface, now: number, isForced: boolean) {
+  const theirs = asMerges(await $.store.get('merges'))
+  let mine = await read($, mergesState)
+  if (theirs !== null && theirs.fetchedAt > (mine?.fetchedAt ?? 0) && !isSameMerges(mine, theirs)) mine = await update($, mergesState, () => theirs)
+  const env = await read($, envState)
+  const tz = env.tzOffsetMin ?? -new Date().getTimezoneOffset()
+  const today = localTime(now, tz).day
+  const recent = addDays(today, -(RECENT_DAYS - 1))
+  const firstDay = (await read($, scanState))?.firstDay ?? null
+  const start = firstDay !== null && firstDay < recent ? firstDay : recent
+  const kept: SproutMerges =
+    mine !== null && mine.tzOffsetMin === tz ? mine : { fetchedAt: 0, from: recent, tzOffsetMin: tz, chunks: [], days: [] }
+  const isDue = isForced || now - kept.fetchedAt >= MERGES_MS
+  const plan = planMergeChunks(start, today, kept.chunks, isDue)
+  if (plan.length === 0) return
+  let merges = kept
+  let isRecentFetched = isDue
+  for (const chunk of plan) {
+    const fresh = await fetchChunk(query => graphql($, query), chunk, tz)
+    if (fresh === null) {
+      if (chunk.to >= recent) isRecentFetched = false
+      break
+    }
+    merges = withChunk(merges, { ...chunk, asOf: today }, fresh)
+  }
+  if (merges === kept) return
+  if (isRecentFetched) merges = { ...merges, fetchedAt: now }
+  if (!isSameMerges(await read($, mergesState), merges)) await update($, mergesState, () => merges)
+  await $.store.set('merges', merges)
 }
 
 function isLevelUp(value: unknown): value is SproutLevelUp {
@@ -424,6 +556,8 @@ async function hydrate($: EngineInterface) {
   if ((await read($, githubState)) === null && typeof github === 'object' && github !== null && typeof (github as SproutGithub).levels === 'string') {
     await update($, githubState, () => github as SproutGithub)
   }
+  const merges = asMerges(await $.store.get('merges'))
+  if ((await read($, mergesState)) === null && merges !== null) await update($, mergesState, () => merges)
   const counters = (await $.store.get('counters')) as { fed?: number; patted?: number } | undefined
   if (counters !== undefined) {
     await update($, petState, pet => ({ ...pet, fed: Math.max(pet.fed, counters.fed ?? 0), patted: Math.max(pet.patted, counters.patted ?? 0) }))
@@ -453,7 +587,11 @@ export function startSprout($: EngineInterface, cwd: string) {
       await syncQuota($, now)
     })
     if (isFirst) await safely($, 'env', () => refreshEnv($, cwd))
-    await safely($, 'merges', () => pollMerges($, now))
+    let isNewMerge = false
+    await safely($, 'merges', async () => {
+      isNewMerge = await pollMerges($, now)
+    })
+    await safely($, 'merge days', () => refreshMerges($, now, isNewMerge))
     await safely($, 'calendar', () => refreshCalendar($, now))
     await safely($, 'growth', () => syncGrowth($, now))
     await runScan($)

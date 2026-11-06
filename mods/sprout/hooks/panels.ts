@@ -1,6 +1,6 @@
-import type { SproutDay } from '../types'
-import { addDays, dayFromNumber, dayNumber, formatTokens, weekdayOf, withCommas } from './logic'
-import { esc, n, paletteCss, svgOpen, textWidth, uid } from './svg-kit'
+import type { SproutDay, SproutMergeDay } from '../types'
+import { dayFromNumber, dayNumber, formatLines, formatTokens, formatUsd, mergeTotals, weekdayOf } from './logic'
+import { esc, n, paletteCss, svgOpen, textWidth, todayCss, uid } from './svg-kit'
 
 const LEVELS = {
   ok: { from: '#34D399', to: '#22D3EE', ink: '#06302A' },
@@ -114,7 +114,7 @@ export function tilesSvg(input: TilesInput) {
   const tw = (W - 8) / 2
   const th = TILE_HEIGHT
   const tokens = formatTokens(input.tokens)
-  const cost = `$${withCommas(input.costUsd)}`
+  const cost = formatUsd(input.costUsd)
   const hit = `${(input.cacheHitRate * 100).toFixed(1)}%`
   const prev = input.previous
   const clips: string[] = []
@@ -143,7 +143,7 @@ export function tilesSvg(input: TilesInput) {
   }
   const pill = (right: number, bottom: number) => {
     if (input.todayUsd <= 0) return ''
-    const label = `+$${input.todayUsd < 10 ? input.todayUsd.toFixed(2) : withCommas(input.todayUsd)}`
+    const label = `+${formatUsd(input.todayUsd)}`
     const w = textWidth(label, 12) + 14
     return `<g${isIntro ? ` class="fade-${id}"` : ''}><rect x="${n(right - w)}" y="${bottom - 18}" width="${n(w)}" height="18" rx="9" fill="rgba(217,119,87,0.16)"/><text x="${n(right - w / 2)}" y="${bottom - 5}" text-anchor="middle" font-size="12" class="clay-${id}">${esc(label)}</text></g>`
   }
@@ -152,7 +152,7 @@ export function tilesSvg(input: TilesInput) {
       .map((isOn, i) => {
         const x = right - (input.week.length - i) * 8 + 2
         const isToday = i === input.week.length - 1
-        return `<rect x="${x}" y="${bottom - 7}" width="6" height="6" rx="1.5" class="${isOn ? `on-${id}` : `tr-${id}`}${isToday ? ` pulse-${id}` : ''}"/>`
+        return `<rect x="${x}" y="${bottom - 7}" width="6" height="6" rx="1.5" class="${isOn ? `on-${id}` : `tr-${id}`}${isToday ? ` tdp-${id}` : ''}"/>`
       })
       .join('')
   const ring = (right: number, bottom: number) => {
@@ -165,7 +165,7 @@ export function tilesSvg(input: TilesInput) {
 
   const body =
     tile(0, 0, '累计 token', tokens, prev === null ? null : formatTokens(prev.tokens), '', bars, 0) +
-    tile(1, 0, '估算费用', cost, prev === null ? null : `$${withCommas(prev.costUsd)}`, '', pill, 0.1) +
+    tile(1, 0, '按 API 价估算', cost, prev === null ? null : formatUsd(prev.costUsd), '', pill, 0.1) +
     tile(0, 1, '连续使用', String(input.streak), null, '天', week, 0.2) +
     tile(1, 1, '缓存命中', hit, prev === null ? null : `${(prev.cacheHitRate * 100).toFixed(1)}%`, '', ring, 0.3)
   const c = 2 * Math.PI * 12
@@ -176,18 +176,29 @@ export function tilesSvg(input: TilesInput) {
 .grow-${id}{transform-box:fill-box;transform-origin:center bottom;animation:grow-${id} .5s cubic-bezier(.3,1.3,.5,1) both}
 @keyframes grow-${id}{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 .fade-${id}{animation:fade-${id} .5s ease-out .6s both}@keyframes fade-${id}{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-.ring-${id}{animation:ring-${id} 1.4s cubic-bezier(.2,.8,.2,1)}@keyframes ring-${id}{from{stroke-dashoffset:${n(c)}}}`
+.ring-${id}{animation:ring-${id} 1.4s cubic-bezier(.2,.8,.2,1)}@keyframes ring-${id}{from{stroke-dashoffset:${n(c)}}}
+@media (prefers-reduced-motion: reduce){.roll-${id},.grow-${id},.fade-${id},.ring-${id}{animation:none}}`
     : ''
 
   return `${svgOpen(W, H)}<style>${paletteCss(id)}
 .num-${id}{fill:#ececec;font-size:20px;font-weight:500}@media (prefers-color-scheme: light){.num-${id}{fill:#1f1e1d}}
-.today-${id}{fill:#D97757}.on-${id}{fill:#3F8F4A}.clay-${id}{fill:#E8906F}@media (prefers-color-scheme: light){.clay-${id}{fill:#B4532F}}${intro}
-.pulse-${id}{animation:pulse-${id} 1.2s infinite}@keyframes pulse-${id}{0%,100%{opacity:1}50%{opacity:.25}}
-@media (prefers-reduced-motion: reduce){${isIntro ? `.roll-${id},.grow-${id},.fade-${id},.ring-${id},` : ''}.pulse-${id}{animation:none}}
-</style><defs><linearGradient id="rg-${id}" x1="0" x2="1"><stop offset="0" stop-color="#34D399"/><stop offset="1" stop-color="#22D3EE"/></linearGradient>${clips.join('')}</defs>${body}</svg>`
+.today-${id},.on-${id}{fill:#D97757}.clay-${id}{fill:#E8906F}@media (prefers-color-scheme: light){.clay-${id}{fill:#B4532F}}${intro}
+${todayCss(id)}
+</style><defs><linearGradient id="rg-${id}" x1="0" x2="1"><stop offset="0" stop-color="#F0997B"/><stop offset="1" stop-color="#D97757"/></linearGradient>${clips.join('')}</defs>${body}</svg>`
 }
 
 export const TREND_HEIGHT = 84
+
+function movingAverage(values: readonly number[]) {
+  return values.map((_, i) => {
+    const win = values.slice(Math.max(0, i - 6), i + 1)
+    return win.reduce((a, b) => a + b, 0) / win.length
+  })
+}
+
+export function trendStats(values: readonly number[]) {
+  return { peak: Math.max(0, ...values), average: movingAverage(values).at(-1) ?? 0 }
+}
 
 export function trendSvg(width: number, days: readonly SproutDay[], isIntro: boolean) {
   const W = width
@@ -199,10 +210,7 @@ export function trendSvg(width: number, days: readonly SproutDay[], isIntro: boo
   const max = Math.max(1, ...values)
   const bw = W / values.length
   const Y = (v: number) => H - (v / max) * (H - T)
-  const avg = values.map((_, i) => {
-    const win = values.slice(Math.max(0, i - 6), i + 1)
-    return win.reduce((a, b) => a + b, 0) / win.length
-  })
+  const avg = movingAverage(values)
   const pts = avg.map((v, i) => [i * bw + bw / 2, Y(v)] as const)
   const line = pts.map(([x, y]) => `${n(x)},${n(y)}`).join(' L')
   const last = pts.at(-1) ?? [W, H]
@@ -215,135 +223,241 @@ export function trendSvg(width: number, days: readonly SproutDay[], isIntro: boo
       return `<rect${attrs} x="${n(i * bw + bw * 0.2)}" y="${n(Y(v))}" width="${n(Math.max(0.6, bw * 0.6))}" height="${n(h)}" rx="${bw > 4 ? 1 : 0}"/>`
     })
     .join('')
-  const peak = `峰值 ${formatTokens(max)}`
-  const now = `7 日均线 ${formatTokens(avg.at(-1) ?? 0)}`
+  const stats = trendStats(values)
+  const peak = `峰值 ${formatTokens(stats.peak)}`
+  const now = `7 日均线 ${formatTokens(stats.average)}`
   const draw = isIntro ? ` class="draw-${id}"` : ''
   const intro = isIntro
     ? `
 .pop-${id}{transform-box:fill-box;transform-origin:center bottom;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) backwards}
 @keyframes pop-${id}{from{transform:scaleY(0)}to{transform:scaleY(1)}}
-.draw-${id}{stroke-dasharray:1;animation:draw-${id} 1.3s ease-out backwards}@keyframes draw-${id}{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}`
+.draw-${id}{stroke-dasharray:1;animation:draw-${id} 1.3s ease-out backwards}@keyframes draw-${id}{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@media (prefers-reduced-motion: reduce){.pop-${id},.draw-${id}{animation:none}}`
     : ''
 
   return `${svgOpen(W, H)}<style>${paletteCss(id)}${intro}
-.pulse-${id}{animation:pulse-${id} 1.6s ease-out infinite}@keyframes pulse-${id}{0%{r:3;opacity:1}100%{r:10;opacity:0}}
+${todayCss(id)}
 .clay-${id}{fill:#E8906F}@media (prefers-color-scheme: light){.clay-${id}{fill:#B4532F}}
-@media (prefers-reduced-motion: reduce){${isIntro ? `.pop-${id},.draw-${id},` : ''}.pulse-${id}{animation:none}.pulse-${id}{opacity:0}}
 </style><defs><linearGradient id="ar-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#D97757" stop-opacity=".45"/><stop offset="1" stop-color="#D97757" stop-opacity="0"/></linearGradient></defs>
 ${bars}
 <path d="M${n(pts[0]?.[0] ?? 0)},${H} L${line} L${n(last[0])},${H}Z" fill="url(#ar-${id})"/>
 <path${draw} d="M${line}" fill="none" stroke="#F0997B" stroke-width="5" stroke-opacity=".25" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
 <path${draw} d="M${line}" fill="none" stroke="#D97757" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" pathLength="1"/>
-<circle class="pulse-${id}" cx="${n(Math.min(W - 4, last[0]))}" cy="${n(last[1])}" r="3" fill="none" stroke="#D97757"/><circle cx="${n(Math.min(W - 4, last[0]))}" cy="${n(last[1])}" r="3" fill="#D97757"/>
+<circle class="tdr-${id}" cx="${n(Math.min(W - 4, last[0]))}" cy="${n(last[1])}" r="3" stroke="#D97757"/><circle cx="${n(Math.min(W - 4, last[0]))}" cy="${n(last[1])}" r="3" fill="#D97757"/>
 <text x="0" y="11" font-size="11" class="t3-${id}">${peak}</text><text x="${W}" y="11" text-anchor="end" font-size="11" class="clay-${id}">${now}</text>
 </svg>`
 }
 
-const CLAY = ['', '#F5C4B3', '#F0997B', '#D97757', '#993C1D']
+export const MERGES_HEIGHT = 96
 
-export function usageHeatmapSvg(width: number, days: readonly SproutDay[], firstDay: string, today: string, isIntro: boolean) {
+export function mergesSvg(width: number, days: readonly SproutMergeDay[], isIntro: boolean) {
   const W = width
-  const firstMonday = addDays(firstDay, -weekdayOf(firstDay))
-  const totalWeeks = Math.floor((dayNumber(today) - dayNumber(firstMonday)) / 7) + 1
-  const legendW = 92
-  let pitch = Math.min(17, W / totalWeeks)
-  let weeks = totalWeeks
-  if (pitch < 7) {
-    pitch = 7
-    weeks = Math.floor(W / pitch)
+  const H = MERGES_HEIGHT
+  const T = 18
+  const D = 12
+  const id = uid('merges', W, days.map(d => `${d.prs}:${d.additions}:${d.deletions}`).join(','))
+  if (days.length === 0) return null
+  const base = H - D - 3
+  const peak = Math.sqrt(Math.max(0, ...days.map(d => d.additions + d.deletions)))
+  const scale = peak > 0 ? (base - T) / peak : 0
+  const bw = W / days.length
+  const prMax = Math.max(1, ...days.map(d => d.prs))
+  const step = days.length > 60 ? 0 : 12
+  const last = days.length - 1
+  const x0 = (i: number) => n(i * bw + bw * 0.2)
+  const w = n(Math.max(0.6, bw * 0.6))
+  const r = bw > 4 ? 1 : 0
+  const now = (i: number) => (i === last ? ` now-${id}` : '')
+  const cx = (i: number) => n(Math.min(W - 4, i * bw + bw / 2))
+  const delay = (i: number) => (isIntro ? ` style="animation-delay:${i * step}ms"` : '')
+  const segment = (cls: string, i: number, y: number, h: number, isTop: boolean) => {
+    const c = `${cls}-${id}${now(i)}`
+    if (!isTop || r === 0 || h < 2 * r) return `<rect class="${c}" x="${x0(i)}" y="${n(y)}" width="${w}" height="${n(h)}"/>`
+    const x = x0(i)
+
+    return `<path class="${c}" d="M${x},${n(y + h)}V${n(y + r)}Q${x},${n(y)} ${n(x + r)},${n(y)}H${n(x + w - r)}Q${n(x + w)},${n(y)} ${n(x + w)},${n(y + r)}V${n(y + h)}Z"/>`
   }
+  const dotY = H - D / 2
+  let marks = `<rect class="bg-${id}" x="${n(last * bw)}" y="${T - 4}" width="${n(bw)}" height="${H - T + 4}" rx="2"/>`
+  for (const [i, d] of days.entries()) {
+    const total = d.additions + d.deletions
+    if (total > 0) {
+      const h = Math.max(1.5, Math.sqrt(total) * scale)
+      const add = (h * d.additions) / total
+      const bar = segment('add', i, base - add, add, d.deletions === 0) + (d.deletions === 0 ? '' : segment('del', i, base - h, h - add, true))
+      marks += `<g${isIntro ? ` class="up-${id}"` : ''}${delay(i)}>${bar}</g>`
+    }
+    if (d.prs > 0) {
+      const radius = n(Math.min(bw * 0.42, 1.4 + 2.6 * Math.sqrt(d.prs / prMax)))
+      marks += `<circle class="pr-${id}${now(i)}${isIntro ? ` pop-${id}` : ''}"${delay(i)} cx="${cx(i)}" cy="${dotY}" r="${radius}"/>`
+    }
+  }
+  const today = days[last]
+  const todayX = cx(last)
+  const empty = today !== undefined && today.prs > 0 ? '' : `<circle class="prs-${id}" cx="${todayX}" cy="${dotY}" r="2.5" fill="none" stroke-width="1"/>`
+  const pulse = `${empty}<circle class="prs-${id} tdr-${id}" cx="${todayX}" cy="${dotY}" r="3"/>`
+  const sum = mergeTotals(days)
+  const keys = [
+    { cls: `add-${id}`, label: '新增', value: `+${formatLines(sum.additions)}`, isDot: false },
+    { cls: `del-${id}`, label: '删除', value: `−${formatLines(sum.deletions)}`, isDot: false },
+    { cls: `pr-${id}`, label: 'PR', value: '', isDot: true },
+  ]
+  let legend = ''
+  let lx = 0
+  for (const k of keys) {
+    legend += k.isDot ? `<circle class="${k.cls}" cx="${n(lx + 5)}" cy="7" r="4"/>` : `<rect class="${k.cls}" x="${n(lx)}" y="2" width="10" height="10" rx="2.5"/>`
+    const text = k.value === '' ? k.label : `${k.label} ${k.value}`
+    legend += `<text x="${n(lx + 13)}" y="11" font-size="11" class="t3-${id}">${k.label}${k.value === '' ? '' : `<tspan class="t2-${id}"> ${esc(k.value)}</tspan>`}</text>`
+    lx += 13 + textWidth(text, 11) + 10
+  }
+  const legendRight = lx - 10
+  const parts: Array<Array<[string, string]>> =
+    today === undefined || today.prs === 0
+      ? [[[`t3-${id}`, '今天还没合并']]]
+      : [
+          [
+            [`prt-${id}`, `今天 ${today.prs} 个`],
+            [`addt-${id}`, ` +${formatLines(today.additions)}`],
+            [`delt-${id}`, ` −${formatLines(today.deletions)}`],
+          ],
+          [[`prt-${id}`, `今天 ${today.prs} 个`]],
+        ]
+  const fit = parts.find(p => legendRight + 12 + textWidth(p.map(([, t]) => t).join(''), 11) <= W)
+  const right =
+    fit === undefined
+      ? ''
+      : `<text x="${W}" y="11" text-anchor="end" font-size="11">${fit.map(([cls, t]) => `<tspan class="${cls}">${esc(t)}</tspan>`).join('')}</text>`
+  const motion = isIntro
+    ? `
+.up-${id}{transform-box:fill-box;transform-origin:center bottom;animation:grow-${id} .4s cubic-bezier(.3,1.5,.5,1) backwards}
+@keyframes grow-${id}{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.pop-${id}{transform-box:fill-box;transform-origin:center;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) .2s backwards}
+@keyframes pop-${id}{from{transform:scale(0)}to{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.up-${id},.pop-${id}{animation:none}}`
+    : ''
+
+  return `${svgOpen(W, H)}<style>${paletteCss(id)}
+.add-${id}{fill:#3FB950;opacity:.7}.del-${id}{fill:#F85149;opacity:.7}.pr-${id}{fill:#A371F7;opacity:.8}.now-${id}{opacity:1}
+.addt-${id}{fill:#3FB950}.delt-${id}{fill:#F85149}.prt-${id}{fill:#C4A5FA}.axis-${id}{stroke:rgba(255,255,255,0.16)}.prs-${id}{stroke:#A371F7}
+@media (prefers-color-scheme: light){.add-${id},.addt-${id}{fill:#1A7F37}.del-${id},.delt-${id}{fill:#CF222E}.pr-${id}{fill:#8250DF}.prt-${id}{fill:#6639BA}.axis-${id}{stroke:rgba(0,0,0,0.14)}.prs-${id}{stroke:#8250DF}}${motion}
+${todayCss(id)}
+</style>${legend}${right}<line class="axis-${id}" x1="0" x2="${W}" y1="${base + 0.5}" y2="${base + 0.5}" stroke-width="1"/>${marks}${pulse}</svg>`
+}
+
+type Ramp = { dark: readonly string[]; light: readonly string[]; ring: { dark: string; light: string } }
+
+const CLAY: Ramp = {
+  dark: ['#62301F', '#93442A', '#C8603F', '#F0997B'],
+  light: ['#F5C4B3', '#F0997B', '#D97757', '#993C1D'],
+  ring: { dark: '#D97757', light: '#D97757' },
+}
+
+const GREEN: Ramp = {
+  dark: ['#0E4429', '#006D32', '#26A641', '#39D353'],
+  light: ['#9BE9A8', '#40C463', '#30A14E', '#216E39'],
+  ring: { dark: '#39D353', light: '#1A7F37' },
+}
+
+type Entrance = { name: string; css: (id: string) => string; delay: (column: number, row: number) => number }
+
+const POP: Entrance = {
+  name: 'pop',
+  css: id => `.pop-${id}{transform-box:fill-box;transform-origin:center;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) backwards}
+@keyframes pop-${id}{from{transform:scale(0)}to{transform:scale(1)}}
+@media (prefers-reduced-motion: reduce){.pop-${id}{animation:none}}`,
+  delay: (c, r) => c * 12 + r * 8,
+}
+
+const GLINT: Entrance = {
+  name: 'gl',
+  css: id => `.gl-${id}{animation:gl-${id} .7s ease-out}@keyframes gl-${id}{0%,100%{filter:brightness(1)}40%{filter:brightness(1.9)}}
+@media (prefers-reduced-motion: reduce){.gl-${id}{animation:none}}`,
+  delay: c => c * 25,
+}
+
+export const HEAT_WEEKS = 53
+
+function heatmapSvg(width: number, today: string, ramp: Ramp, levelOn: (day: number) => number | null, entrance: Entrance | null, key: string) {
+  const W = width
+  const ringOut = 2.75
+  const pitch = (W - ringOut) / (HEAT_WEEKS - 1 + 14 / 17)
   const cell = pitch * (14 / 17)
   const radius = n(cell * 0.25)
-  const startMonday = addDays(firstMonday, (totalWeeks - weeks) * 7)
-  const top = 16
-  const gridH = 7 * pitch
-  const H = Math.ceil(top + gridH + 18)
-  const map = new Map(days.map(d => [d.day, d.tokens]))
-  const max = Math.max(1, ...days.map(d => d.tokens))
-  const id = uid('clay', W, firstDay, today, days.map(d => `${d.day}:${d.tokens}`).join(','))
-  let cells = ''
-  let months = ''
-  let lastLabelX = -100
+  const gridRight = (HEAT_WEEKS - 1) * pitch + cell
   const todayN = dayNumber(today)
-  const firstN = dayNumber(firstDay)
-  for (let c = 0; c < weeks; c++) {
-    const colStart = dayNumber(startMonday) + c * 7
+  const startN = todayN - weekdayOf(today) - (HEAT_WEEKS - 1) * 7
+  const top = 18
+  const H = Math.ceil(top + 7 * pitch + 18)
+  const id = uid('heat', W, today, key, entrance?.name ?? '')
+  let cells = ''
+  const starts: Array<{ x: number; label: string }> = []
+  for (let c = 0; c < HEAT_WEEKS; c++) {
+    const colStart = startN + c * 7
     for (let r = 0; r < 7; r++) {
       const dn = colStart + r
       if (dn > todayN) continue
-      const day = dayFromNumber(dn)
-      const v = map.get(day) ?? 0
-      const k = dn < firstN || v === 0 ? 0 : Math.min(4, 1 + Math.floor((v / max) * 3.99))
-      const x = n(c * pitch)
-      const y = n(top + r * pitch)
-      const delay = Math.round(c * (weeks > 26 ? 12 : 40) + r * 8)
-      const attrs = isIntro ? ` class="k${k}-${id} pop-${id}" style="animation-delay:${delay}ms"` : ` class="k${k}-${id}"`
-      cells += `<rect${attrs} x="${x}" y="${y}" width="${n(cell)}" height="${n(cell)}" rx="${radius}"/>`
+      const level = levelOn(dn)
+      const classes = `k${level ?? 0}-${id}${level === null ? ` nd-${id}` : ''}${entrance === null ? '' : ` ${entrance.name}-${id}`}`
+      const delay = entrance === null ? '' : ` style="animation-delay:${entrance.delay(c, r)}ms"`
+      cells += `<rect class="${classes}"${delay} x="${n(c * pitch)}" y="${n(top + r * pitch)}" width="${n(cell)}" height="${n(cell)}" rx="${radius}"/>`
       if (dn === todayN) {
-        cells += `<rect class="ring-${id}" x="${n(c * pitch - 2)}" y="${n(top + r * pitch - 2)}" width="${n(cell + 4)}" height="${n(cell + 4)}" rx="${n(cell * 0.3 + 1.5)}" fill="none" stroke="#D97757" stroke-width="1.5"/>`
+        cells += `<rect class="ring-${id} tdp-${id}" x="${n(c * pitch - 2)}" y="${n(top + r * pitch - 2)}" width="${n(cell + 4)}" height="${n(cell + 4)}" rx="${n(cell * 0.3 + 1.5)}" fill="none" stroke-width="1.5"/>`
       }
     }
-    for (let r = 0; r < 7; r++) {
-      const day = dayFromNumber(colStart + r)
-      if (day.endsWith('-01') || (c === 0 && r === 0)) {
-        const x = c * pitch
-        const label = `${Number(day.slice(5, 7))}月`
-        if (x - lastLabelX >= textWidth(label, 11) + 6 && x + textWidth(label, 11) <= W) {
-          months += `<text x="${n(x)}" y="10" font-size="11" class="t3-${id}">${label}</text>`
-          lastLabelX = x
-        }
-        break
-      }
-    }
+    const first = Array.from({ length: 7 }, (_, r) => dayFromNumber(colStart + r)).find(day => day.endsWith('-01'))
+    if (first !== undefined) starts.push({ x: c * pitch, label: `${Number(first.slice(5, 7))} 月` })
   }
-  const lx = W - legendW
+  const place = (labels: typeof starts) => {
+    let freeX = 0
+    const placed: typeof starts = []
+    for (const { x, label } of labels) {
+      const at = Math.min(x, W - textWidth(label, 11))
+      if (at < freeX) continue
+      placed.push({ x: at, label })
+      freeX = at + textWidth(label, 11) + 6
+    }
+    return placed
+  }
+  const every = place(starts)
+  const shown = every.length === starts.length ? every : place(starts.filter((_, i) => (starts.length - 1 - i) % 2 === 0))
+  const months = shown.map(({ x, label }) => `<text x="${n(x)}" y="11" font-size="11" class="t3-${id}">${label}</text>`).join('')
+  const legendW = 14 + 5 * 12 + 13
+  const lx = gridRight - legendW
   const ly = H - 12
-  const legend = `<text x="${lx}" y="${ly + 9}" font-size="11" class="t3-${id}">少</text>${[0, 1, 2, 3, 4]
-    .map(k => `<rect class="k${k}-${id}" x="${lx + 14 + k * 12}" y="${ly}" width="10" height="10" rx="2.5"/>`)
-    .join('')}<text x="${lx + 14 + 5 * 12 + 2}" y="${ly + 9}" font-size="11" class="t3-${id}">多</text>`
-  const kinds = CLAY.map((color, k) => (k === 0 ? '' : `.k${k}-${id}{fill:${color}}`)).join('')
-  const intro = isIntro
-    ? `
-.pop-${id}{transform-box:fill-box;transform-origin:center;animation:pop-${id} .35s cubic-bezier(.3,1.6,.5,1) backwards}
-@keyframes pop-${id}{from{transform:scale(0)}to{transform:scale(1)}}`
-    : ''
+  const legend = `<text x="${n(lx)}" y="${ly + 9}" font-size="11" class="t3-${id}">少</text>${[0, 1, 2, 3, 4]
+    .map(k => `<rect class="k${k}-${id}" x="${n(lx + 14 + k * 12)}" y="${ly}" width="10" height="10" rx="2.5"/>`)
+    .join('')}<text x="${n(lx + 14 + 5 * 12 + 2)}" y="${ly + 9}" font-size="11" class="t3-${id}">多</text>`
+  const kinds = (colors: readonly string[]) => colors.map((color, i) => `.k${i + 1}-${id}{fill:${color}}`).join('')
 
   return {
     height: H,
     svg: `${svgOpen(W, H)}<style>${paletteCss(id)}
-.k0-${id}{fill:rgba(255,255,255,0.08)}${kinds}
-@media (prefers-color-scheme: light){.k0-${id}{fill:rgba(0,0,0,0.07)}}${intro}
-.ring-${id}{animation:tw-${id} 1.4s infinite}@keyframes tw-${id}{0%,100%{opacity:1}50%{opacity:.3}}
-@media (prefers-reduced-motion: reduce){${isIntro ? `.pop-${id},` : ''}.ring-${id}{animation:none}}
+.k0-${id}{fill:rgba(255,255,255,0.08)}${kinds(ramp.dark)}.ring-${id}{stroke:${ramp.ring.dark}}.nd-${id}{opacity:.35}
+@media (prefers-color-scheme: light){.k0-${id}{fill:rgba(0,0,0,0.07)}${kinds(ramp.light)}.ring-${id}{stroke:${ramp.ring.light}}}
+${entrance === null ? '' : entrance.css(id)}
+${todayCss(id)}
 </style>${months}${cells}${legend}</svg>`,
   }
 }
 
-const GREEN = ['', '#9BE9A8', '#40C463', '#30A14E', '#216E39']
+export function usageHeatmapSvg(width: number, days: readonly SproutDay[], firstDay: string, today: string, isIntro: boolean) {
+  const tokens = new Map(days.map(d => [dayNumber(d.day), d.tokens]))
+  const max = Math.max(1, ...days.map(d => d.tokens))
+  const firstN = dayNumber(firstDay)
+  const levelOn = (dn: number) => {
+    if (dn < firstN) return null
+    const v = tokens.get(dn) ?? 0
 
-export function githubHeatmapSvg(width: number, levels: string) {
-  const W = width
-  const columns = Math.ceil(levels.length / 7)
-  const pitch = W / Math.max(1, columns)
-  const cell = n(pitch * 0.78)
-  const H = Math.ceil(7 * pitch)
-  const id = uid('gh', W, levels)
-  let cells = ''
-  for (let i = 0; i < levels.length; i++) {
-    const k = Number(levels[i] ?? '0')
-    const c = Math.floor(i / 7)
-    const r = i % 7
-    cells += `<rect class="k${k}-${id} gl-${id}" style="animation-delay:${(c * 0.035).toFixed(2)}s" x="${n(c * pitch)}" y="${n(r * pitch)}" width="${cell}" height="${cell}" rx="1"/>`
+    return v === 0 ? 0 : Math.min(4, 1 + Math.floor((v / max) * 3.99))
   }
-  const kinds = GREEN.map((color, k) => (k === 0 ? '' : `.k${k}-${id}{fill:${color}}`)).join('')
 
-  return {
-    height: H,
-    svg: `${svgOpen(W, H)}<style>
-.k0-${id}{fill:rgba(255,255,255,0.08)}${kinds}
-@media (prefers-color-scheme: light){.k0-${id}{fill:rgba(0,0,0,0.07)}}
-.gl-${id}{animation:gl-${id} 4.5s linear infinite}@keyframes gl-${id}{0%,88%,100%{filter:brightness(1)}93%{filter:brightness(1.9)}}
-@media (prefers-reduced-motion: reduce){.gl-${id}{animation:none}}
-</style>${cells}</svg>`,
-  }
+  return heatmapSvg(width, today, CLAY, levelOn, isIntro ? POP : null, `${firstDay}|${days.map(d => `${d.day}:${d.tokens}`).join(',')}`)
+}
+
+/** `levels` holds one digit per day from `start` on, as GitHub's contribution calendar gives them. */
+export function githubHeatmapSvg(width: number, start: string, levels: string, today: string, isIntro: boolean) {
+  const startN = dayNumber(start)
+  const levelOn = (dn: number) => (dn < startN ? null : Number(levels[dn - startN] ?? '0'))
+
+  return heatmapSvg(width, today, GREEN, levelOn, isIntro ? GLINT : null, `${start}|${levels}`)
 }

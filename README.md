@@ -33,7 +33,7 @@ Long-lived numbers that one session cannot show:
   - It has buttons to feed it, pat it, or get another line.
 - **Quota**: this week's and the 5-hour quota, each with a forecast for its reset.
 - **Usage**: total tokens, estimated API cost, the streak and the cache hit rate, from the first transcript on. A daily trend and a heatmap go with them.
-- **GitHub**: the contribution heatmap.
+- **GitHub**: the PRs merged each day over the last 30 days, with the lines each day added and deleted, and the contribution heatmap.
 
 If the window is too narrow for the pane to open by itself, open it with `/sprout`.
 

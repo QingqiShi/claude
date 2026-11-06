@@ -16,16 +16,22 @@ import {
   calendar,
   dayNumber,
   forecast,
+  formatLines,
   formatTokens,
   formatUsd,
   hashOf,
   introStep,
   liveLimit,
   localTime,
+  mergeCalendar,
+  mergeTotals,
   moodOf,
   levelForTokens,
   lostStreakOf,
+  RECENT_DAYS,
   pipsFor,
+  rangeFrom,
+  rangeTotals,
   samplesOf,
   streakOf,
   untilText,
@@ -35,7 +41,7 @@ import {
   wrapText,
 } from './logic'
 import { levelLabel } from './levels'
-import { capsuleSvg, githubHeatmapSvg, levelOf, tilesSvg, trendSvg, usageHeatmapSvg } from './panels'
+import { capsuleSvg, githubHeatmapSvg, levelOf, mergesSvg, tilesSvg, trendStats, trendSvg, usageHeatmapSvg } from './panels'
 import { BUBBLE_ROWS, BUBBLE_UNITS, sceneSvg } from './scene'
 import { memoize } from './svg-kit'
 
@@ -47,6 +53,7 @@ const quotaState = atom(
   { shape: 'quota-1' },
 )
 const githubState = atom({ plugin: 'sprout', key: 'github' } as const, null, { shape: 'github-1' })
+const mergesState = atom({ plugin: 'sprout', key: 'merges' } as const, null, { shape: 'merges-2' })
 const partyState = atom({ plugin: 'sprout', key: 'party' } as const, null)
 const petState = atom(
   { plugin: 'sprout', key: 'pet' } as const,
@@ -125,10 +132,14 @@ async function readModel($: EngineInterface) {
   const scan = await read($, scanState)
   const quota = await read($, quotaState)
   const github = await read($, githubState)
+  const merges = await read($, mergesState)
   const party = await read($, partyState)
   const pet = await read($, petState)
   const range = await read($, rangeState)
   const growth = await read($, growthState)
+  const from = rangeFrom(range, today, scan?.firstDay ?? null)
+  const mergeDays = merges === null ? [] : mergeCalendar(merges.days, merges.from > from ? merges.from : from, today)
+  const totals = scan === null ? null : rangeTotals(scan.days, from, scan.totals.cacheHitRate)
 
   const active = (scan?.days ?? []).filter(d => d.tokens > 0).map(d => d.day)
   const streak = streakOf(active, today)
@@ -202,10 +213,14 @@ async function readModel($: EngineInterface) {
     scan,
     quota,
     github,
+    mergeDays,
+    merged: mergeTotals(mergeDays),
     party: isParty ? party : null,
     isLevelUp,
     pet,
     range,
+    from,
+    totals,
     env,
     streak,
     level,
@@ -266,12 +281,31 @@ function sceneFor(model: Model, width: number) {
   return memoize(`scene|${JSON.stringify(input)}`, () => sceneSvg(input))
 }
 
-function trendDays(model: Model, range: SproutRange) {
+function trendDays(model: Model) {
   const scan = model.scan
   if (scan === null || scan.firstDay === null) return []
-  const from = range === '30' ? addDays(model.today, -29) : scan.firstDay
 
-  return calendar(scan.days, from, model.today)
+  return calendar(scan.days, model.from, model.today)
+}
+
+async function setRange($: EngineInterface, range: SproutRange) {
+  await update($, rangeState, () => range)
+  try {
+    await $.store.set('range', range)
+  } catch {}
+}
+
+async function hydrateRange($: EngineInterface) {
+  try {
+    const stored = await $.store.get('range')
+    if ((stored === '30' || stored === 'all') && stored !== (await read($, rangeState))) await update($, rangeState, () => stored)
+  } catch {}
+}
+
+function rangeText(model: Model) {
+  const firstDay = model.scan?.firstDay ?? null
+
+  return model.range === 'all' && firstDay !== null ? firstDayText(firstDay, model.today) : `最近 ${RECENT_DAYS} 天`
 }
 
 function firstDayText(firstDay: string, today: string) {
@@ -301,22 +335,49 @@ async function introsFor($: EngineInterface, today: string, drawings: Record<Spr
 }
 
 function tilesInputFor(model: Model, width: number) {
-  const scan = model.scan
-  if (scan === null) return null
+  const { scan, totals } = model
+  if (scan === null || totals === null) return null
   const last10 = calendar(scan.days, addDays(model.today, -9), model.today)
   const last7 = calendar(scan.days, addDays(model.today, -6), model.today)
 
   return {
     width,
-    tokens: scan.totals.tokens,
-    costUsd: scan.totals.costUsd,
+    tokens: totals.tokens,
+    costUsd: totals.costUsd,
     todayUsd: last7.at(-1)?.costUsd ?? 0,
     streak: model.streak,
     week: last7.map(d => d.tokens > 0),
-    cacheHitRate: scan.totals.cacheHitRate,
+    cacheHitRate: totals.cacheHitRate,
     bars: last10.map(d => d.tokens),
-    previous: scan.previous,
+    previous: model.range === 'all' ? scan.previous : null,
   }
+}
+
+function mergedText(model: Model) {
+  return `${model.mergeDays.length} 天 ${model.merged.prs} 个 PR`
+}
+
+function statsText(totals: NonNullable<Model['totals']>, streak: number) {
+  return `${formatTokens(totals.tokens)} token · ${formatUsd(totals.costUsd)} · 连续 ${streak} 天 · 缓存命中 ${(totals.cacheHitRate * 100).toFixed(1)}%`
+}
+
+function usedText(model: Model) {
+  const firstDay = model.scan?.firstDay ?? null
+  if (model.scan === null || firstDay === null) return null
+  const span = dayNumber(model.today) - dayNumber(firstDay) + 1
+  const active = model.scan.days.filter(d => d.tokens > 0 && d.day <= model.today).length
+
+  return `${span} 天里用了 ${active} 天`
+}
+
+function trendText(days: ReturnType<typeof trendDays>) {
+  const { peak, average } = trendStats(days.map(d => d.tokens))
+
+  return `峰值 ${formatTokens(peak)} · 7 日均线 ${formatTokens(average)}`
+}
+
+function githubText(total: number) {
+  return `过去一年 ${withCommas(total)} 次`
 }
 
 function terminalBar(pct: number) {
@@ -332,6 +393,7 @@ export const register: Register = on => {
       await $.command.register({ name: 'sprout', description: '打开芽团面板' })
     } catch {}
     void $.ui.open({ id: PANE, title: TITLE }).catch(() => {})
+    void hydrateRange($)
     const started = await next(e)
     startSprout($, e.cwd)
 
@@ -352,6 +414,8 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const model = await readModel($)
+    const trend = trendDays(model)
+    const used = usedText(model)
 
     if (e.surface === 'terminal') {
       const { Box, Text, Button } = $.ui.resolve(e)
@@ -390,15 +454,26 @@ export const register: Register = on => {
               </Box>
             )
           })}
-          {scan === null ? (
+          {scan === null || scan.firstDay === null || model.totals === null ? (
             <Text dimColor>正在翻你的聊天记录，第一次要一两分钟。</Text>
           ) : (
-            <Text>
-              累计 {formatTokens(scan.totals.tokens)} token · {formatUsd(scan.totals.costUsd)} · 连续 {model.streak} 天 · 缓存命中{' '}
-              {(scan.totals.cacheHitRate * 100).toFixed(1)}%
+            <Box flexDirection="column">
+              <Box flexDirection="row" gap={1}>
+                <Text dimColor>{rangeText(model)} · 费用按 API 价格估算</Text>
+                <Button key="range-30" label="30 天" plain dimColor={model.range !== '30'} onPress={() => void setRange($, '30')} />
+                <Button key="range-all" label="全部" plain dimColor={model.range !== 'all'} onPress={() => void setRange($, 'all')} />
+              </Box>
+              <Text>累计 {statsText(model.totals, model.streak)}</Text>
+            </Box>
+          )}
+          {trend.length < 2 ? null : <Text dimColor>每日 token {trendText(trend)}</Text>}
+          {model.merged.prs === 0 ? null : (
+            <Text dimColor>
+              每日合并 {mergedText(model)} · +{formatLines(model.merged.additions)} −{formatLines(model.merged.deletions)} 行
             </Text>
           )}
-          {model.github === null ? null : <Text dimColor>GitHub 过去一年 {withCommas(model.github.total)} 次</Text>}
+          {used === null ? null : <Text dimColor>Claude 使用 {used}</Text>}
+          {model.github === null ? null : <Text dimColor>GitHub 贡献 {githubText(model.github.total)}</Text>}
         </Box>
       )
     }
@@ -414,13 +489,15 @@ export const register: Register = on => {
       </Box>
     )
 
-    const trend = trendDays(model, model.range)
     const firstDay = scan?.firstDay ?? null
+    const github = model.github
     const tilesInput = tilesInputFor(model, width)
     const drawings = {
       tiles: tilesInput === null ? null : `tiles|${JSON.stringify(tilesInput)}`,
       trend: trend.length < 2 ? null : `trend|${width}|${trend.map(d => d.tokens).join(',')}`,
+      merges: model.merged.prs === 0 ? null : `merges|${width}|${model.mergeDays.map(d => `${d.prs}:${d.additions}:${d.deletions}`).join(',')}`,
       clay: scan === null || firstDay === null ? null : `clay|${width}|${model.today}|${firstDay}|${scan.days.map(d => `${d.day}:${d.tokens}`).join(',')}`,
+      github: github === null ? null : `gh|${width}|${model.today}|${github.start}|${github.levels}`,
     }
     const intro = await introsFor($, model.today, drawings)
     const tiles =
@@ -429,14 +506,20 @@ export const register: Register = on => {
         : memoize(`${drawings.tiles}|${intro.has('tiles')}`, () => tilesSvg({ ...tilesInput, isIntro: intro.has('tiles') }))
     const trendSource =
       drawings.trend === null ? null : memoize(`${drawings.trend}|${intro.has('trend')}`, () => trendSvg(width, trend, intro.has('trend')) ?? '')
+    const mergesSource =
+      drawings.merges === null
+        ? null
+        : memoize(`${drawings.merges}|${intro.has('merges')}`, () => mergesSvg(width, model.mergeDays, intro.has('merges')) ?? '')
     const clayDrawing =
       scan === null || firstDay === null
         ? null
         : memoize(`${drawings.clay}|${intro.has('clay')}`, () => usageHeatmapSvg(width, scan.days, firstDay, model.today, intro.has('clay')))
-    const span = firstDay === null ? 0 : dayNumber(model.today) - dayNumber(firstDay) + 1
-    const activeDays = scan === null ? 0 : scan.days.filter(d => d.tokens > 0 && d.day <= model.today).length
-    const levels = model.github?.levels ?? null
-    const ghDrawing = levels === null ? null : memoize(`gh|${width}|${levels}`, () => githubHeatmapSvg(width, levels))
+    const ghDrawing =
+      github === null
+        ? null
+        : memoize(`${drawings.github}|${intro.has('github')}`, () =>
+            githubHeatmapSvg(width, github.start, github.levels, model.today, intro.has('github')),
+          )
 
     return (
       <Box flexDirection="column" gap="lg">
@@ -459,7 +542,7 @@ export const register: Register = on => {
         </Box>
 
         <Box flexDirection="column" gap="sm">
-          {sectionHead('额度', isStale && model.quota.at !== null ? <Text dimColor>{agoText(model.quota.at, model.now)}</Text> : null)}
+          {sectionHead('额度', isStale && model.quota.at !== null ? <Text dimColor>{`更新于 ${agoText(model.quota.at, model.now)}`}</Text> : null)}
           {model.windows.length === 0 ? (
             <Text dimColor>还没有额度读数。用订阅账号发一句话，我就看得到了。</Text>
           ) : (
@@ -473,7 +556,7 @@ export const register: Register = on => {
               return (
                 <Box flexDirection="column" gap="xs">
                   <Box flexDirection="row" justifyContent="space-between" gap="sm">
-                    <Text>{w.label}</Text>
+                    <Text dimColor>{w.label}</Text>
                     <Text dimColor>{resetText(w, model.now, model.tz)}</Text>
                   </Box>
                   <Svg source={source} alt={`${w.label}已用 ${Math.round(w.limit.pct)}%`} />
@@ -484,42 +567,57 @@ export const register: Register = on => {
           )}
         </Box>
 
-        {scan === null || firstDay === null || tiles === null ? (
+        {scan === null || firstDay === null || tiles === null || tilesInput === null ? (
           <Text dimColor>正在翻你的聊天记录，第一次要一两分钟。</Text>
         ) : (
           <Box flexDirection="column" gap="sm">
-            {sectionHead(firstDayText(firstDay, model.today), <Text dimColor>按 API 价格估算</Text>)}
+            {sectionHead(
+              rangeText(model),
+              <Box flexDirection="row" gap="xs" flexWrap="nowrap">
+                <Button key="range-30" label="30 天" plain dimColor={model.range !== '30'} onPress={() => void setRange($, '30')} />
+                <Button key="range-all" label="全部" plain dimColor={model.range !== 'all'} onPress={() => void setRange($, 'all')} />
+              </Box>,
+            )}
             <Svg
               source={tiles}
-              alt={`累计 ${formatTokens(scan.totals.tokens)} token，估算 ${formatUsd(scan.totals.costUsd)}，连续 ${model.streak} 天，缓存命中 ${(scan.totals.cacheHitRate * 100).toFixed(1)}%`}
+              alt={`${rangeText(model)}：${formatTokens(tilesInput.tokens)} token，按 API 价格估算 ${formatUsd(tilesInput.costUsd)}，今天 ${formatUsd(tilesInput.todayUsd)}；连续使用 ${model.streak} 天；缓存命中 ${(tilesInput.cacheHitRate * 100).toFixed(1)}%`}
             />
           </Box>
         )}
 
         {trendSource === null ? null : (
           <Box flexDirection="column" gap="sm">
+            {sectionHead('每日 token', null)}
+            <Svg source={trendSource} alt={`每日 token，最近 ${trend.length} 天，${trendText(trend)}`} />
+          </Box>
+        )}
+
+        {mergesSource === null ? null : (
+          <Box flexDirection="column" gap="sm">
             {sectionHead(
-              '每日 token',
-              <Box flexDirection="row" gap="xs" flexWrap="nowrap">
-                <Button key="range-30" label="30 天" dimColor={model.range !== '30'} onPress={() => void update($, rangeState, () => '30' as const)} />
-                <Button key="range-all" label="全部" dimColor={model.range !== 'all'} onPress={() => void update($, rangeState, () => 'all' as const)} />
-              </Box>,
+              '每日合并',
+              <Text dimColor wrap="truncate-end">
+                {mergedText(model)}
+              </Text>,
             )}
-            <Svg source={trendSource} alt={`每日 token，${model.range === '30' ? '最近 30 天' : '全部'}`} />
+            <Svg
+              source={mergesSource}
+              alt={`最近 ${model.mergeDays.length} 天合并 ${model.merged.prs} 个 PR，共改动 ${withCommas(model.merged.additions + model.merged.deletions)} 行：新增 ${withCommas(model.merged.additions)} 行，删除 ${withCommas(model.merged.deletions)} 行`}
+            />
           </Box>
         )}
 
-        {clayDrawing === null ? null : (
+        {clayDrawing === null || used === null ? null : (
           <Box flexDirection="column" gap="sm">
-            {sectionHead('Claude 使用', <Text dimColor>{`${span} 天里用了 ${activeDays} 天`}</Text>)}
-            <Svg source={clayDrawing.svg} alt={`${span} 天里用了 ${activeDays} 天`} />
+            {sectionHead('Claude 使用', <Text dimColor>{used}</Text>)}
+            <Svg source={clayDrawing.svg} alt={`Claude 使用，${used}`} />
           </Box>
         )}
 
-        {ghDrawing === null || model.github === null ? null : (
+        {ghDrawing === null || github === null ? null : (
           <Box flexDirection="column" gap="sm">
-            {sectionHead('GitHub 贡献', <Text dimColor>{`过去一年 ${withCommas(model.github.total)} 次`}</Text>)}
-            <Svg source={ghDrawing.svg} alt={`GitHub 过去一年 ${withCommas(model.github.total)} 次贡献`} />
+            {sectionHead('GitHub 贡献', <Text dimColor>{githubText(github.total)}</Text>)}
+            <Svg source={ghDrawing.svg} alt={`GitHub 贡献，${githubText(github.total)}`} />
           </Box>
         )}
       </Box>

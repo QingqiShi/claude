@@ -1,93 +1,96 @@
-# ~/.claude — personal Claude Code config
+# ~/.claude
 
-Git-backed so a new machine can be restored from scratch. The guiding rule:
+My Claude Code setup: instructions, settings, hooks, skills, and two mods that change Claude Code's own interface. It lives in git so that a new Mac is one clone away.
 
-> **Commit *references*, not third-party code.** My own skills/config live here as
-> source. Third-party plugins & skills are reinstalled from upstream via a
-> bootstrap script — never vendored/forked into this repo.
+```sh
+git clone https://github.com/QingqiShi/claude.git ~/.claude
+~/.claude/bootstrap.sh
+```
 
-## What's tracked vs. reinstalled
+`bootstrap.sh` needs `git`, `node` and `npm`, `jq`, `gh`, and the `claude` CLI on the PATH.
 
-| Thing | In git? | Source of truth | Restored by |
-|---|---|---|---|
-| `settings.json`, `CLAUDE.md`, `statusline-command.sh`, `hooks/` | ✅ committed | this repo | `git clone` |
-| **My custom skills** — `auto-improve`, `pr-standards`, `merge-dependabot`, `prepare-for-pr`, `agent-instructions` | ✅ committed | this repo | `git clone` |
-| **My mods** — `mods/dev-band` and `mods/sprout`, see [My mods](#my-mods) | ✅ committed | this repo | `git clone` |
-| `sprout-cache/` (sprout's scan cache) and `sprout-imports/<device>/` (transcripts copied from other machines, counted by sprout) | ❌ ignored | this machine | re-created by sprout; imports copied by hand |
-| **Marketplace plugins** — `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | ❌ ignored | `settings.json` → `enabledPlugins` + `extraKnownMarketplaces` | `bootstrap.sh` → `claude plugin install` |
-| **`vercel-cli`** skill | ❌ ignored | `npx skills add github.com/vercel/vercel --skill vercel-cli` | `bootstrap.sh` |
-| **`improve-codebase-architecture`** skill, plus the skills it calls: `codebase-design`, `domain-modeling`, `grilling` | ❌ ignored | `npx skills add github.com/mattpocock/skills --skill <name>` | `bootstrap.sh` |
-| **`gh-stack`** skill, plus the `gh stack` extension it drives | ❌ ignored | `gh skill install github/gh-stack gh-stack` + `gh extension install github/gh-stack` | `bootstrap.sh` |
-| **`playwright-cli`** skill (binary-generated) | ❌ ignored | `@playwright/cli` npm pkg → `playwright-cli install --skills` | `bootstrap.sh` |
+## Mods
 
-The third-party skill folders (`skills/vercel-cli/`, `skills/playwright-cli/`, and the
-four `mattpocock/skills` ones, and `skills/gh-stack/`) are `.gitignore`d — present on disk, absent from git.
+Mods are plugins that redraw parts of Claude Code. `settings.json` loads both mods in every session, and desktop sessions reload a mod as soon as its folder changes.
 
-## My mods
+### dev-band, the band above the prompt
 
-Claude Code mods are plugins that change Claude Code's own interface. `settings.json` loads both of them in every session:
-- `env.CLAUDE_CODE_PLUGIN_DIRS` names their folders, separated by `:`.
-- `env.CLAUDE_CODE_PLUGIN_DIR_WATCH=1` makes desktop sessions hot-reload them, so an edit to a mod's folder shows up without a new session.
+![The dev-band above the prompt](mods/dev-band/screenshot.png)
 
-### dev-band: the band above the prompt
+- **Context**: a liquid meter of the context used. It measures against the 400k auto-compact window, not the model's 1M window.
+- **Cost**: the session cost, with a sparkline of the cost of each turn and a rolling number when it goes up.
+- **Agents**: running subagents circle as comets on the right, so the band does not shift when they start and stop.
 
-![dev-band](mods/dev-band/screenshot.png)
+### sprout (芽团), a pane beside the chat
 
-- **Context:** a liquid meter of the context used, measured against the auto-compact window (400k), not the model's 1M.
-- **Cost:** the session cost with a per-turn sparkline, a rolling number and a `+$delta` pill.
-- **Agents:** the running subagents as comets on an orbit, pinned to the right so that they do not shift the layout.
+<img src="mods/sprout/screenshot.webp" alt="The sprout pane" align="right" width="230">
 
-### sprout (芽团): a pane beside the chat
+Long-lived numbers that one session cannot show:
 
-![sprout](mods/sprout/screenshot.webp)
-
-It shows long-lived information that is not tied to one session:
-- **Pet:** a cheeky pixel pet that talks back and has buttons to feed and pat it.
-  - It grows through 9 levels with the cumulative tokens, from Lv1 种子 (0) to Lv9 传说金树 (1000B), and never loses a level.
+- **A pixel pet that talks back.**
+  - It grows through 9 levels as the total tokens grow, from Lv1 种子 to Lv9 传说金树 at 1000B, and never loses a level.
   - Its mood follows the quota, the streak, the time of day and merged PRs.
-- **Quota:** the weekly and 5-hour quota, with a forecast of where each will be at its reset.
-- **Usage since the first transcript:** tokens, estimated API cost, streak and cache hit rate, with a daily trend and a heatmap.
-- **GitHub:** the contribution heatmap, from `gh`.
+  - It has buttons to feed it, pat it, or get another line.
+- **Quota**: this week's and the 5-hour quota, each with a forecast for its reset.
+- **Usage**: total tokens, estimated API cost, the streak and the cache hit rate, from the first transcript on. A daily trend and a heatmap go with them.
+- **GitHub**: the contribution heatmap.
 
-Open it with `/sprout` if it does not open by itself; a narrow window keeps it closed.
+If the window is too narrow for the pane to open by itself, open it with `/sprout`.
 
-`mods/sprout/scripts/scan.mjs` reads every transcript in `projects/` and in each `sprout-imports/<device>/`. It caches what it has read in `sprout-cache/`, so later runs read only new lines. Both folders are git-ignored, because transcripts hold whole conversations.
+**Where the numbers come from.** `mods/sprout/scripts/scan.mjs` reads every transcript in `projects/`, plus every import in `sprout-imports/`. It keeps its progress in `sprout-cache/`, so later scans read only new lines.
 
-To count the history of another machine, pack its transcripts there:
-
-```sh
-cd ~/.claude && find projects -name '*.jsonl' | tar czf ~/claude-transcripts.tgz -T -
-```
-
-Then extract the archive here into `~/.claude/sprout-imports/<device>/`. The next scan counts it, and a message that is on both machines counts once.
-
-## New machine setup
+**Bring in another Mac's history.** On the other Mac:
 
 ```sh
-git clone <this-repo> ~/.claude
 cd ~/.claude
-./bootstrap.sh          # installs plugins + third-party skills from upstream
+find projects -name '*.jsonl' |
+  tar czf ~/transcripts.tgz -T -
 ```
 
-Prereqs: `git`, `node`/`npm`, `jq`, and the `claude` CLI on PATH.
+Then extract the archive here into `~/.claude/sprout-imports/<device-name>/`. The next scan counts it once, even where the two Macs share messages.
 
-> Trade-off of the reference model: a bare `git clone` gives you config + your own
-> skills immediately, but the third-party plugins/skills don't exist until
-> `bootstrap.sh` runs.
+<br clear="right">
 
-## Keeping third-party skills up to date
+## What else is here
 
-Updating is decoupled from git — the third-party skills are ignored, so refreshing
-them changes nothing to commit; it just pulls the latest bits onto this machine.
+| Path | What it is |
+|---|---|
+| `CLAUDE.md` | My instructions for every project |
+| `settings.json` | Permissions, environment, enabled plugins, and the mods to load |
+| `statusline-command.sh` | The status line |
+| `hooks/` | Guards on tool calls, with tests in `hooks/tests/`. They:<br>• refuse links to other repos in public GitHub text, because GitHub keeps such references forever<br>• refuse a subagent that has no explicit model<br>• nudge the main agent to delegate after a run of tool calls<br>• move a stale `HANDOFF.md` out of a reused worktree<br>• check search commands |
+| `skills/` | My own skills: `agent-instructions`, `auto-improve`, `merge-dependabot`, `pr-standards`, `prepare-for-pr` |
+| `mods/` | The two mods above |
+| `bootstrap.sh`, `update.sh` | Install, and later update, everything that is not mine (next section) |
+
+## What is not in git, and why
+
+`.gitignore` ignores everything, then lets back in only the paths above. The rest stays on this Mac for one of two reasons.
+
+**Other people's code is installed, not copied.** Plugins and skills by others are installed from their source, so that they keep getting updates and this repo never holds a stale copy. `bootstrap.sh` installs them, and `update.sh` updates them:
+
+| What | Installed with |
+|---|---|
+| Plugins: `codex`, `frontend-design`, `skill-creator`, `claude-code-setup` | `claude plugin install`, from `enabledPlugins` in `settings.json` |
+| `vercel-cli` skill | `npx skills add github.com/vercel/vercel` |
+| `improve-codebase-architecture`, `codebase-design`, `domain-modeling`, `grilling` skills | `npx skills add github.com/mattpocock/skills` |
+| `gh-stack` skill and its `gh stack` extension | `gh skill install` and `gh extension install` |
+| `playwright-cli` skill | the `@playwright/cli` npm package |
+
+**Private or rebuilt data stays local.**
+- Session transcripts (`projects/`) and `sprout-imports/` hold whole conversations, code included.
+- `sprout-cache/` and Claude Code's own caches are rebuilt by themselves.
+
+## Keep the installed parts up to date
 
 ```sh
-./update.sh             # updates plugins, skills-CLI skills, and playwright-cli to latest
+~/.claude/update.sh
 ```
 
-`update.sh` writes `.last-skill-update` (timestamp + versions) so you can see how
-stale things are.
+It updates every plugin and installed skill to its latest version, and writes what it did to `.last-skill-update`. Nothing changes in git.
 
-### Optional: run it monthly (macOS launchd)
+<details>
+<summary>Run it on the 1st of every month (launchd)</summary>
 
 ```sh
 cat > ~/Library/LaunchAgents/dev.qingqi.claude-skills-update.plist <<'PLIST'
@@ -108,16 +111,18 @@ PLIST
 launchctl load ~/Library/LaunchAgents/dev.qingqi.claude-skills-update.plist
 ```
 
-Runs `update.sh` at 10:00 on the 1st of each month (login shell → picks up
-node/claude PATH). Remove with `launchctl unload …` then delete the plist.
+The job runs `update.sh` at 10:00 in a login shell, so `node` and `claude` are on the PATH. To stop it, run `launchctl unload` on the plist, then delete the file.
 
-## Adding a new third-party skill/plugin later
+</details>
 
-- **Plugin:** install as usual; it lands in `settings.json` → nothing else to do.
-- **`skills`-CLI skill:** `npx skills add <repo> --skill <name> -g --agent claude-code --copy`,
-  then add the `"<url>|<name>"` line to `SKILLS_CLI_PACKAGES` in both `bootstrap.sh`
-  and `update.sh`.
-- **`gh skill` skill:** `gh skill install <owner/repo> <name> --agent claude-code --scope user`,
-  then add the `"<owner/repo>|<name>"` line to `GH_SKILL_PACKAGES` in both `bootstrap.sh`
-  and `update.sh`, and the `skills/<name>` line to `.gitignore`.
-- Confirm it's ignored (not vendored): `git check-ignore skills/<name>`.
+## Add something new
+
+- **My own skill or mod**: put it in `skills/<name>/` or `mods/<name>/` and commit it. A new mod also needs its folder added to `CLAUDE_CODE_PLUGIN_DIRS` in `settings.json`; separate the folders with `:`.
+- **A plugin by someone else**: install it as usual. It lands in `settings.json`, and nothing else is needed.
+- **A skill by someone else**:
+  1. Install it:
+     - from npm: `npx skills add <repo> --skill <name> -g --agent claude-code --copy`
+     - from GitHub: `gh skill install <owner/repo> <name> --agent claude-code --scope user`
+  2. Add its `"<source>|<name>"` line to `SKILLS_CLI_PACKAGES` or `GH_SKILL_PACKAGES` in both `bootstrap.sh` and `update.sh`.
+  3. Add `skills/<name>` to `.gitignore`.
+  4. Confirm that git ignores it: `git check-ignore skills/<name>`.

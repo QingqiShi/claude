@@ -32,10 +32,15 @@ A pane beside the chat, for the numbers one session cannot show:
 
 It opens by itself when the window is wide enough. Otherwise, run `/sprout`. To count another Mac's history, copy its `~/.claude/projects/` into `~/.claude/sprout-imports/<device-name>/`.
 
-<picture>
-  <source media="(prefers-color-scheme: light)" srcset="mods/sprout/screenshot-light.webp">
-  <img src="mods/sprout/screenshot-dark.webp" alt="The sprout pane" width="680">
-</picture>
+The same pane runs in the desktop app, on the phone, and in the terminal. A terminal cannot draw SVG, so there sprout paints the pet, the charts and the heatmaps cell by cell, two pixels to a cell, and folds its layout to fit the pane's height.
+
+<p>
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="mods/sprout/screenshot-light.webp">
+    <img src="mods/sprout/screenshot-dark.webp" alt="The sprout pane in the desktop app" width="593">
+  </picture>
+  <img src="mods/sprout/screenshot-terminal.png" alt="The sprout pane in the terminal" width="224">
+</p>
 
 ## What is here
 

@@ -405,13 +405,13 @@ function unitsOf(ch: string) {
   return 1
 }
 
-export function wrapText(text: string, maxUnits: number, maxLines: number) {
+export function wrapText(text: string, maxUnits: number, maxLines: number, measure: (ch: string) => number = unitsOf) {
   const tokens = text.match(/[A-Za-z0-9_#$%.,:+\-/@'"`]+|\s|./gu) ?? []
   const rows: string[] = []
   let row = ''
   let units = 0
   for (const token of tokens) {
-    const w = [...token].reduce((sum, ch) => sum + unitsOf(ch), 0)
+    const w = [...token].reduce((sum, ch) => sum + measure(ch), 0)
     const isMark = NO_LINE_START.has(token)
     if (units + w > maxUnits && row.trim() !== '' && !isMark) {
       rows.push(row.trimEnd())

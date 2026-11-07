@@ -16,7 +16,6 @@ import {
   calendar,
   dayNumber,
   forecast,
-  formatLines,
   formatTokens,
   formatUsd,
   hashOf,
@@ -41,9 +40,23 @@ import {
   wrapText,
 } from './logic'
 import { levelLabel } from './levels'
-import { capsuleSvg, githubHeatmapSvg, levelOf, mergesSvg, tilesSvg, trendStats, trendSvg, usageHeatmapSvg } from './panels'
+import {
+  capsuleSvg,
+  githubHeatmapSvg,
+  githubLevels,
+  levelOf,
+  mergesSvg,
+  tilesSvg,
+  trendStats,
+  trendSvg,
+  usageHeatmapSvg,
+  usageLevels,
+} from './panels'
+import type { Scheme } from './raster'
 import { BUBBLE_ROWS, BUBBLE_UNITS, sceneSvg } from './scene'
 import { memoize } from './svg-kit'
+import type { TerminalView } from './terminal'
+import { terminalPane } from './terminal'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in data.ts.
 const scanState = atom({ plugin: 'sprout', key: 'scan' } as const, null, { shape: 'scan-1' })
@@ -362,10 +375,6 @@ function mergedText(model: Model) {
   return `${model.mergeDays.length} 天 ${model.merged.prs} 个 PR`
 }
 
-function statsText(totals: NonNullable<Model['totals']>, streak: number) {
-  return `${formatTokens(totals.tokens)} token · ${formatUsd(totals.costUsd)} · 连续 ${streak} 天 · 缓存命中 ${(totals.cacheHitRate * 100).toFixed(1)}%`
-}
-
 function usedText(model: Model) {
   const firstDay = model.scan?.firstDay ?? null
   if (model.scan === null || firstDay === null) return null
@@ -381,15 +390,19 @@ function trendText(days: ReturnType<typeof trendDays>) {
   return `峰值 ${formatTokens(peak)} · 7 日均线 ${formatTokens(average)}`
 }
 
-function githubText(total: number) {
-  return `过去一年 ${withCommas(total)} 次`
+/** The terminal tells no plugin its colors, so we take the scheme from the theme the person chose. */
+async function schemeOf($: EngineInterface): Promise<Scheme> {
+  try {
+    const theme = (await $.config.list()).find(row => row.key === 'theme')?.value
+
+    return typeof theme === 'string' && theme.includes('light') ? 'light' : 'dark'
+  } catch {
+    return 'dark'
+  }
 }
 
-function terminalBar(pct: number) {
-  const cells = 12
-  const full = Math.round((Math.min(100, Math.max(0, pct)) / 100) * cells)
-
-  return `${'█'.repeat(full)}${'░'.repeat(cells - full)}`
+function githubText(total: number) {
+  return `过去一年 ${withCommas(total)} 次`
 }
 
 export const register: Register = on => {
@@ -423,64 +436,65 @@ export const register: Register = on => {
     const used = usedText(model)
 
     if (e.surface === 'terminal') {
-      const { Box, Text, Button } = $.ui.resolve(e)
+      const tiles = tilesInputFor(model, 0)
       const scan = model.scan
+      const firstDay = scan?.firstDay ?? null
+      const view: TerminalView = {
+        width: e.props.bodyColumns,
+        scheme: await schemeOf($),
+        title: TITLE,
+        repo: model.env.repo ?? '',
+        pet: {
+          mood: model.mood,
+          action: model.action,
+          isConfetti: (model.party !== null || model.isLevelUp) && model.mood === 'party',
+          level: model.level,
+          pips: model.pips,
+          isDay: model.local.hour >= 7 && model.local.hour < 19,
+          text: model.text,
+        },
+        quota: {
+          windows: model.windows.map(w => ({
+            label: w.label,
+            pct: w.limit.pct,
+            projected: w.forecast?.projected ?? null,
+            reset: resetText(w, model.now, model.tz),
+            sentence: forecastText(w, model.now, model.tz),
+          })),
+          note: model.quota.at !== null && model.now - model.quota.at > STALE_QUOTA_MS ? `更新于 ${agoText(model.quota.at, model.now)}` : null,
+        },
+        stats:
+          tiles === null || firstDay === null
+            ? null
+            : {
+                heading: rangeText(model),
+                range: model.range,
+                tiles: {
+                  tokensLabel: tiles.tokensLabel,
+                  tokens: tiles.tokens,
+                  costUsd: formatUsd(tiles.costUsd),
+                  todayUsd: tiles.todayUsd > 0 ? formatUsd(tiles.todayUsd) : null,
+                  streak: tiles.streak,
+                  week: tiles.week,
+                  cacheHitRate: tiles.cacheHitRate,
+                  bars: tiles.bars,
+                },
+              },
+        trend,
+        merges: model.merged.prs === 0 ? null : { days: model.mergeDays, heading: mergedText(model) },
+        usage: scan === null || firstDay === null || used === null ? null : { levelOn: usageLevels(scan.days, firstDay), heading: used },
+        github: model.github === null ? null : { levelOn: githubLevels(model.github.start, model.github.levels), heading: githubText(model.github.total) },
+        today: model.today,
+        rows: e.props.placement === 'dock' ? e.props.scroll.bodyRows : null,
+        on: {
+          feed: () => void press($, 'feed'),
+          pat: () => void press($, 'pat'),
+          sass: () => void talk($, model.moodKey),
+          range: range => void setRange($, range),
+        },
+      }
 
-      return (
-        <Box flexDirection="column" gap={1}>
-          <Text>
-            <Text color="success">● </Text>
-            {TITLE}
-            <Text dimColor> · {model.env.repo ?? ''}</Text>
-          </Text>
-          <Text>
-            {model.mood === 'sleep' ? '(－_－) zZ' : model.mood === 'worry' ? '(°□°;)' : model.mood === 'party' ? '\\(^o^)/' : '(・ω・)'} 「{model.text}」
-          </Text>
-          <Text dimColor>
-            {levelLabel(model.level)} {'●'.repeat(model.pips)}
-            {'○'.repeat(7 - model.pips)}
-          </Text>
-          <Box flexDirection="row" gap={1}>
-            <Button key="feed" label="喂水" onPress={() => void press($, 'feed')} />
-            <Button key="pat" label="摸摸" onPress={() => void press($, 'pat')} />
-            <Button key="sass" label="再嘴一句" onPress={() => void talk($, model.moodKey)} />
-          </Box>
-          {model.windows.map(w => {
-            const fc = w.forecast === null ? null : Math.round(w.forecast.projected)
-            const sentence = forecastText(w, model.now, model.tz)
-            return (
-              <Box flexDirection="column">
-                <Text>
-                  {w.label} {terminalBar(w.limit.pct)} {Math.round(w.limit.pct)}%
-                  {fc === null ? '' : fc > 100 ? ` 超 ${fc - 100}%` : ` → ${fc}%`}
-                  <Text dimColor> {resetText(w, model.now, model.tz)}</Text>
-                </Text>
-                {sentence === null ? null : <Text color={fc !== null && fc > 100 ? 'error' : undefined} dimColor={!(fc !== null && fc > 100)}>  {sentence}</Text>}
-              </Box>
-            )
-          })}
-          {scan === null || scan.firstDay === null || model.totals === null ? (
-            <Text dimColor>正在翻你的聊天记录，第一次要一两分钟。</Text>
-          ) : (
-            <Box flexDirection="column">
-              <Box flexDirection="row" gap={1}>
-                <Text dimColor>{rangeText(model)} · 费用按 API 价格估算</Text>
-                <Button key="range-30" label="30 天" plain dimColor={model.range !== '30'} onPress={() => void setRange($, '30')} />
-                <Button key="range-all" label="全部" plain dimColor={model.range !== 'all'} onPress={() => void setRange($, 'all')} />
-              </Box>
-              <Text>{rangeWord(model)} {statsText(model.totals, model.streak)}</Text>
-            </Box>
-          )}
-          {trend.length < 2 ? null : <Text dimColor>每日 token {trendText(trend)}</Text>}
-          {model.merged.prs === 0 ? null : (
-            <Text dimColor>
-              每日合并 {mergedText(model)} · +{formatLines(model.merged.additions)} −{formatLines(model.merged.deletions)} 行
-            </Text>
-          )}
-          {used === null ? null : <Text dimColor>Claude 使用 {used}</Text>}
-          {model.github === null ? null : <Text dimColor>GitHub 贡献 {githubText(model.github.total)}</Text>}
-        </Box>
-      )
+      return terminalPane($.ui.resolve(e), view)
     }
 
     const { Box, Text, Button, Svg } = $.ui.resolve(e)

@@ -2,7 +2,7 @@ import type { SproutDay, SproutMergeDay } from '../types'
 import { dayFromNumber, dayNumber, formatLines, formatTokens, formatUsd, mergeTotals, weekdayOf } from './logic'
 import { esc, n, paletteCss, svgOpen, textWidth, todayCss, uid } from './svg-kit'
 
-const LEVELS = {
+export const LEVELS = {
   ok: { from: '#34D399', to: '#22D3EE', ink: '#06302A' },
   warn: { from: '#FBBF24', to: '#F97316', ink: '#3A1D02' },
   over: { from: '#FB7185', to: '#E11D48', ink: '#FFF1F2' },
@@ -190,7 +190,7 @@ ${todayCss(id)}
 
 export const TREND_HEIGHT = 84
 
-function movingAverage(values: readonly number[]) {
+export function movingAverage(values: readonly number[]) {
   return values.map((_, i) => {
     const win = values.slice(Math.max(0, i - 6), i + 1)
     return win.reduce((a, b) => a + b, 0) / win.length
@@ -345,15 +345,15 @@ ${todayCss(id)}
 </style>${legend}${right}<line class="axis-${id}" x1="0" x2="${W}" y1="${base + 0.5}" y2="${base + 0.5}" stroke-width="1"/>${marks}${pulse}</svg>`
 }
 
-type Ramp = { dark: readonly string[]; light: readonly string[]; ring: { dark: string; light: string } }
+export type Ramp = { dark: readonly string[]; light: readonly string[]; ring: { dark: string; light: string } }
 
-const CLAY: Ramp = {
+export const CLAY: Ramp = {
   dark: ['#62301F', '#93442A', '#C8603F', '#F0997B'],
   light: ['#F5C4B3', '#F0997B', '#D97757', '#993C1D'],
   ring: { dark: '#D97757', light: '#D97757' },
 }
 
-const GREEN: Ramp = {
+export const GREEN: Ramp = {
   dark: ['#0E4429', '#006D32', '#26A641', '#39D353'],
   light: ['#9BE9A8', '#40C463', '#30A14E', '#216E39'],
   ring: { dark: '#39D353', light: '#1A7F37' },
@@ -378,7 +378,7 @@ const GLINT: Entrance = {
 
 export const HEAT_WEEKS = 53
 
-function heatmapSvg(width: number, today: string, ramp: Ramp, levelOn: (day: number) => number | null, entrance: Entrance | null, key: string) {
+function heatmapSvg(width: number, today: string, ramp: Ramp, levelOn: LevelOn, entrance: Entrance | null, key: string) {
   const W = width
   const ringOut = 2.75
   const pitch = (W - ringOut) / (HEAT_WEEKS - 1 + 14 / 17)
@@ -441,24 +441,33 @@ ${todayCss(id)}
   }
 }
 
-export function usageHeatmapSvg(width: number, days: readonly SproutDay[], firstDay: string, today: string, isIntro: boolean) {
+/** The heat level 0 to 4 of a day number, or null before the first day with data. */
+export type LevelOn = (day: number) => number | null
+
+export function usageLevels(days: readonly SproutDay[], firstDay: string): LevelOn {
   const tokens = new Map(days.map(d => [dayNumber(d.day), d.tokens]))
   const max = Math.max(1, ...days.map(d => d.tokens))
   const firstN = dayNumber(firstDay)
-  const levelOn = (dn: number) => {
+
+  return dn => {
     if (dn < firstN) return null
     const v = tokens.get(dn) ?? 0
 
     return v === 0 ? 0 : Math.min(4, 1 + Math.floor((v / max) * 3.99))
   }
-
-  return heatmapSvg(width, today, CLAY, levelOn, isIntro ? POP : null, `${firstDay}|${days.map(d => `${d.day}:${d.tokens}`).join(',')}`)
 }
 
 /** `levels` holds one digit per day from `start` on, as GitHub's contribution calendar gives them. */
-export function githubHeatmapSvg(width: number, start: string, levels: string, today: string, isIntro: boolean) {
+export function githubLevels(start: string, levels: string): LevelOn {
   const startN = dayNumber(start)
-  const levelOn = (dn: number) => (dn < startN ? null : Number(levels[dn - startN] ?? '0'))
 
-  return heatmapSvg(width, today, GREEN, levelOn, isIntro ? GLINT : null, `${start}|${levels}`)
+  return dn => (dn < startN ? null : Number(levels[dn - startN] ?? '0'))
+}
+
+export function usageHeatmapSvg(width: number, days: readonly SproutDay[], firstDay: string, today: string, isIntro: boolean) {
+  return heatmapSvg(width, today, CLAY, usageLevels(days, firstDay), isIntro ? POP : null, `${firstDay}|${days.map(d => `${d.day}:${d.tokens}`).join(',')}`)
+}
+
+export function githubHeatmapSvg(width: number, start: string, levels: string, today: string, isIntro: boolean) {
+  return heatmapSvg(width, today, GREEN, githubLevels(start, levels), isIntro ? GLINT : null, `${start}|${levels}`)
 }

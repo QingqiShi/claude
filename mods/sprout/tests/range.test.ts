@@ -206,18 +206,20 @@ test('the tiles, the token trend and the merges follow the one range, and the ch
   for (const surface of ['desktop', 'terminal'] as const) {
     const ui = await $.ui.mount({ ...PANE, surface })
     expect(await ui.find({ type: 'Text', text: /30 天 2 个 PR/ })).toBeTruthy()
-    if (surface === 'desktop') {
-      expect(await ui.find({ type: 'Text', text: '最近 30 天' })).toBeTruthy()
-    } else {
-      expect(await ui.find({ type: 'Text', text: /30 天 500 token · \$5\.00 · .*缓存命中 88\.9%/})).toBeTruthy()
+    expect(await ui.find({ type: 'Text', text: '最近 30 天' })).toBeTruthy()
+    if (surface === 'terminal') {
+      expect(await ui.find({ type: 'Text', text: '30 天 token' })).toBeTruthy()
+      expect(await ui.find({ type: 'Text', text: '$5.00' })).toBeTruthy()
+      expect(await ui.find({ type: 'Text', text: '88.9%' })).toBeTruthy()
     }
 
     await ui.press({ key: 'range-all' })
     expect(await ui.find({ type: 'Text', text: /88 天 9 个 PR/ })).toBeTruthy()
-    if (surface === 'desktop') {
-      expect(await ui.find({ type: 'Text', text: '自 8 月 11 日起' })).toBeTruthy()
-    } else {
-      expect(await ui.find({ type: 'Text', text: /累计 2k token · \$20 · .*缓存命中 45\.7%/ })).toBeTruthy()
+    expect(await ui.find({ type: 'Text', text: '自 8 月 11 日起' })).toBeTruthy()
+    if (surface === 'terminal') {
+      expect(await ui.find({ type: 'Text', text: '累计 token' })).toBeTruthy()
+      expect(await ui.find({ type: 'Text', text: '$20' })).toBeTruthy()
+      expect(await ui.find({ type: 'Text', text: '45.7%' })).toBeTruthy()
     }
     expect(store.get('range')).toBe('all')
 

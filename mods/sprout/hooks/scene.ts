@@ -17,10 +17,10 @@ const BUBBLE_FONT = 13
 const BUBBLE_LINE = 19
 const BUBBLE_WIDTH = (BUBBLE_UNITS + 1) * BUBBLE_FONT + 22
 const BUBBLE_BOTTOM = 114
-const INK = '#3B2A1A'
-const PAPER = '#FFF8EC'
+export const INK = '#3B2A1A'
+export const PAPER = '#FFF8EC'
 
-const COLORS: Record<string, string> = {
+export const COLORS: Record<string, string> = {
   o: '#6B5A48',
   b: '#FFF4E6',
   d: '#EBD9C2',
@@ -40,7 +40,7 @@ const COLORS: Record<string, string> = {
   w: '#FFFFFF',
 }
 
-const BODY = [
+export const BODY = [
   '.....oooooo.....',
   '...oobbbbbboo...',
   '..obbbbbbbbbbo..',
@@ -56,14 +56,14 @@ const BODY = [
 ]
 
 /** Eye pixels per mood, as [x, y] in body rows; every other `E` cell is drawn as skin. */
-const EYES: Record<'squint' | 'shut' | 'smile', ReadonlyArray<[number, number]>> = {
+export const EYES: Record<'squint' | 'shut' | 'smile', ReadonlyArray<[number, number]>> = {
   squint: [[4, 5], [5, 5], [10, 5], [11, 5]],
   shut: [[3, 4], [6, 4], [4, 5], [5, 5], [9, 4], [12, 4], [10, 5], [11, 5]],
   smile: [[4, 4], [5, 4], [3, 5], [6, 5], [10, 4], [11, 4], [9, 5], [12, 5]],
 }
 
 /** Sparkles of the gold level, clockwise from the top left, in sprite cells. */
-const SPARKLES: ReadonlyArray<[number, number]> = [
+export const SPARKLES: ReadonlyArray<[number, number]> = [
   [1.5, -0.6],
   [14.5, -0.6],
   [17, 5],
@@ -165,21 +165,30 @@ function goldSvg(layout: Layout, id: string, isAsleep: boolean) {
   return aura + sparkles
 }
 
+/**
+ * The color of one body pixel, `y` counted from the body's top row, in this mood. Open eyes (the happy mood)
+ * come back null, so that the scene can draw them apart and blink them.
+ */
+export function bodyPixel(mood: Mood) {
+  const eyeSet = mood === 'sleep' ? EYES.shut : mood === 'worry' ? EYES.squint : mood === 'party' ? EYES.smile : null
+  const isEye = (x: number, y: number) => eyeSet?.some(([ex, ey]) => ex === x && ey === y) ?? false
+
+  return (ch: string, x: number, y: number): string | null => {
+    if (ch === '.') return null
+    if (ch === 'E') return eyeSet === null ? null : isEye(x, y) ? COLORS.E! : COLORS.b!
+    if (eyeSet !== null && ch === 'b' && isEye(x, y)) return COLORS.E!
+    if (mood === 'sleep' && ch === 'm' && x === 8) return COLORS.b!
+
+    return COLORS[ch] ?? null
+  }
+}
+
 function petSvg(input: SceneInput, layout: Layout, id: string) {
   const { level, crownRows: C } = layout
   const crown = runs(level.crown, 0, ch => COLORS[ch] ?? null) + (level.hasBird === true ? birdSvg(id) : '')
-  const eyeSet =
-    input.mood === 'sleep' ? EYES.shut : input.mood === 'worry' ? EYES.squint : input.mood === 'party' ? EYES.smile : null
-  const isEye = (x: number, y: number) => eyeSet?.some(([ex, ey]) => ex === x && ey === y) ?? false
-  const body = runs(BODY, C, (ch, x, y) => {
-    if (ch === '.') return null
-    if (ch === 'E') return eyeSet === null ? null : isEye(x, y - C) ? COLORS.E! : COLORS.b!
-    if (eyeSet !== null && ch === 'b' && isEye(x, y - C)) return COLORS.E!
-    if (input.mood === 'sleep' && ch === 'm' && x === 8) return COLORS.b!
-
-    return COLORS[ch] ?? null
-  })
-  const openEyes = eyeSet === null ? runs(BODY, C, ch => (ch === 'E' ? COLORS.E! : null)) : ''
+  const pixel = bodyPixel(input.mood)
+  const body = runs(BODY, C, (ch, x, y) => pixel(ch, x, y - C))
+  const openEyes = input.mood === 'happy' ? runs(BODY, C, ch => (ch === 'E' ? COLORS.E! : null)) : ''
 
   let fx = level.hasPetals === true ? petalsSvg(id) : ''
   if (input.mood === 'worry') {
@@ -257,21 +266,33 @@ function levelSvg(input: SceneInput) {
   return `<g shape-rendering="crispEdges"><rect x="${x - 5}" y="131" width="${n(end - x + 11)}" height="16" fill="rgba(0,0,0,0.32)"/><rect x="${x - 3}" y="129" width="${n(end - x + 7)}" height="2" fill="rgba(0,0,0,0.32)"/><rect x="${x - 3}" y="147" width="${n(end - x + 7)}" height="2" fill="rgba(0,0,0,0.32)"/>${pips}</g><text x="${x + 1}" y="144" font-size="${size}" fill="rgba(0,0,0,0.6)">${label}</text><text x="${x}" y="143" font-size="${size}" fill="#F4F1E6">${label}</text>`
 }
 
+export type SkyPalette = { top: string; bottom: string; ground: string; tuft: string; light: string; cloud: string; glow: string }
+
+export function skyPalette(isDay: boolean, isWorry: boolean): SkyPalette {
+  if (isDay) {
+    return isWorry
+      ? { top: '#8E3B3B', bottom: '#E39A6B', ground: '#4A3A2A', tuft: '#6B4E36', light: '#FFB37A', cloud: '#F6C9B8', glow: '#FFF6C8' }
+      : { top: '#5AAEE6', bottom: '#BFE4F7', ground: '#4E8B45', tuft: '#3D7336', light: '#FFE27A', cloud: '#FFFFFF', glow: '#FFF6C8' }
+  }
+
+  return isWorry
+    ? { top: '#2A1220', bottom: '#4A1E2A', ground: '#3A1B22', tuft: '#6B2E3A', light: '#FFF1B8', cloud: '#FFFFFF', glow: '#FB7185' }
+    : { top: '#0E1A33', bottom: '#24406A', ground: '#16301F', tuft: '#2F6B3F', light: '#FFF1B8', cloud: '#FFFFFF', glow: '#8FD17A' }
+}
+
 function skySvg(input: SceneInput, layout: Layout, id: string) {
   const W = input.width
   const isWorry = input.mood === 'worry'
+  const { top, bottom, ground, tuft, light, cloud: cloudFill, glow } = skyPalette(input.isDay, isWorry)
   const random = rng(11)
   let s = ''
   if (input.isDay) {
-    const [top, bottom] = isWorry ? ['#8E3B3B', '#E39A6B'] : ['#5AAEE6', '#BFE4F7']
-    const [ground, tuft] = isWorry ? ['#4A3A2A', '#6B4E36'] : ['#4E8B45', '#3D7336']
-    s += `<defs><linearGradient id="sky-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient><radialGradient id="glow-${id}"><stop offset="0" stop-color="#FFF6C8" stop-opacity=".7"/><stop offset="1" stop-color="#FFF6C8" stop-opacity="0"/></radialGradient></defs>`
+    s += `<defs><linearGradient id="sky-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient><radialGradient id="glow-${id}"><stop offset="0" stop-color="${glow}" stop-opacity=".7"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient></defs>`
     s += `<rect width="${W}" height="${SCENE_HEIGHT}" fill="url(#sky-${id})"/>`
-    const sun = isWorry ? '#FFB37A' : '#FFE27A'
     const sx = W - 42
-    s += `<g shape-rendering="crispEdges" fill="${sun}"><g class="sunray-${id}" style="transform-origin:${sx + 8}px 24px"><rect x="${sx + 7}" y="8" width="2" height="4"/><rect x="${sx + 7}" y="36" width="2" height="4"/><rect x="${sx - 8}" y="23" width="4" height="2"/><rect x="${sx + 20}" y="23" width="4" height="2"/><rect x="${sx - 4}" y="12" width="2" height="2"/><rect x="${sx + 18}" y="12" width="2" height="2"/><rect x="${sx - 4}" y="34" width="2" height="2"/><rect x="${sx + 18}" y="34" width="2" height="2"/></g><rect x="${sx}" y="16" width="16" height="16"/><rect x="${sx - 2}" y="18" width="20" height="12"/><rect x="${sx + 2}" y="14" width="12" height="20"/></g><rect x="${sx + 2}" y="18" width="4" height="4" fill="#FFF7D1" shape-rendering="crispEdges"/>`
+    s += `<g shape-rendering="crispEdges" fill="${light}"><g class="sunray-${id}" style="transform-origin:${sx + 8}px 24px"><rect x="${sx + 7}" y="8" width="2" height="4"/><rect x="${sx + 7}" y="36" width="2" height="4"/><rect x="${sx - 8}" y="23" width="4" height="2"/><rect x="${sx + 20}" y="23" width="4" height="2"/><rect x="${sx - 4}" y="12" width="2" height="2"/><rect x="${sx + 18}" y="12" width="2" height="2"/><rect x="${sx - 4}" y="34" width="2" height="2"/><rect x="${sx + 18}" y="34" width="2" height="2"/></g><rect x="${sx}" y="16" width="16" height="16"/><rect x="${sx - 2}" y="18" width="20" height="12"/><rect x="${sx + 2}" y="14" width="12" height="20"/></g><rect x="${sx + 2}" y="18" width="4" height="4" fill="#FFF7D1" shape-rendering="crispEdges"/>`
     const cloud = (cx: number, cy: number, k: number, delay: number) =>
-      `<g class="cloud-${id}" style="animation-delay:${delay}s" shape-rendering="crispEdges" fill="${isWorry ? '#F6C9B8' : '#FFFFFF'}" opacity=".92"><rect x="${cx}" y="${cy + 4 * k}" width="${22 * k}" height="${4 * k}"/><rect x="${cx + 4 * k}" y="${cy}" width="${8 * k}" height="${4 * k}"/><rect x="${cx + 10 * k}" y="${cy - 2 * k}" width="${6 * k}" height="${6 * k}"/></g>`
+      `<g class="cloud-${id}" style="animation-delay:${delay}s" shape-rendering="crispEdges" fill="${cloudFill}" opacity=".92"><rect x="${cx}" y="${cy + 4 * k}" width="${22 * k}" height="${4 * k}"/><rect x="${cx + 4 * k}" y="${cy}" width="${8 * k}" height="${4 * k}"/><rect x="${cx + 10 * k}" y="${cy - 2 * k}" width="${6 * k}" height="${6 * k}"/></g>`
     s += cloud(Math.round(W * 0.36), 16, 1.5, 0) + cloud(Math.round(W * 0.62), 30, 1, 1.4)
     s += `<ellipse cx="${PET_CX}" cy="128" rx="${n(10 * layout.s)}" ry="16" fill="url(#glow-${id})"/>`
     s += `<rect y="${GROUND_Y}" width="${W}" height="${SCENE_HEIGHT - GROUND_Y}" fill="${ground}"/>`
@@ -283,8 +304,6 @@ function skySvg(input: SceneInput, layout: Layout, id: string) {
     return s
   }
 
-  const [top, bottom] = isWorry ? ['#2A1220', '#4A1E2A'] : ['#0E1A33', '#24406A']
-  const glow = isWorry ? '#FB7185' : '#8FD17A'
   s += `<defs><linearGradient id="sky-${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${top}"/><stop offset="1" stop-color="${bottom}"/></linearGradient><radialGradient id="glow-${id}"><stop offset="0" stop-color="${glow}" stop-opacity=".9"/><stop offset="1" stop-color="${glow}" stop-opacity="0"/></radialGradient></defs>`
   s += `<rect width="${W}" height="${SCENE_HEIGHT}" fill="url(#sky-${id})"/>`
   for (let i = 0; i < 24; i++) {
@@ -295,12 +314,12 @@ function skySvg(input: SceneInput, layout: Layout, id: string) {
     s += `<rect class="star-${id}" x="${x}" y="${y}" width="${z}" height="${z}" fill="#FFF6D6" style="animation-delay:${delay}s"/>`
   }
   const mx = W - 40
-  s += `<g shape-rendering="crispEdges" fill="#FFF1B8"><rect x="${mx + 2}" y="12" width="12" height="12"/><rect x="${mx}" y="14" width="2" height="8"/><rect x="${mx + 14}" y="14" width="2" height="8"/><rect x="${mx + 4}" y="10" width="8" height="2"/><rect x="${mx + 4}" y="24" width="8" height="2"/></g><rect x="${mx + 6}" y="12" width="10" height="10" fill="${top}" opacity=".9" shape-rendering="crispEdges"/>`
+  s += `<g shape-rendering="crispEdges" fill="${light}"><rect x="${mx + 2}" y="12" width="12" height="12"/><rect x="${mx}" y="14" width="2" height="8"/><rect x="${mx + 14}" y="14" width="2" height="8"/><rect x="${mx + 4}" y="10" width="8" height="2"/><rect x="${mx + 4}" y="24" width="8" height="2"/></g><rect x="${mx + 6}" y="12" width="10" height="10" fill="${top}" opacity=".9" shape-rendering="crispEdges"/>`
   s += `<ellipse class="glow-${id}" cx="${PET_CX}" cy="128" rx="${n(10 * layout.s)}" ry="18" fill="url(#glow-${id})"/>`
-  s += `<rect y="${GROUND_Y}" width="${W}" height="${SCENE_HEIGHT - GROUND_Y}" fill="${isWorry ? '#3A1B22' : '#16301F'}"/>`
+  s += `<rect y="${GROUND_Y}" width="${W}" height="${SCENE_HEIGHT - GROUND_Y}" fill="${ground}"/>`
   for (let x = 0; x < W; x += 9) {
     const hh = 2 + Math.round(random() * 3)
-    s += `<rect x="${x}" y="${GROUND_Y - hh}" width="2" height="${hh}" fill="${isWorry ? '#6B2E3A' : '#2F6B3F'}"/>`
+    s += `<rect x="${x}" y="${GROUND_Y - hh}" width="2" height="${hh}" fill="${tuft}"/>`
   }
   if (!isWorry) {
     for (let i = 0; i < 5; i++) {

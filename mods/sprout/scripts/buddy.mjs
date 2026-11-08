@@ -49,7 +49,7 @@ function readSeed(keychain) {
   if (r.status === NOT_FOUND) return null;
   if (r.status !== 0) throw new BuddyError("keychain", r.stderr.trim());
   const seed = Buffer.from(r.stdout.trim(), "base64");
-  if (seed.length !== 32) throw new BuddyError("keychain", "the stored key is not an Ed25519 seed");
+  if (seed.length !== 32) throw new BuddyError("bad-key", "the stored key is not an Ed25519 seed");
   return seed;
 }
 
@@ -86,6 +86,16 @@ export function readMessage(user, machine, at) {
   return Buffer.from([READ_PREFIX, user, machine, String(at)].join("\n"));
 }
 
+// A bad stored value cannot belong to a connected Mac, because the server refuses a key that is not 32 bytes. Thus `key` can replace it.
+function readSeedOrNullIfBad(keychain) {
+  try {
+    return readSeed(keychain);
+  } catch (error) {
+    if (error instanceof BuddyError && error.code === "bad-key") return null;
+    throw error;
+  }
+}
+
 function requireSeed(keychain) {
   const seed = readSeed(keychain);
   if (seed === null) throw new BuddyError("no-key");
@@ -102,7 +112,7 @@ function run(args) {
   const keychain = args.keychain;
   switch (args.command) {
     case "key": {
-      let seed = readSeed(keychain);
+      let seed = readSeedOrNullIfBad(keychain);
       if (seed === null) {
         writeSeed(randomBytes(32), keychain);
         seed = requireSeed(keychain);

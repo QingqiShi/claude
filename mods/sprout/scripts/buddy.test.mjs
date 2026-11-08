@@ -33,6 +33,18 @@ function publicKeyOf(raw) {
   return createPublicKey({ key: Buffer.concat([SPKI_PREFIX, Buffer.from(raw, "base64")]), format: "der", type: "spki" });
 }
 
+test("key replaces a stored value that is not a key", { skip: !isMac }, () => {
+  withKeychain((keychain) => {
+    const add = ["add-generic-password", "-a", "mac-key", "-s", "sprout-buddy", "-w", "QQ==", keychain];
+    assert.equal(spawnSync("/usr/bin/security", add).status, 0);
+    const kc = ["--keychain", keychain];
+    const made = run(["key", ...kc]);
+    assert.equal(made.status, 0);
+    assert.equal(Buffer.from(made.out.publicKey, "base64").length, 32);
+    assert.deepEqual(run(["key", ...kc]).out, made.out);
+  });
+});
+
 test("the key is made once in the keychain, and signs what the server checks", { skip: !isMac }, () => {
   withKeychain((keychain) => {
     const kc = ["--keychain", keychain];

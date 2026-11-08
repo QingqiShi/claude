@@ -12,9 +12,9 @@ Code should be self-documenting. Only add a comment for something truly unexpect
 
 # Session Memory (main agent only)
 
-Keep a HANDOFF.md file current so that a new session after `/clear` can continue where this one stopped. It holds what that session cannot read from the code: where the work is heading, how far it has come, and what is in flight. A sub-agent can read the file when you tell it to.
+Keep a handoff file current so that the session after `/clear` can continue where this one stopped. It holds what that session cannot read from the code: where the work is heading, how far it has come, and what is in flight. A sub-agent can read the file when you tell it to.
 
-The app can reuse a worktree for a new session, so a SessionStart hook moves a HANDOFF.md found at a new start (not after `/clear`, compaction, resume or fork) into the git dir, and tells that session where it is.
+A SessionStart hook names the file's path. In the desktop app, each sidebar session has its own file, which stays the same across `/clear` and compaction, so other sessions in the same folder never touch it. In a terminal, the file is HANDOFF.md at the repository root.
 
 Use exactly these headings, in this order. A new session reads the whole file before it starts, so keep it short: when it grows, shorten `## Done` first, because `## Now` is what that session works from.
 

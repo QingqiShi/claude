@@ -1,8 +1,11 @@
 import { expect, test } from 'claude-code/testing'
 
+import { setLang } from '../hooks/i18n'
 import { introStep } from '../hooks/logic'
 import { githubHeatmapSvg, mergesSvg, tilesSvg, trendSvg, usageHeatmapSvg } from '../hooks/panels'
 import type { SproutDay, SproutIntroKind, SproutMergeDay } from '../types'
+
+setLang('zh')
 
 const DAYS: SproutDay[] = [
   { day: '2026-11-04', tokens: 1200, costUsd: 0.4 },

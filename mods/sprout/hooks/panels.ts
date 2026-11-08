@@ -1,5 +1,6 @@
 import type { SproutDay, SproutMergeDay } from '../types'
-import { dayFromNumber, dayNumber, formatLines, formatTokens, formatUsd, mergeTotals, weekdayOf } from './logic'
+import { dayFromNumber, dayNumber, formatLines, formatTokens, formatUsd, mergeTotals, monthLabel, weekdayOf } from './logic'
+import { t } from './i18n'
 import { esc, n, paletteCss, svgOpen, textWidth, todayCss, uid } from './svg-kit'
 
 export const LEVELS = {
@@ -35,7 +36,7 @@ export function capsuleSvg(width: number, pct: number, projected: number | null)
   const id = uid('cap', W, pct, Math.round(fc ?? -1), level)
   const label = `${Math.round(pct)}%`
   const isOut = pct >= 100
-  const end = isOut ? '用完了' : fc === null ? '' : isOver ? `超 ${Math.round(fc - 100)}%` : `→ ${Math.round(fc)}%`
+  const end = isOut ? t('用完了', 'Used up') : fc === null ? '' : isOver ? t(`超 ${Math.round(fc - 100)}%`, `${Math.round(fc - 100)}% over`) : `→ ${Math.round(fc)}%`
   const endWidth = textWidth(end, 12)
   const hasPill = end !== '' && (isOut || isOver || fcX > W - endWidth - 18)
   const isLabelInside = fill >= textWidth(label, 12) + 16
@@ -166,9 +167,9 @@ export function tilesSvg(input: TilesInput) {
 
   const body =
     tile(0, 0, input.tokensLabel, tokens, prev === null ? null : formatTokens(prev.tokens), '', bars, 0) +
-    tile(1, 0, '按 API 价估算', cost, prev === null ? null : formatUsd(prev.costUsd), '', pill, 0.1) +
-    tile(0, 1, '连续使用', String(input.streak), null, '天', week, 0.2) +
-    tile(1, 1, '缓存命中', hit, prev === null ? null : `${(prev.cacheHitRate * 100).toFixed(1)}%`, '', ring, 0.3)
+    tile(1, 0, t('按 API 价估算', 'At API prices'), cost, prev === null ? null : formatUsd(prev.costUsd), '', pill, 0.1) +
+    tile(0, 1, t('连续使用', 'Streak'), String(input.streak), null, t('天', 'days'), week, 0.2) +
+    tile(1, 1, t('缓存命中', 'Cache hits'), hit, prev === null ? null : `${(prev.cacheHitRate * 100).toFixed(1)}%`, '', ring, 0.3)
   const c = 2 * Math.PI * 12
   const intro = isIntro
     ? `
@@ -225,8 +226,8 @@ export function trendSvg(width: number, days: readonly SproutDay[], isIntro: boo
     })
     .join('')
   const stats = trendStats(values)
-  const peak = `峰值 ${formatTokens(stats.peak)}`
-  const now = `7 日均线 ${formatTokens(stats.average)}`
+  const peak = t(`峰值 ${formatTokens(stats.peak)}`, `Peak ${formatTokens(stats.peak)}`)
+  const now = t(`7 日均线 ${formatTokens(stats.average)}`, `7-day avg ${formatTokens(stats.average)}`)
   const draw = isIntro ? ` class="draw-${id}"` : ''
   const intro = isIntro
     ? `
@@ -299,8 +300,8 @@ export function mergesSvg(width: number, days: readonly SproutMergeDay[], isIntr
   const pulse = `${empty}<circle class="prs-${id} tdr-${id}" cx="${todayX}" cy="${dotY}" r="3"/>`
   const sum = mergeTotals(days)
   const keys = [
-    { cls: `add-${id}`, label: '新增', value: `+${formatLines(sum.additions)}`, isDot: false },
-    { cls: `del-${id}`, label: '删除', value: `−${formatLines(sum.deletions)}`, isDot: false },
+    { cls: `add-${id}`, label: t('新增', 'Added'), value: `+${formatLines(sum.additions)}`, isDot: false },
+    { cls: `del-${id}`, label: t('删除', 'Removed'), value: `−${formatLines(sum.deletions)}`, isDot: false },
     { cls: `pr-${id}`, label: 'PR', value: '', isDot: true },
   ]
   let legend = ''
@@ -314,20 +315,20 @@ export function mergesSvg(width: number, days: readonly SproutMergeDay[], isIntr
   const legendRight = lx - 10
   const parts: Array<Array<[string, string]>> =
     today === undefined || today.prs === 0
-      ? [[[`t3-${id}`, '今天还没合并']]]
+      ? [[[`t3-${id}`, t('今天还没合并', 'No merges today')]]]
       : [
           [
-            [`prt-${id}`, `今天 ${today.prs} 个`],
+            [`prt-${id}`, t(`今天 ${today.prs} 个`, `${today.prs} today`)],
             [`addt-${id}`, ` +${formatLines(today.additions)}`],
             [`delt-${id}`, ` −${formatLines(today.deletions)}`],
           ],
-          [[`prt-${id}`, `今天 ${today.prs} 个`]],
+          [[`prt-${id}`, t(`今天 ${today.prs} 个`, `${today.prs} today`)]],
         ]
-  const fit = parts.find(p => legendRight + 12 + textWidth(p.map(([, t]) => t).join(''), 11) <= W)
+  const fit = parts.find(p => legendRight + 12 + textWidth(p.map(([, text]) => text).join(''), 11) <= W)
   const right =
     fit === undefined
       ? ''
-      : `<text x="${W}" y="11" text-anchor="end" font-size="11">${fit.map(([cls, t]) => `<tspan class="${cls}">${esc(t)}</tspan>`).join('')}</text>`
+      : `<text x="${W}" y="11" text-anchor="end" font-size="11">${fit.map(([cls, text]) => `<tspan class="${cls}">${esc(text)}</tspan>`).join('')}</text>`
   const motion = isIntro
     ? `
 .up-${id}{transform-box:fill-box;transform-origin:center bottom;animation:grow-${id} .4s cubic-bezier(.3,1.5,.5,1) backwards}
@@ -406,7 +407,7 @@ function heatmapSvg(width: number, today: string, ramp: Ramp, levelOn: LevelOn, 
       }
     }
     const first = Array.from({ length: 7 }, (_, r) => dayFromNumber(colStart + r)).find(day => day.endsWith('-01'))
-    if (first !== undefined) starts.push({ x: c * pitch, label: `${Number(first.slice(5, 7))} 月` })
+    if (first !== undefined) starts.push({ x: c * pitch, label: monthLabel(Number(first.slice(5, 7))) })
   }
   const place = (labels: typeof starts) => {
     let freeX = 0
@@ -422,12 +423,15 @@ function heatmapSvg(width: number, today: string, ramp: Ramp, levelOn: LevelOn, 
   const every = place(starts)
   const shown = every.length === starts.length ? every : place(starts.filter((_, i) => (starts.length - 1 - i) % 2 === 0))
   const months = shown.map(({ x, label }) => `<text x="${n(x)}" y="11" font-size="11" class="t3-${id}">${label}</text>`).join('')
-  const legendW = 14 + 5 * 12 + 13
+  const less = t('少', 'Less')
+  const more = t('多', 'More')
+  const lessW = textWidth(less, 11) + 3
+  const legendW = lessW + 5 * 12 + 2 + textWidth(more, 11)
   const lx = gridRight - legendW
   const ly = H - 12
-  const legend = `<text x="${n(lx)}" y="${ly + 9}" font-size="11" class="t3-${id}">少</text>${[0, 1, 2, 3, 4]
-    .map(k => `<rect class="k${k}-${id}" x="${n(lx + 14 + k * 12)}" y="${ly}" width="10" height="10" rx="2.5"/>`)
-    .join('')}<text x="${n(lx + 14 + 5 * 12 + 2)}" y="${ly + 9}" font-size="11" class="t3-${id}">多</text>`
+  const legend = `<text x="${n(lx)}" y="${ly + 9}" font-size="11" class="t3-${id}">${less}</text>${[0, 1, 2, 3, 4]
+    .map(k => `<rect class="k${k}-${id}" x="${n(lx + lessW + k * 12)}" y="${ly}" width="10" height="10" rx="2.5"/>`)
+    .join('')}<text x="${n(lx + lessW + 5 * 12 + 2)}" y="${ly + 9}" font-size="11" class="t3-${id}">${more}</text>`
   const kinds = (colors: readonly string[]) => colors.map((color, i) => `.k${i + 1}-${id}{fill:${color}}`).join('')
 
   return {

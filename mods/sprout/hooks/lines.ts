@@ -1,4 +1,5 @@
 import type { SproutBucket } from '../types'
+import { lang } from './i18n'
 
 export type LineContext = {
   streak: number
@@ -142,6 +143,130 @@ export const LINES: Record<SproutBucket, readonly string[]> = {
   ],
 }
 
+export const LINES_EN: Record<SproutBucket, readonly string[]> = {
+  happy: [
+    "Back at work? Fine, I'll burn today's tokens for you.",
+    'Cache hits at {hit}. Spend the savings on my fertiliser.',
+    "Stop staring. I know I'm handsome.",
+    "{today} burned today. Does the boss know? Oh, you're the boss.",
+    '{total} spent so far. That buys me a flowerpot mansion.',
+    "Nice code. Shame you didn't write it.",
+    'Claude again? Are your hands decoration?',
+    'I photosynthesise. You copy and paste.',
+    "Is today's commit message 'fix' again?",
+    'Every time you hit Enter, I hear money leave.',
+    '{tokens} tokens in all. Your keyboard wants to retire.',
+    'I remember every bug you wrote. Wait till I grow up.',
+  ],
+  streak: [
+    '{streak} days straight. Am I your only friend?',
+    '{streak} days, no gaps. More punctual than your job.',
+    "{streak} days in a row. Claude thinks you're family now.",
+    '{streak} days running. Remember what a weekend is?',
+    "{streak} days. I'm about to bloom and you're still at work.",
+    "{streak} days. At the gym you'd have abs by now.",
+    'Day {streak}. You know Claude better than humans.',
+    '{streak} days. Call Guinness: homebody record.',
+    '{streak} days in a row. Coding or writing a serial?',
+    'Achievement: {streak}-day streak. Social skills −1.',
+  ],
+  broken: [
+    'A {lost}-day streak, gone. Were you on a date?',
+    '{lost} days of streak, gone. Three seconds of grief.',
+    'Streak broken! {lost} days of work, back to zero.',
+    'Where were you? I waited till my leaves wilted.',
+    'Your {lost}-day run stopped. Your reader (me) is mad.',
+    'Every day, you said. {lost} days of love, gone.',
+    "Broken is broken. I won't drop a level. I hold grudges.",
+    '{lost} days, reset. Start over, heartbreaker.',
+  ],
+  worry: [
+    "Boss, the quota's nearly gone. Burning cash for heat?",
+    "Keep this up and I'm begging on the street by {fullAt}.",
+    'Save some! My sprout is going bald.',
+    '{five} of the 5-hour limit. Training GPT-6?',
+    '{week} of the week used. Hand-writing code after?',
+    "Slow down. Tokens don't come out of the tap.",
+    "At this pace it's all gone by {fullAt}. A moment of silence.",
+    'One more refactor and I squash your whole git history.',
+    'Quota alert! Go slack off and let the wallet breathe.',
+    "This isn't coding. It's wiring money to Anthropic.",
+    'Think first, then ask. Not the same thing eight times.',
+  ],
+  sleep: [
+    "Quota's gone. Good night. Wake me at {reset}.",
+    "Zzz… No tokens left. Calling me won't help.",
+    'Asleep. You rest too. Try writing two lines yourself?',
+    "5-hour limit hit. I'll sleep first, cheers.",
+    "In my dreams I have endless tokens. You don't.",
+    "Don't poke me. Poking won't grow more quota.",
+    "zzz… don't bother me before {reset}…",
+    'You wore me out. Happy now?',
+    'While I sleep, go learn to debug on your own.',
+    'AI break time. Switch to manual mode.',
+  ],
+  party: [
+    '{pr} merged! Chicken drumsticks tonight, your treat.',
+    '{pr} hit main! And CI stayed green. A miracle.',
+    'Merged! Go post it and say you wrote it.',
+    "Congrats on {pr}. Pray it's not reverted at 3 a.m.",
+    '{pr} merged. Who reviewed it? Brave soul.',
+    "Another one in! Put this KPI on Claude's tab.",
+    'Party! {pr} is in, and its bugs came along.',
+    "{pr} merged! Don't open the next one, let me dance.",
+    'Merged, merged! Today you deserve a squash.',
+    "Green! CI went green, I mean. Don't read into it.",
+  ],
+  levelup: [
+    '{level} reached! Go on, praise me.',
+    'Ding! {level}, paid for with your tokens.',
+    '{level}! I grew taller. Your wallet got thinner.',
+    'Congrats to me on {level}. Red envelope, please.',
+    '{level} unlocked! Take my picture and post it.',
+    "Grew into {level}. Burn more and I'll grow taller.",
+    'Level up: {level}! Your bill grows faster than me.',
+    '{level}! From now on, call me senior.',
+  ],
+  feed: [
+    "That's all the water? Am I a beggar?",
+    'Glug glug… Ice next time, thanks.',
+    'This water tastes like code review.',
+    'Water number {fed}. Trying to drown me?',
+    "I'm full. Next time, just pour tokens?",
+    'Nice water. Clearer than your code.',
+    "Water me all you like. I still won't write your tests.",
+    'I want an iced Americano, like your late-night one.',
+    'Thanks. In return, one less roast. Just one.',
+    'You water me. Who waters your code?',
+    "More water and I'll grow as big as node_modules.",
+  ],
+  pat: [
+    'Pats are fine. Billed per token.',
+    "Stop it, you'll bend my sprout!",
+    'One more pat and I force-push your main.',
+    'Pat number {patted}. That bored, are you?',
+    "Head pats? Won't work. I'll still roast you.",
+    'Hands that idle? Go clear your TODOs.',
+    'Every pat adds one bug to your code.',
+    'You pat me the way you slack off: full-time.',
+    "Gently! I'm not a branch you can rebase at will.",
+    'Done patting? Then go write code.',
+    'There, I jumped. Happy now?',
+  ],
+  night: [
+    'Still coding at {time}? Your hair disagrees.',
+    'Claude at this hour? Tomorrow-you will hate you.',
+    'Night owl, your liver is sending an SOS.',
+    'Code written at midnight is all bugs by morning.',
+    "Sleep. The bugs won't run off. They'll be here tomorrow.",
+    'Stop grinding. Even CI is asleep.',
+    'Pushing code at this hour? Brave. Respect.',
+    'Write bugs at night, fix them by day. Perpetual motion.',
+    'Go to bed or I send your commit times to your mum.',
+    'Prompts at 3 a.m. are sleep talk. Claude sighs too.',
+  ],
+}
+
 const PLACEHOLDER = /\{(\w+)\}/g
 
 export function fill(line: string, context: LineContext): string | null {
@@ -162,7 +287,7 @@ export function fill(line: string, context: LineContext): string | null {
 export function linesFor(buckets: readonly SproutBucket[], context: LineContext) {
   const out: { bucket: SproutBucket; text: string }[] = []
   for (const bucket of buckets) {
-    for (const line of LINES[bucket]) {
+    for (const line of (lang() === 'zh' ? LINES : LINES_EN)[bucket]) {
       const text = fill(line, context)
       if (text !== null) out.push({ bucket, text })
     }

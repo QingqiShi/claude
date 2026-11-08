@@ -195,6 +195,7 @@ const PANE = {
 
 test('the tiles, the token trend and the merges follow the one range, and the choice is kept', async ($, on) => {
   mock.clock(on, { now: NOW })
+  on('settings.read', () => ({ value: { language: '中文' } }))
   const store = new Map<string, unknown>()
   on('store.get', (_, e) => ({ value: store.get(e.key) }))
   on('store.set', (_, e) => {
@@ -232,6 +233,7 @@ test('the tiles, the token trend and the merges follow the one range, and the ch
 
 test('the first tile names the range it adds up', async ($, on) => {
   mock.clock(on, { now: NOW })
+  on('settings.read', () => ({ value: { language: '中文' } }))
   mock.store(on, {})
   on('state.get', (_, e, next) => (e.key in SEEDED ? { value: { value: SEEDED[e.key], version: 1 } } : next(e)))
 
@@ -248,6 +250,7 @@ test('the first tile names the range it adds up', async ($, on) => {
 
 test('a new session starts on the range chosen last', async ($, on) => {
   mock.clock(on, { now: NOW })
+  on('settings.read', () => ({ value: { language: '中文' } }))
   mock.store(on, { range: 'all' })
   on('state.get', (_, e, next) => (e.key in SEEDED ? { value: { value: SEEDED[e.key], version: 1 } } : next(e)))
   on('command.register', () => ({ value: { command: 'sprout' } }))

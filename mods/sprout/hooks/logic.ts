@@ -1,4 +1,5 @@
 import type { SproutBucket, SproutDay, SproutLimit, SproutMergeChunk, SproutMergeDay, SproutRange, SproutSample } from '../types'
+import { t } from './i18n'
 import { LEVELS, MAX_LEVEL, levelInfo } from './levels'
 
 export const MINUTE_MS = 60_000
@@ -9,6 +10,8 @@ export const FIVE_HOUR = { windowMs: 5 * HOUR_MS, lookbackMs: HOUR_MS }
 export const SEVEN_DAY = { windowMs: 7 * DAY_MS, lookbackMs: 24 * HOUR_MS }
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 export type LocalTime = {
   year: number
@@ -55,15 +58,19 @@ export function weekdayOf(day: string) {
 }
 
 export function clock(ms: number, tzOffsetMin: number) {
-  const t = localTime(ms, tzOffsetMin)
+  const local = localTime(ms, tzOffsetMin)
 
-  return `${String(t.hour).padStart(2, '0')}:${String(t.minute).padStart(2, '0')}`
+  return `${String(local.hour).padStart(2, '0')}:${String(local.minute).padStart(2, '0')}`
 }
 
 export function weekdayClock(ms: number, tzOffsetMin: number) {
-  const t = localTime(ms, tzOffsetMin)
+  const local = localTime(ms, tzOffsetMin)
 
-  return `${WEEKDAYS[t.weekday]} ${clock(ms, tzOffsetMin)}`
+  return `${t(WEEKDAYS[local.weekday]!, WEEKDAYS_EN[local.weekday]!)} ${clock(ms, tzOffsetMin)}`
+}
+
+export function monthLabel(month: number, gap = ' ') {
+  return t(`${month}${gap}月`, MONTHS_EN[month - 1] ?? '')
 }
 
 export function whenText(ms: number, now: number, tzOffsetMin: number) {
@@ -76,19 +83,19 @@ export function untilText(ms: number, now: number) {
   const minutes = Math.max(0, Math.round((ms - now) / MINUTE_MS))
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
-  if (h === 0) return `${m} 分`
-  if (m === 0) return `${h} 小时`
+  if (h === 0) return t(`${m} 分`, `${m}m`)
+  if (m === 0) return t(`${h} 小时`, `${h}h`)
 
-  return `${h} 小时 ${m} 分`
+  return t(`${h} 小时 ${m} 分`, `${h}h ${m}m`)
 }
 
 export function agoText(ms: number, now: number) {
   const minutes = Math.max(0, Math.round((now - ms) / MINUTE_MS))
-  if (minutes < 60) return `${Math.max(1, minutes)} 分钟前`
+  if (minutes < 60) return t(`${Math.max(1, minutes)} 分钟前`, `${Math.max(1, minutes)}m ago`)
   const hours = Math.round(minutes / 60)
-  if (hours < 48) return `${hours} 小时前`
+  if (hours < 48) return t(`${hours} 小时前`, `${hours}h ago`)
 
-  return `${Math.round(hours / 24)} 天前`
+  return t(`${Math.round(hours / 24)} 天前`, `${Math.round(hours / 24)}d ago`)
 }
 
 export function streakOf(activeDays: readonly string[], today: string) {

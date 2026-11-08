@@ -3,7 +3,8 @@ import type { Elements } from 'claude-code'
 import type { SproutDay, SproutMergeDay, SproutRange } from '../types'
 import { levelInfo, levelLabel } from './levels'
 import type { Mood } from './logic'
-import { PIPS, dayFromNumber, dayNumber, formatLines, formatTokens, mergeTotals, weekdayOf, wrapText } from './logic'
+import { t } from './i18n'
+import { PIPS, dayFromNumber, dayNumber, formatLines, formatTokens, mergeTotals, monthLabel, weekdayOf, wrapText } from './logic'
 import type { LevelOn } from './panels'
 import { CLAY, GREEN, LEVELS as METER, levelOf, movingAverage, trendStats } from './panels'
 import type { Cells, Pixels, Rgb, Scheme } from './raster'
@@ -31,6 +32,7 @@ type El = Elements['terminal']
 
 export type TerminalWindow = {
   label: string
+  quotaLabel: string
   pct: number
   projected: number | null
   reset: string
@@ -447,7 +449,7 @@ export function monthRow(today: string, weeks: number, scale: number) {
   const starts: Array<{ x: number; label: string }> = []
   for (let c = 0; c < weeks; c++) {
     const first = Array.from({ length: 7 }, (_, r) => dayFromNumber(startN + c * 7 + r)).find(day => day.endsWith('-01'))
-    if (first !== undefined) starts.push({ x: c * scale, label: `${Number(first.slice(5, 7))}月` })
+    if (first !== undefined) starts.push({ x: c * scale, label: monthLabel(Number(first.slice(5, 7)), '') })
   }
   const place = (labels: typeof starts) => {
     let free = 0
@@ -604,15 +606,15 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
   const isQuotaFolded = fit.isTight && view.quota.windows.length > 0 && view.quota.note === null
   const quota = (
     <Box flexDirection="column" gap={1}>
-      {isQuotaFolded ? null : head('额度', view.quota.note === null ? null : <Text dimColor>{view.quota.note}</Text>)}
+      {isQuotaFolded ? null : head(t('额度', 'Quota'), view.quota.note === null ? null : <Text dimColor>{view.quota.note}</Text>)}
       {view.quota.windows.length === 0 ? (
-        <Text dimColor>还没有额度读数。用订阅账号发一句话，我就看得到了。</Text>
+        <Text dimColor>{t('还没有额度读数。用订阅账号发一句话，我就看得到了。', 'No quota reading yet. Send one message on a subscription account and I will see it.')}</Text>
       ) : (
         view.quota.windows.map(w => {
           const isOver = levelOf(w.pct, w.projected) === 'over'
           return (
             <Box flexDirection="column">
-              {head(isQuotaFolded ? `${w.label}额度` : w.label, <Text dimColor>{w.reset}</Text>)}
+              {head(isQuotaFolded ? w.quotaLabel : w.label, <Text dimColor>{w.reset}</Text>)}
               {raster(Raster, `meter-${w.label}`, meterCells(W, w.pct, w.projected === null ? null : Math.round(w.projected), view.scheme))}
               {w.sentence === null || (fit.isTerse && !isOver) ? null : isOver ? (
                 <Text color="error">{w.sentence}</Text>
@@ -629,14 +631,14 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
   const stats = view.stats
   const statsPart =
     stats === null ? (
-      <Text dimColor>正在翻你的聊天记录，第一次要一两分钟。</Text>
+      <Text dimColor>{t('正在翻你的聊天记录，第一次要一两分钟。', 'Reading your chat history. The first time takes a minute or two.')}</Text>
     ) : (
       <Box flexDirection="column">
         {head(
           stats.heading,
           <Box flexDirection="row" gap={1} flexShrink={0}>
-            <Button key="range-30" label="30 天" plain dimColor={stats.range !== '30'} onPress={() => view.on.range('30')} />
-            <Button key="range-all" label="全部" plain dimColor={stats.range !== 'all'} onPress={() => view.on.range('all')} />
+            <Button key="range-30" label={t('30 天', '30 days')} plain dimColor={stats.range !== '30'} onPress={() => view.on.range('30')} />
+            <Button key="range-all" label={t('全部', 'All')} plain dimColor={stats.range !== 'all'} onPress={() => view.on.range('all')} />
           </Box>,
         )}
         {tiles(el, stats.tiles, W, clay, fit.isFlatTiles)}
@@ -645,14 +647,15 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
 
   const trend = view.trend
   const trendFigures = trendStats(trend.map(d => d.tokens))
-  const peak = `峰值 ${formatTokens(trendFigures.peak)}`
-  const average = `7 日均线 ${formatTokens(trendFigures.average)}`
-  const isTrendInHead = fit.isTight && cellWidth(`每日 token ${peak}  ${average}`) <= W
+  const peak = t(`峰值 ${formatTokens(trendFigures.peak)}`, `Peak ${formatTokens(trendFigures.peak)}`)
+  const average = t(`7 日均线 ${formatTokens(trendFigures.average)}`, `7-day avg ${formatTokens(trendFigures.average)}`)
+  const dailyTokens = t('每日 token', 'Daily tokens')
+  const isTrendInHead = fit.isTight && cellWidth(`${dailyTokens} ${peak}  ${average}`) <= W
   const trendPart =
     trend.length < 2 ? null : (
       <Box flexDirection="column">
         {head(
-          '每日 token',
+          dailyTokens,
           isTrendInHead ? (
             <Text wrap="truncate-end">
               <Text dimColor>{peak}</Text>
@@ -685,7 +688,7 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
     merges === null || mergeSum === null ? null : (
       <Box flexDirection="column">
         {head(
-          '每日合并',
+          t('每日合并', 'Daily merges'),
           <Text dimColor wrap="truncate-end">
             {merges.heading}
           </Text>,
@@ -693,15 +696,15 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
         <Box flexDirection="row" justifyContent="space-between" width={W}>
           <Text wrap="truncate-end">
             <Text color={mergeInk.add}>■</Text>
-            <Text dimColor> 新增 </Text>+{formatLines(mergeSum.additions)}
+            <Text dimColor> {t('新增', 'Added')} </Text>+{formatLines(mergeSum.additions)}
             <Text color={mergeInk.del}>{'  ■'}</Text>
-            <Text dimColor> 删除 </Text>−{formatLines(mergeSum.deletions)}
+            <Text dimColor> {t('删除', 'Removed')} </Text>−{formatLines(mergeSum.deletions)}
             {W >= 46 ? <Text color={mergeInk.pr}>{'  ●'}</Text> : null}
             {W >= 46 ? <Text dimColor> PR</Text> : null}
           </Text>
           {W < 56 ? null : (
             <Text color={mergeInk.prText} wrap="truncate-end">
-              {mergeToday === undefined || mergeToday.prs === 0 ? '今天还没合并' : `今天 ${mergeToday.prs} 个`}
+              {mergeToday === undefined || mergeToday.prs === 0 ? t('今天还没合并', 'No merges today') : t(`今天 ${mergeToday.prs} 个`, `${mergeToday.prs} today`)}
             </Text>
           )}
         </Box>
@@ -713,16 +716,16 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
   const legend = (swatches: JSX.Element[]) => (
     <Box flexDirection="row" justifyContent="flex-end" width={weeks * scale}>
       <Text wrap="truncate-end">
-        <Text dimColor>少 </Text>
+        <Text dimColor>{t('少', 'Less')} </Text>
         {swatches}
-        <Text dimColor> 多</Text>
+        <Text dimColor> {t('多', 'More')}</Text>
       </Text>
     </Box>
   )
   const swatchesOf = (ramp: typeof CLAY) => heatColors(view.scheme, ramp).levels.map(color => <Text color={hex(color)}>■</Text>)
   const heatMaps = [
-    view.usage === null ? null : { key: 'clay', title: 'Claude 使用', map: view.usage, ramp: CLAY },
-    view.github === null ? null : { key: 'github', title: 'GitHub 贡献', map: view.github, ramp: GREEN },
+    view.usage === null ? null : { key: 'clay', title: t('Claude 使用', 'Claude usage'), map: view.usage, ramp: CLAY },
+    view.github === null ? null : { key: 'github', title: t('GitHub 贡献', 'GitHub contributions'), map: view.github, ramp: GREEN },
   ].filter(heat => heat !== null)
   const isOneLegend = fit.isOneLegend && heatMaps.length === 2
   const heatParts = heatMaps.map((heat, i) => (
@@ -758,9 +761,9 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
         <Box flexDirection="column" gap={fit.hasButtonsGap ? 1 : 0}>
           {petPart}
           <Box flexDirection="row" gap={1}>
-            <Button key="feed" label="喂水" onPress={view.on.feed} />
-            <Button key="pat" label="摸摸" onPress={view.on.pat} />
-            <Button key="sass" label="再嘴一句" onPress={view.on.sass} />
+            <Button key="feed" label={t('喂水', 'Water')} onPress={view.on.feed} />
+            <Button key="pat" label={t('摸摸', 'Pat')} onPress={view.on.pat} />
+            <Button key="sass" label={t('再嘴一句', 'Roast me')} onPress={view.on.sass} />
           </Box>
         </Box>
       </Box>
@@ -801,35 +804,35 @@ function sharedSwatches(el: El, scheme: Scheme) {
 }
 
 /** Two framed tiles a row where they fit, else one line a tile; `isFlat` drops the frames. */
-function tiles(el: El, t: TerminalTiles, W: number, clay: string, isFlat: boolean) {
+function tiles(el: El, input: TerminalTiles, W: number, clay: string, isFlat: boolean) {
   const { Box, Text } = el
   const isTwo = W >= TWO_TILES_MIN
   const columnGap = isFlat ? 3 : 1
   const tileWidth = isTwo ? Math.floor((W - columnGap) / 2) : W
   const inner = isTwo && !isFlat ? tileWidth - 4 : tileWidth
-  const max = Math.max(1, ...t.bars)
-  const hit = `${(t.cacheHitRate * 100).toFixed(1)}%`
-  const tokens = formatTokens(t.tokens)
+  const max = Math.max(1, ...input.bars)
+  const hit = `${(input.cacheHitRate * 100).toFixed(1)}%`
+  const tokens = formatTokens(input.tokens)
   const room = (value: string) => inner - cellWidth(value) - 1
 
-  const barGap = room(tokens) >= t.bars.length * 2 + 1 ? ' ' : ''
-  const barsWidth = t.bars.length + barGap.length * (t.bars.length - 1)
+  const barGap = room(tokens) >= input.bars.length * 2 + 1 ? ' ' : ''
+  const barsWidth = input.bars.length + barGap.length * (input.bars.length - 1)
   const barsChart = (
     <Text>
-      <Text dimColor>{t.bars.slice(0, -1).map(v => spark(v, max) + barGap).join('')}</Text>
-      <Text color={clay}>{spark(t.bars.at(-1) ?? 0, max)}</Text>
+      <Text dimColor>{input.bars.slice(0, -1).map(v => spark(v, max) + barGap).join('')}</Text>
+      <Text color={clay}>{spark(input.bars.at(-1) ?? 0, max)}</Text>
     </Text>
   )
-  const isWideWeek = room(`${t.streak} 天`) >= 13
+  const isWideWeek = room(`${input.streak} ${t('天', 'days')}`) >= 13
   const weekChart = (
     <Text>
-      {t.week.map((isOn, i) => (
+      {input.week.map((isOn, i) => (
         <Text color={isOn ? clay : 'subtle'}>{`${i === 0 || !isWideWeek ? '' : ' '}■`}</Text>
       ))}
     </Text>
   )
   const meterWidth = Math.min(12, room(hit))
-  const lit = Math.round(meterWidth * Math.min(1, Math.max(0, t.cacheHitRate)))
+  const lit = Math.round(meterWidth * Math.min(1, Math.max(0, input.cacheHitRate)))
   const hitChart = (
     <Text>
       <Text color={clay}>{'━'.repeat(lit)}</Text>
@@ -881,17 +884,17 @@ function tiles(el: El, t: TerminalTiles, W: number, clay: string, isFlat: boolea
     )
   }
 
-  const tokenTile = tile('tile-tokens', t.tokensLabel, tokens, '', barsChart, barsWidth)
+  const tokenTile = tile('tile-tokens', input.tokensLabel, tokens, '', barsChart, barsWidth)
   const costTile = tile(
     'tile-cost',
-    '按 API 价估算',
-    t.costUsd,
+    t('按 API 价估算', 'At API prices'),
+    input.costUsd,
     '',
-    t.todayUsd === null ? null : <Text color={clay}>+{t.todayUsd}</Text>,
-    t.todayUsd === null ? 0 : cellWidth(t.todayUsd) + 1,
+    input.todayUsd === null ? null : <Text color={clay}>+{input.todayUsd}</Text>,
+    input.todayUsd === null ? 0 : cellWidth(input.todayUsd) + 1,
   )
-  const streakTile = tile('tile-streak', '连续使用', String(t.streak), '天', weekChart, isWideWeek ? 13 : 7)
-  const hitTile = tile('tile-hit', '缓存命中', hit, '', meterWidth >= 4 ? hitChart : null, meterWidth)
+  const streakTile = tile('tile-streak', t('连续使用', 'Streak'), String(input.streak), t('天', 'days'), weekChart, isWideWeek ? 13 : 7)
+  const hitTile = tile('tile-hit', t('缓存命中', 'Cache hits'), hit, '', meterWidth >= 4 ? hitChart : null, meterWidth)
 
   if (!isTwo) {
     return (

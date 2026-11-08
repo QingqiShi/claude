@@ -1,3 +1,5 @@
+English | [中文](README.zh.md)
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset="docs/banner-light.png">
@@ -32,14 +34,16 @@ A band above the prompt: context used, time left on the prompt cache, session co
 
 It opens by itself when the window is wide enough. Otherwise, run `/sprout`.
 
-The same pane runs in the desktop app, on the phone, and in the terminal. A terminal cannot draw SVG, so there 小苗 paints the pet, the charts and the heatmaps cell by cell, two pixels to a cell, and folds its layout to fit the pane's height.
+It speaks Chinese when Claude Code's `language` setting is Chinese (or, with no such setting, when the locale in `LC_ALL`, else `LANG`, is Chinese), and English otherwise.
+
+The same pane runs in the desktop app, on the phone, and in the terminal. A terminal cannot draw SVG, so there Miao paints the pet, the charts and the heatmaps cell by cell, two pixels to a cell, and folds its layout to fit the pane's height.
 
 <p>
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="mods/sprout/screenshot-light.webp">
-    <img src="mods/sprout/screenshot-dark.webp" alt="The 小苗 pane in the desktop app" width="593">
+    <source media="(prefers-color-scheme: light)" srcset="mods/sprout/screenshot-en-light.webp">
+    <img src="mods/sprout/screenshot-en-dark.webp" alt="The Miao pane in the desktop app" width="593">
   </picture>
-  <img src="mods/sprout/screenshot-terminal.png" alt="The 小苗 pane in the terminal" width="224">
+  <img src="mods/sprout/screenshot-terminal-en.png" alt="The Miao pane in the terminal" width="224">
 </p>
 
 ### Install
@@ -70,14 +74,14 @@ It needs `node` 18 or newer for the usage history (it reads `~/.claude/projects/
 
 ### See the pet on your phone
 
-[Buddy (搭子)](https://buddy.qingqi.dev) shows the same pet on a phone, live. Under the pane, 小苗 asks once: 手机上也想看小苗？ Press 同步到手机 (sync to phone), and your browser opens Buddy, where you sign in (a passkey, no password) and confirm that this Mac may post to your account. From then on the Mac uploads its state at most every five minutes, and only when something changed; the pane says when it last synced and links to your page. A quiet Mac means the pet sleeps, which is right.
+[Buddy (搭子)](https://buddy.qingqi.dev) shows the same pet on a phone, live. Under the pane, Miao asks once: “See Miao on your phone too?” Press “Sync to phone”, and your browser opens Buddy, where you sign in (a passkey, no password) and confirm that this Mac may post to your account. From then on the Mac uploads its state at most every five minutes, and only when something changed; the pane says when it last synced and links to your page. A quiet Mac means the pet sleeps, which is right.
 
 What goes up is what the page shows: tokens and cost by day, the quota readings, the GitHub heatmap levels, the number of PRs and lines merged each day, the pet's level and how often you fed and patted it. Repository names, PR titles and anything else about what you work on stay on the Mac. Each Mac signs its uploads with its own Ed25519 key, kept in the macOS Keychain (the item `sprout-buddy`), so only this Mac can post as itself; Buddy adds the days of all your Macs together, and each Mac pulls that total back so the pane shows every Mac.
 
 - `/sprout sync` starts the connection, or uploads right away once connected.
 - `/sprout disconnect` forgets the link but keeps the key on this Mac, so connecting it again makes it the same Mac on Buddy and its days count once. Buddy lists the Mac, and counts its days, until you remove it there; removing it there also deletes the days it sent.
 - `/sprout server <url>` points this Mac at another Buddy (a preview deployment, or your own); `/sprout server default` goes back. `SPROUT_BUDDY_SERVER` in the environment does the same for one process.
-- Pressing 不用 hides the offer; `/sprout sync` brings it back.
+- Pressing “No thanks” hides the offer; `/sprout sync` brings it back.
 
 To count a Mac that does not sync, copy its `~/.claude/projects/` into `~/.claude/sprout-imports/<device-name>/`. Once that Mac syncs to Buddy itself, remove its folder, or its days count twice.
 

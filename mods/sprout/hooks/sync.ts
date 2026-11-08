@@ -3,6 +3,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { SproutBuddy, SproutBuddyLink, SproutConnect, SproutOthers, SproutUpload } from '../types'
 import { BUDDY_DEFAULT_SERVER, machineName, normalizeServer, parseOthers, shouldUpload, uploadBodyOf, uploadHashOf } from './buddy'
+import { t } from './i18n'
 import { HOUR_MS, MINUTE_MS } from './logic'
 import { findNode, note } from './tools'
 
@@ -183,7 +184,7 @@ export async function startConnect($: EngineInterface) {
   const key = await script($, ['key'])
   const publicKey = key?.publicKey
   if (typeof publicKey !== 'string') {
-    await patch($, { note: key?.error === 'no-keychain' ? '这台电脑没有钥匙串，先不同步' : '拿不到这台 Mac 的钥匙' })
+    await patch($, { note: key?.error === 'no-keychain' ? t('这台电脑没有钥匙串，先不同步', 'No Keychain on this computer, so no sync') : t('拿不到这台 Mac 的钥匙', "Can't get this Mac's key") })
     return
   }
   const server = await buddyServer($)
@@ -196,7 +197,7 @@ export async function startConnect($: EngineInterface) {
   const body = parseJson(reply.text)
   const now = await $.clock.now()
   if (reply.status !== 200 || body === null || typeof body.requestId !== 'string' || typeof body.code !== 'string' || typeof body.url !== 'string') {
-    await patch($, { note: reply.status === 429 ? '试得太勤了，过几分钟再来' : '暂时连不上 Buddy' })
+    await patch($, { note: reply.status === 429 ? t('试得太勤了，过几分钟再来', 'Too many tries. Try again in a few minutes') : t('暂时连不上 Buddy', "Can't reach Buddy right now") })
     return
   }
   const connect: SproutConnect = {
@@ -234,7 +235,7 @@ export async function pollConnect($: EngineInterface) {
   const now = await $.clock.now()
   if (now > connect.expiresAt) {
     stopBuddy()
-    await patch($, { connect: null, note: '没在 10 分钟内确认，再试一次吧' })
+    await patch($, { connect: null, note: t('没在 10 分钟内确认，再试一次吧', 'Not confirmed within 10 minutes. Try again') })
     return
   }
   const reply = await fetchJson($, `${connect.server}/api/v1/connect/${connect.requestId}`)
@@ -246,7 +247,7 @@ export async function pollConnect($: EngineInterface) {
   if (status === 'approved') {
     const machine = (body?.machine as { id?: unknown; name?: unknown } | undefined) ?? {}
     if (typeof body?.user !== 'string' || typeof machine.id !== 'string') {
-      await patch($, { connect: null, note: '暂时连不上 Buddy' })
+      await patch($, { connect: null, note: t('暂时连不上 Buddy', "Can't reach Buddy right now") })
       return
     }
     const link: SproutBuddyLink = {
@@ -260,13 +261,13 @@ export async function pollConnect($: EngineInterface) {
     await $.store.delete(STORE.upload)
     await patch($, { connect: null, link, upload: null, error: null, note: null })
     try {
-      $.ui.toast('连上了，手机上也能看到小苗了')
+      $.ui.toast(t('连上了，手机上也能看到小苗了', 'Connected. Now you can see Miao on your phone too'))
     } catch {}
     await syncBuddy($, true)
     await pullOthers($, true)
     return
   }
-  await patch($, { connect: null, note: status === 'denied' ? '你在网页上拒绝了' : '这次连接过期了，再试一次吧' })
+  await patch($, { connect: null, note: status === 'denied' ? t('你在网页上拒绝了', 'You declined on the web page') : t('这次连接过期了，再试一次吧', 'This connect request expired. Try again') })
 }
 
 async function signed($: EngineInterface, link: SproutBuddyLink, command: 'sign-upload' | 'sign-read', extra: string[], stdin?: string) {

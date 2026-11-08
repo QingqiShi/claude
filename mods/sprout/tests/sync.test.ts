@@ -32,6 +32,7 @@ const pane = {
 /** A Buddy that answers as told, and a `buddy.mjs` that answers from memory, with `node`, the Keychain and `open` in place. */
 function world(on: Parameters<TestBody>[1], server: { poll: unknown; upload: number }, buddy: Record<string, unknown>, store: Record<string, unknown> = {}) {
   const clock = mock.clock(on, { now: NOW })
+  on('settings.read', () => ({ value: { language: '中文' } }))
   mock.store(on, { nodePath: '/usr/bin/node', ...store })
   mock.env(on, { HOME: '/Users/me', SPROUT_BUDDY_SERVER: SERVER })
   const calls: Call[] = []

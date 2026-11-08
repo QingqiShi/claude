@@ -25,6 +25,7 @@ import {
   localTime,
   mergeCalendar,
   mergeTotals,
+  monthLabel,
   moodOf,
   levelForTokens,
   lostStreakOf,
@@ -40,6 +41,7 @@ import {
   withCommas,
   wrapText,
 } from './logic'
+import { loadLang, t } from './i18n'
 import { levelLabel } from './levels'
 import {
   capsuleSvg,
@@ -86,7 +88,6 @@ const buddyState = atom(
 const othersState = atom({ plugin: 'sprout', key: 'others' } as const, null, { shape: 'others-1' })
 
 const PANE = 'sprout'
-const TITLE = '小苗'
 const FEED_MS = 1800
 const PAT_MS = 1200
 const POP_MS = 1000
@@ -106,8 +107,13 @@ function contentWidth(columns: number) {
 type Window = {
   kind: 'five' | 'week'
   label: string
+  quotaLabel: string
   limit: SproutLimit
   forecast: Forecast | null
+}
+
+function title() {
+  return t('小苗', 'Miao')
 }
 
 function poolFor(key: SproutBucket, streak: number): SproutBucket[] {
@@ -116,35 +122,36 @@ function poolFor(key: SproutBucket, streak: number): SproutBucket[] {
 
 function resetText(window: Window, now: number, tz: number) {
   const at = window.limit.resetsAt
-  if (at === null) return window.limit.pct === 0 ? '已重置' : ''
-  if (window.kind === 'five') return `${untilText(at, now)}后重置`
+  if (at === null) return window.limit.pct === 0 ? t('已重置', 'Reset') : ''
+  if (window.kind === 'five') return t(`${untilText(at, now)}后重置`, `Resets in ${untilText(at, now)}`)
 
-  return `${weekdayClock(at, tz)} 重置`
+  return t(`${weekdayClock(at, tz)} 重置`, `Resets ${weekdayClock(at, tz)}`)
 }
 
 function forecastText(window: Window, now: number, tz: number) {
   const { limit } = window
   const fc = window.forecast
   if (limit.pct >= 100) {
-    return limit.resetsAt === null ? '已用完' : `已用完，${whenText(limit.resetsAt, now, tz)} 恢复`
+    return limit.resetsAt === null ? t('已用完', 'Used up') : t(`已用完，${whenText(limit.resetsAt, now, tz)} 恢复`, `Used up, back at ${whenText(limit.resetsAt, now, tz)}`)
   }
   if (fc === null) return null
   const basis =
     window.kind === 'five'
       ? fc.basis === 'recent'
-        ? '按最近 1 小时的速度'
-        : '按这个窗口的平均速度'
+        ? t('按最近 1 小时的速度', "At the last hour's pace")
+        : t('按这个窗口的平均速度', "At this window's average pace")
       : fc.basis === 'recent'
-        ? '按最近 24 小时的速度'
-        : '按本周的平均速度'
-  if (fc.fullAt !== null) return `${basis}，${whenText(fc.fullAt, now, tz)} 左右就用完`
+        ? t('按最近 24 小时的速度', "At the last 24 hours' pace")
+        : t('按本周的平均速度', "At this week's average pace")
+  if (fc.fullAt !== null) return t(`${basis}，${whenText(fc.fullAt, now, tz)} 左右就用完`, `${basis}, it runs out around ${whenText(fc.fullAt, now, tz)}`)
   const projected = Math.round(fc.projected)
-  if (window.kind === 'five') return `${basis}，重置时约 ${projected}%`
+  if (window.kind === 'five') return t(`${basis}，重置时约 ${projected}%`, `${basis}, about ${projected}% at reset`)
 
-  return `${basis}，重置时还剩约 ${Math.max(0, 100 - projected)}%`
+  return t(`${basis}，重置时还剩约 ${Math.max(0, 100 - projected)}%`, `${basis}, about ${Math.max(0, 100 - projected)}% left at reset`)
 }
 
 async function readModel($: EngineInterface) {
+  await loadLang($)
   const now = await $.clock.now()
   const env = await read($, envState)
   const tz = env.tzOffsetMin ?? -new Date().getTimezoneOffset()
@@ -171,17 +178,17 @@ async function readModel($: EngineInterface) {
   const pips = pipsFor(level, tokens)
 
   const windows: Window[] = []
-  const add = (kind: 'five' | 'week', label: string, raw: SproutLimit | null) => {
+  const add = (kind: 'five' | 'week', label: string, quotaLabel: string, raw: SproutLimit | null) => {
     const limit = liveLimit(raw, now)
     if (limit === null) return
     const fc =
       limit.resetsAt === null || quota.at === null
         ? null
         : forecast(samplesOf(quota.samples, kind), { pct: limit.pct, at: quota.at, resetsAt: limit.resetsAt }, kind === 'five' ? FIVE_HOUR : SEVEN_DAY)
-    windows.push({ kind, label, limit, forecast: fc })
+    windows.push({ kind, label, quotaLabel, limit, forecast: fc })
   }
-  add('five', '5 小时', quota.five)
-  add('week', '本周', quota.week)
+  add('five', t('5 小时', '5 hours'), t('5 小时额度', '5-hour quota'), quota.five)
+  add('week', t('本周', 'This week'), t('本周额度', 'Weekly quota'), quota.week)
   const fiveWindow = windows.find(w => w.kind === 'five')
   const weekWindow = windows.find(w => w.kind === 'week')
 
@@ -225,7 +232,8 @@ async function readModel($: EngineInterface) {
   const lineKey = isLineLive ? line.bucket : moodKey
   const pool = linesFor(poolFor(lineKey, streak), context)
   const index = isLineLive ? line.index : Math.floor(now / AUTO_LINE_MS) + Number.parseInt(hashOf(today), 36)
-  const text = pool.length === 0 ? '……' : (pool[index % pool.length]?.text ?? '……')
+  const silence = t('……', '…')
+  const text = pool.length === 0 ? silence : (pool[index % pool.length]?.text ?? silence)
 
   return {
     now,
@@ -328,14 +336,16 @@ async function hydrateRange($: EngineInterface) {
 function rangeText(model: Model) {
   const firstDay = model.scan?.firstDay ?? null
 
-  return model.range === 'all' && firstDay !== null ? firstDayText(firstDay, model.today) : `最近 ${RECENT_DAYS} 天`
+  return model.range === 'all' && firstDay !== null ? firstDayText(firstDay, model.today) : t(`最近 ${RECENT_DAYS} 天`, `Last ${RECENT_DAYS} days`)
 }
 
 function firstDayText(firstDay: string, today: string) {
   const [y, m, d] = firstDay.split('-').map(Number)
-  const year = y === Number(today.slice(0, 4)) ? '' : `${y} 年 `
+  const isThisYear = y === Number(today.slice(0, 4))
+  const zh = `自 ${isThisYear ? '' : `${y} 年 `}${m} 月 ${d} 日起`
+  const en = `Since ${monthLabel(m ?? 1)} ${d}${isThisYear ? '' : `, ${y}`}`
 
-  return `自 ${year}${m} 月 ${d} 日起`
+  return t(zh, en)
 }
 
 async function introsFor($: EngineInterface, today: string, drawings: Record<SproutIntroKind, string | null>) {
@@ -358,7 +368,7 @@ async function introsFor($: EngineInterface, today: string, drawings: Record<Spr
 }
 
 function rangeWord(model: Model) {
-  return model.range === '30' ? '30 天' : '累计'
+  return model.range === '30' ? t('30 天', '30-day') : t('累计', 'All-time')
 }
 
 function tilesInputFor(model: Model, width: number) {
@@ -369,7 +379,7 @@ function tilesInputFor(model: Model, width: number) {
 
   return {
     width,
-    tokensLabel: `${rangeWord(model)} token`,
+    tokensLabel: t(`${rangeWord(model)} token`, `${rangeWord(model)} tokens`),
     tokens: totals.tokens,
     costUsd: totals.costUsd,
     todayUsd: last7.at(-1)?.costUsd ?? 0,
@@ -382,7 +392,7 @@ function tilesInputFor(model: Model, width: number) {
 }
 
 function mergedText(model: Model) {
-  return `${model.mergeDays.length} 天 ${model.merged.prs} 个 PR`
+  return t(`${model.mergeDays.length} 天 ${model.merged.prs} 个 PR`, `${model.merged.prs} PRs in ${model.mergeDays.length} days`)
 }
 
 function usedText(model: Model) {
@@ -391,13 +401,13 @@ function usedText(model: Model) {
   const span = dayNumber(model.today) - dayNumber(firstDay) + 1
   const active = model.scan.days.filter(d => d.tokens > 0 && d.day <= model.today).length
 
-  return `${span} 天里用了 ${active} 天`
+  return t(`${span} 天里用了 ${active} 天`, `Active ${active} of ${span} days`)
 }
 
 function trendText(days: ReturnType<typeof trendDays>) {
   const { peak, average } = trendStats(days.map(d => d.tokens))
 
-  return `峰值 ${formatTokens(peak)} · 7 日均线 ${formatTokens(average)}`
+  return t(`峰值 ${formatTokens(peak)} · 7 日均线 ${formatTokens(average)}`, `Peak ${formatTokens(peak)} · 7-day avg ${formatTokens(average)}`)
 }
 
 /** The terminal tells no plugin its colors, so we take the scheme from the theme the person chose. */
@@ -412,7 +422,7 @@ async function schemeOf($: EngineInterface): Promise<Scheme> {
 }
 
 function githubText(total: number) {
-  return `过去一年 ${withCommas(total)} 次`
+  return t(`过去一年 ${withCommas(total)} 次`, `${withCommas(total)} in the past year`)
 }
 
 /** One quiet line on syncing to the phone: the offer, the connect in progress, or the link and its last upload. */
@@ -421,86 +431,101 @@ function syncView($: EngineInterface, buddy: SproutBuddy, now: number): Terminal
   const connect = buddy.connect
   if (connect !== null) {
     return {
-      text: `在浏览器里确认连接 · 代码 ${connect.code}`,
-      link: { href: connect.url, label: '打开页面' },
-      buttons: [{ key: 'buddy-cancel', label: '取消', isPrimary: false, onPress: () => void cancelConnect($).catch(() => {}) }],
+      text: t(`在浏览器里确认连接 · 代码 ${connect.code}`, `Confirm in your browser · code ${connect.code}`),
+      link: { href: connect.url, label: t('打开页面', 'Open page') },
+      buttons: [{ key: 'buddy-cancel', label: t('取消', 'Cancel'), isPrimary: false, onPress: () => void cancelConnect($).catch(() => {}) }],
     }
   }
   const link = buddy.link
   if (link !== null) {
     const text =
       buddy.error === 'unauthorized'
-        ? 'Buddy 不认这台 Mac 了'
+        ? t('Buddy 不认这台 Mac 了', 'Buddy no longer knows this Mac')
         : buddy.error === 'network'
-          ? '暂时连不上 Buddy，稍后再同步'
+          ? t('暂时连不上 Buddy，稍后再同步', "Can't reach Buddy. Will sync later")
           : buddy.upload === null
-            ? '已连接，等第一次同步'
-            : `已同步到手机 · ${agoText(buddy.upload.at, now)}`
+            ? t('已连接，等第一次同步', 'Connected, waiting for the first sync')
+            : t(`已同步到手机 · ${agoText(buddy.upload.at, now)}`, `Synced to phone · ${agoText(buddy.upload.at, now)}`)
     return {
       text,
-      link: { href: `${link.server}/u/${link.user}`, label: '我的页面' },
+      link: { href: `${link.server}/u/${link.user}`, label: t('我的页面', 'My page') },
       buttons:
         buddy.error === 'unauthorized'
           ? [
-              { key: 'buddy-again', label: '重新连接', isPrimary: true, onPress: () => void reconnectBuddy($).catch(() => {}) },
-              { key: 'buddy-off', label: '断开', isPrimary: false, onPress: () => void disconnectBuddy($).catch(() => {}) },
+              { key: 'buddy-again', label: t('重新连接', 'Reconnect'), isPrimary: true, onPress: () => void reconnectBuddy($).catch(() => {}) },
+              { key: 'buddy-off', label: t('断开', 'Disconnect'), isPrimary: false, onPress: () => void disconnectBuddy($).catch(() => {}) },
             ]
-          : [{ key: 'buddy-off', label: '断开', isPrimary: false, onPress: () => void disconnectBuddy($).catch(() => {}) }],
+          : [{ key: 'buddy-off', label: t('断开', 'Disconnect'), isPrimary: false, onPress: () => void disconnectBuddy($).catch(() => {}) }],
     }
   }
   if (buddy.isOfferHidden && buddy.note === null) return null
 
   return {
-    text: buddy.note ?? '手机上也想看小苗？',
+    text: buddy.note ?? t('手机上也想看小苗？', 'See Miao on your phone too?'),
     link: null,
     buttons: [
-      { key: 'buddy-sync', label: '同步到手机', isPrimary: true, onPress: () => void startConnect($).catch(() => {}) },
-      { key: 'buddy-no', label: '不用', isPrimary: false, onPress: () => void hideOffer($, true).catch(() => {}) },
+      { key: 'buddy-sync', label: t('同步到手机', 'Sync to phone'), isPrimary: true, onPress: () => void startConnect($).catch(() => {}) },
+      { key: 'buddy-no', label: t('不用', 'No thanks'), isPrimary: false, onPress: () => void hideOffer($, true).catch(() => {}) },
     ],
   }
 }
 
 async function runSproutCommand($: EngineInterface, args: string) {
+  await loadLang($)
   const [verb = '', ...rest] = args.trim().split(/\s+/).filter(Boolean)
   const buddy = await read($, buddyState)
   switch (verb) {
     case '': {
-      await $.ui.open({ id: PANE, title: TITLE })
-      return '小苗来了。'
+      await $.ui.open({ id: PANE, title: title() })
+      return t('小苗来了。', 'Miao is here.')
     }
     case 'sync': {
-      if (buddy.isReady !== true) return '这台电脑上同步不了：需要 macOS 的钥匙串和 node。'
+      if (buddy.isReady !== true) return t('这台电脑上同步不了：需要 macOS 的钥匙串和 node。', "Can't sync on this computer: it needs the macOS Keychain and node.")
       if (buddy.link !== null) {
         await syncBuddy($, true)
         const after = await read($, buddyState)
-        return after.error === null ? '已同步到手机。' : after.error === 'unauthorized' ? 'Buddy 不认这台 Mac 了，在面板里点「重新连接」。' : '暂时连不上 Buddy。'
+        return after.error === null
+          ? t('已同步到手机。', 'Synced to phone.')
+          : after.error === 'unauthorized'
+            ? t('Buddy 不认这台 Mac 了，在面板里点「重新连接」。', 'Buddy no longer knows this Mac. Press Reconnect in the pane.')
+            : t('暂时连不上 Buddy。', "Can't reach Buddy right now.")
       }
       await hideOffer($, false)
       await startConnect($)
       const after = await read($, buddyState)
-      return after.connect === null ? (after.note ?? '暂时连不上 Buddy。') : `在浏览器里确认连接，代码 ${after.connect.code}：${after.connect.url}`
+      return after.connect === null
+        ? (after.note ?? t('暂时连不上 Buddy。', "Can't reach Buddy right now."))
+        : t(`在浏览器里确认连接，代码 ${after.connect.code}：${after.connect.url}`, `Confirm in your browser, code ${after.connect.code}: ${after.connect.url}`)
     }
     case 'server': {
       const value = rest[0]
-      if (value === undefined) return `Buddy 服务器：${await buddyServer($)}`
+      if (value === undefined) return t(`Buddy 服务器：${await buddyServer($)}`, `Buddy server: ${await buddyServer($)}`)
       const server = await setBuddyServer($, value === 'default' ? null : value)
-      return server === null ? '要一个 http(s) 地址，或 default。' : `Buddy 服务器：${server}`
+      return server === null ? t('要一个 http(s) 地址，或 default。', 'Give an http(s) address, or default.') : t(`Buddy 服务器：${server}`, `Buddy server: ${server}`)
     }
     case 'disconnect': {
       await disconnectBuddy($)
-      return '已断开。钥匙留在这台 Mac 上，再连还是同一台。要连同它的数据一起去掉，在 Buddy 的「我的 Mac」里移除。'
+      return t(
+        '已断开。钥匙留在这台 Mac 上，再连还是同一台。要连同它的数据一起去掉，在 Buddy 的「我的 Mac」里移除。',
+        'Disconnected. The key stays on this Mac, so a new connect makes it the same Mac. To remove it and its data too, remove it under Your Macs on Buddy.',
+      )
     }
     default:
-      return '用法：/sprout、/sprout sync、/sprout server <地址|default>、/sprout disconnect'
+      return t('用法：/sprout、/sprout sync、/sprout server <地址|default>、/sprout disconnect', 'Usage: /sprout, /sprout sync, /sprout server <url|default>, /sprout disconnect')
   }
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
+    await loadLang($)
     try {
-      await $.command.register({ name: 'sprout', description: '打开小苗面板；sync 同步到手机', argumentHint: '[sync | server <url> | disconnect]' })
+      await $.command.register({
+        name: 'sprout',
+        description: t('打开小苗面板；sync 同步到手机', 'Open the Miao pane; sync sends it to your phone'),
+        argumentHint: '[sync | server <url> | disconnect]',
+      })
     } catch {}
-    void $.ui.open({ id: PANE, title: TITLE }).catch(() => {})
+    void $.ui.open({ id: PANE, title: title() }).catch(() => {})
     void hydrateRange($)
     const started = await next(e)
     startSprout($, e.cwd)
@@ -528,7 +553,7 @@ export const register: Register = on => {
       const view: TerminalView = {
         width: e.props.bodyColumns,
         scheme: await schemeOf($),
-        title: TITLE,
+        title: title(),
         repo: model.env.repo ?? '',
         pet: {
           mood: model.mood,
@@ -542,12 +567,13 @@ export const register: Register = on => {
         quota: {
           windows: model.windows.map(w => ({
             label: w.label,
+            quotaLabel: w.quotaLabel,
             pct: w.limit.pct,
             projected: w.forecast?.projected ?? null,
             reset: resetText(w, model.now, model.tz),
             sentence: forecastText(w, model.now, model.tz),
           })),
-          note: model.quota.at !== null && model.now - model.quota.at > STALE_QUOTA_MS ? `更新于 ${agoText(model.quota.at, model.now)}` : null,
+          note: model.quota.at !== null && model.now - model.quota.at > STALE_QUOTA_MS ? t(`更新于 ${agoText(model.quota.at, model.now)}`, `Updated ${agoText(model.quota.at, model.now)}`) : null,
         },
         stats:
           tiles === null || firstDay === null
@@ -632,7 +658,7 @@ export const register: Register = on => {
       <Box flexDirection="column" gap="lg">
         <Box flexDirection="row" alignItems="center" gap="sm">
           <Text color="#3F8F4A">●</Text>
-          <Text weight="medium">{TITLE}</Text>
+          <Text weight="medium">{title()}</Text>
           <Box flexGrow={1} />
           <Text dimColor wrap="truncate-end">
             {model.env.repo ?? ''}
@@ -640,18 +666,21 @@ export const register: Register = on => {
         </Box>
 
         <Box flexDirection="column" gap="sm">
-          <Svg source={sceneFor(model, width)} alt={`小苗，${levelLabel(model.level)}：${model.text}`} />
+          <Svg source={sceneFor(model, width)} alt={t(`小苗，${levelLabel(model.level)}：${model.text}`, `Miao, ${levelLabel(model.level)}: ${model.text}`)} />
           <Box flexDirection="row" flexWrap="nowrap" gap="sm">
-            <Button key="feed" label="喂水" onPress={() => void press($, 'feed')} />
-            <Button key="pat" label="摸摸" onPress={() => void press($, 'pat')} />
-            <Button key="sass" label="再嘴一句" onPress={() => void talk($, model.moodKey)} />
+            <Button key="feed" label={t('喂水', 'Water')} onPress={() => void press($, 'feed')} />
+            <Button key="pat" label={t('摸摸', 'Pat')} onPress={() => void press($, 'pat')} />
+            <Button key="sass" label={t('再嘴一句', 'Roast me')} onPress={() => void talk($, model.moodKey)} />
           </Box>
         </Box>
 
         <Box flexDirection="column" gap="sm">
-          {sectionHead('额度', isStale && model.quota.at !== null ? <Text dimColor>{`更新于 ${agoText(model.quota.at, model.now)}`}</Text> : null)}
+          {sectionHead(
+            t('额度', 'Quota'),
+            isStale && model.quota.at !== null ? <Text dimColor>{t(`更新于 ${agoText(model.quota.at, model.now)}`, `Updated ${agoText(model.quota.at, model.now)}`)}</Text> : null,
+          )}
           {model.windows.length === 0 ? (
-            <Text dimColor>还没有额度读数。用订阅账号发一句话，我就看得到了。</Text>
+            <Text dimColor>{t('还没有额度读数。用订阅账号发一句话，我就看得到了。', 'No quota reading yet. Send one message on a subscription account and I will see it.')}</Text>
           ) : (
             model.windows.map(w => {
               const projected = w.forecast === null ? null : w.forecast.projected
@@ -666,7 +695,7 @@ export const register: Register = on => {
                     <Text dimColor>{w.label}</Text>
                     <Text dimColor>{resetText(w, model.now, model.tz)}</Text>
                   </Box>
-                  <Svg source={source} alt={`${w.label}已用 ${Math.round(w.limit.pct)}%`} />
+                  <Svg source={source} alt={t(`${w.label}已用 ${Math.round(w.limit.pct)}%`, `${w.label}: ${Math.round(w.limit.pct)}% used`)} />
                   {sentence === null ? null : isOver ? <Text color="error">{sentence}</Text> : <Text dimColor>{sentence}</Text>}
                 </Box>
               )
@@ -675,56 +704,62 @@ export const register: Register = on => {
         </Box>
 
         {scan === null || firstDay === null || tiles === null || tilesInput === null ? (
-          <Text dimColor>正在翻你的聊天记录，第一次要一两分钟。</Text>
+          <Text dimColor>{t('正在翻你的聊天记录，第一次要一两分钟。', 'Reading your chat history. The first time takes a minute or two.')}</Text>
         ) : (
           <Box flexDirection="column" gap="sm">
             {sectionHead(
               rangeText(model),
               <Box flexDirection="row" gap="xs" flexWrap="nowrap">
-                <Button key="range-30" label="30 天" plain dimColor={model.range !== '30'} onPress={() => void setRange($, '30')} />
-                <Button key="range-all" label="全部" plain dimColor={model.range !== 'all'} onPress={() => void setRange($, 'all')} />
+                <Button key="range-30" label={t('30 天', '30 days')} plain dimColor={model.range !== '30'} onPress={() => void setRange($, '30')} />
+                <Button key="range-all" label={t('全部', 'All')} plain dimColor={model.range !== 'all'} onPress={() => void setRange($, 'all')} />
               </Box>,
             )}
             <Svg
               source={tiles}
-              alt={`${rangeText(model)}：${formatTokens(tilesInput.tokens)} token，按 API 价格估算 ${formatUsd(tilesInput.costUsd)}，今天 ${formatUsd(tilesInput.todayUsd)}；连续使用 ${model.streak} 天；缓存命中 ${(tilesInput.cacheHitRate * 100).toFixed(1)}%`}
+              alt={t(
+                `${rangeText(model)}：${formatTokens(tilesInput.tokens)} token，按 API 价格估算 ${formatUsd(tilesInput.costUsd)}，今天 ${formatUsd(tilesInput.todayUsd)}；连续使用 ${model.streak} 天；缓存命中 ${(tilesInput.cacheHitRate * 100).toFixed(1)}%`,
+                `${rangeText(model)}: ${formatTokens(tilesInput.tokens)} tokens, ${formatUsd(tilesInput.costUsd)} at API prices, ${formatUsd(tilesInput.todayUsd)} today; ${model.streak}-day streak; ${(tilesInput.cacheHitRate * 100).toFixed(1)}% cache hits`,
+              )}
             />
           </Box>
         )}
 
         {trendSource === null ? null : (
           <Box flexDirection="column" gap="sm">
-            {sectionHead('每日 token', null)}
-            <Svg source={trendSource} alt={`每日 token，最近 ${trend.length} 天，${trendText(trend)}`} />
+            {sectionHead(t('每日 token', 'Daily tokens'), null)}
+            <Svg source={trendSource} alt={t(`每日 token，最近 ${trend.length} 天，${trendText(trend)}`, `Daily tokens, last ${trend.length} days, ${trendText(trend)}`)} />
           </Box>
         )}
 
         {mergesSource === null ? null : (
           <Box flexDirection="column" gap="sm">
             {sectionHead(
-              '每日合并',
+              t('每日合并', 'Daily merges'),
               <Text dimColor wrap="truncate-end">
                 {mergedText(model)}
               </Text>,
             )}
             <Svg
               source={mergesSource}
-              alt={`最近 ${model.mergeDays.length} 天合并 ${model.merged.prs} 个 PR，共改动 ${withCommas(model.merged.additions + model.merged.deletions)} 行：新增 ${withCommas(model.merged.additions)} 行，删除 ${withCommas(model.merged.deletions)} 行`}
+              alt={t(
+                `最近 ${model.mergeDays.length} 天合并 ${model.merged.prs} 个 PR，共改动 ${withCommas(model.merged.additions + model.merged.deletions)} 行：新增 ${withCommas(model.merged.additions)} 行，删除 ${withCommas(model.merged.deletions)} 行`,
+                `${model.merged.prs} PRs merged in the last ${model.mergeDays.length} days, ${withCommas(model.merged.additions + model.merged.deletions)} lines changed: ${withCommas(model.merged.additions)} added, ${withCommas(model.merged.deletions)} removed`,
+              )}
             />
           </Box>
         )}
 
         {clayDrawing === null || used === null ? null : (
           <Box flexDirection="column" gap="sm">
-            {sectionHead('Claude 使用', <Text dimColor>{used}</Text>)}
-            <Svg source={clayDrawing.svg} alt={`Claude 使用，${used}`} />
+            {sectionHead(t('Claude 使用', 'Claude usage'), <Text dimColor>{used}</Text>)}
+            <Svg source={clayDrawing.svg} alt={t(`Claude 使用，${used}`, `Claude usage, ${used}`)} />
           </Box>
         )}
 
         {ghDrawing === null || github === null ? null : (
           <Box flexDirection="column" gap="sm">
-            {sectionHead('GitHub 贡献', <Text dimColor>{githubText(github.total)}</Text>)}
-            <Svg source={ghDrawing.svg} alt={`GitHub 贡献，${githubText(github.total)}`} />
+            {sectionHead(t('GitHub 贡献', 'GitHub contributions'), <Text dimColor>{githubText(github.total)}</Text>)}
+            <Svg source={ghDrawing.svg} alt={t(`GitHub 贡献，${githubText(github.total)}`, `GitHub contributions, ${githubText(github.total)}`)} />
           </Box>
         )}
 
@@ -746,6 +781,6 @@ export const register: Register = on => {
   }).catch(($, e) => {
     const { Text } = $.ui.resolve(e)
 
-    return <Text dimColor>小苗打了个盹，过会儿再来。</Text>
+    return <Text dimColor>{t('小苗打了个盹，过会儿再来。', 'Miao is taking a nap. Come back soon.')}</Text>
   })
 }

@@ -1,6 +1,7 @@
+import { lang } from './i18n'
 import { hashOf } from './logic'
 
-export const FONT = "-apple-system, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif"
+export const FONT = "-apple-system, system-ui, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif"
 
 const GLYPH_EM: Record<string, number> = {
   ' ': 0.33,
@@ -59,7 +60,8 @@ export function todayCss(id: string) {
 
 const memo = new Map<string, unknown>()
 
-export function memoize<T>(key: string, build: () => T): T {
+export function memoize<T>(name: string, build: () => T): T {
+  const key = `${lang()}|${name}`
   if (memo.has(key)) return memo.get(key) as T
   const value = build()
   if (memo.size > 48) memo.delete(memo.keys().next().value as string)

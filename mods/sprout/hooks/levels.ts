@@ -1,6 +1,9 @@
+import { t } from './i18n'
+
 export type Level = {
   lv: number
   name: string
+  nameEn: string
   thresholdB: number
   /** The pixel size in the approved 200×140 mockup; the scene scales it. */
   px: number
@@ -13,11 +16,12 @@ export type Level = {
 }
 
 export const LEVELS: readonly Level[] = [
-  { lv: 1, name: '种子', thresholdB: 0, px: 3, isSeed: true, crown: ['.......G........', '........g.......'] },
-  { lv: 2, name: '小苗', thresholdB: 20, px: 3.4, crown: ['.....GG...GG....', '......GGgGG.....', '........g.......'] },
+  { lv: 1, name: '种子', nameEn: 'Seed', thresholdB: 0, px: 3, isSeed: true, crown: ['.......G........', '........g.......'] },
+  { lv: 2, name: '幼苗', nameEn: 'Sprout', thresholdB: 20, px: 3.4, crown: ['.....GG...GG....', '......GGgGG.....', '........g.......'] },
   {
     lv: 3,
     name: '嫩芽',
+    nameEn: 'Shoot',
     thresholdB: 35,
     px: 3.8,
     crown: ['......gg..gg....', '.....gGGggGGg...', '......gggggg....', '........g.......'],
@@ -25,6 +29,7 @@ export const LEVELS: readonly Level[] = [
   {
     lv: 4,
     name: '花苞',
+    nameEn: 'Bud',
     thresholdB: 60,
     px: 4.1,
     crown: [
@@ -40,6 +45,7 @@ export const LEVELS: readonly Level[] = [
   {
     lv: 5,
     name: '开花',
+    nameEn: 'Bloom',
     thresholdB: 100,
     px: 4.4,
     crown: [
@@ -55,6 +61,7 @@ export const LEVELS: readonly Level[] = [
   {
     lv: 6,
     name: '结果',
+    nameEn: 'Fruit',
     thresholdB: 180,
     px: 4.6,
     crown: [
@@ -70,6 +77,7 @@ export const LEVELS: readonly Level[] = [
   {
     lv: 7,
     name: '小树',
+    nameEn: 'Sapling',
     thresholdB: 320,
     px: 4.8,
     hasBird: true,
@@ -88,6 +96,7 @@ export const LEVELS: readonly Level[] = [
   {
     lv: 8,
     name: '花树',
+    nameEn: 'Blossom Tree',
     thresholdB: 560,
     px: 5,
     hasBird: true,
@@ -107,6 +116,7 @@ export const LEVELS: readonly Level[] = [
   {
     lv: 9,
     name: '传说金树',
+    nameEn: 'Golden Tree',
     thresholdB: 1000,
     px: 5.2,
     isGold: true,
@@ -132,5 +142,7 @@ export function levelInfo(lv: number): Level {
 }
 
 export function levelLabel(lv: number) {
-  return `Lv${levelInfo(lv).lv} ${levelInfo(lv).name}`
+  const level = levelInfo(lv)
+
+  return `Lv${level.lv} ${t(level.name, level.nameEn)}`
 }

@@ -45,6 +45,7 @@ const pane = (bodyColumns: number, bodyRows = 120, placement: 'dock' | 'inline' 
 
 function mockState(on: Parameters<TestBody>[1]) {
   mock.clock(on, { now: NOW })
+  on('settings.read', () => ({ value: { language: '中文' } }))
   mock.store(on)
   on('state.get', (_, e) => ({ value: { value: STATE[(e as { key: string }).key], version: 1 } }))
 }

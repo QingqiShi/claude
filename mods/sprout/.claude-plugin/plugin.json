@@ -1,6 +1,6 @@
 {
   "name": "sprout",
-  "version": "0.1.5",
-  "description": "芽团: a pane beside the chat with a cheeky pixel pet, your quota forecast, your Claude Code usage over time, your merged PRs and lines changed each day, and your GitHub contributions.",
+  "version": "0.2.0",
+  "description": "小苗 (Miao): a pane beside the chat with a cheeky pixel pet, your quota forecast, your Claude Code usage over time, your merged PRs and lines changed each day, and your GitHub contributions. Syncs to Buddy so you see your pet on your phone.",
   "types": "./types/index.d.ts"
 }

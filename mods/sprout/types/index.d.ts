@@ -73,6 +73,32 @@ export type SproutIntroKind = 'tiles' | 'trend' | 'merges' | 'clay' | 'github'
 /** Kept in the store as `introPlayed`: the local day each drawing last played its entrance, in any session. */
 export type SproutIntroPlayed = Partial<Record<SproutIntroKind, string>>
 
+/** The Buddy account and machine this Mac uploads as; `server` is the origin it connected to. */
+export type SproutBuddyLink = { server: string; user: string; machine: string; name: string; connectedAt: number }
+
+/** A connect request the person is confirming in the browser; polled every `intervalMs` until `expiresAt`. */
+export type SproutConnect = { server: string; requestId: string; code: string; url: string; expiresAt: number; intervalMs: number }
+
+/** Kept in the store as `buddyUpload`, shared by every session on this Mac: the last upload's time and the hash of its data. */
+export type SproutUpload = { at: number; hash: string }
+
+export type SproutBuddyError = 'unauthorized' | 'network'
+
+export type SproutBuddy = {
+  /** Null until the Mac's key and `node` are found; false where there is no Keychain. */
+  isReady: boolean | null
+  link: SproutBuddyLink | null
+  connect: SproutConnect | null
+  upload: SproutUpload | null
+  error: SproutBuddyError | null
+  /** A short word on the last connect attempt, shown once in the pane. */
+  note: string | null
+  isOfferHidden: boolean
+}
+
+/** What the account's other Macs uploaded to Buddy, pulled back so that the pane shows every Mac's total. */
+export type SproutOthers = { fetchedAt: number; firstDay: string | null; days: SproutDay[] }
+
 declare module 'claude-code' {
   interface PluginState {
     sprout: {
@@ -85,6 +111,8 @@ declare module 'claude-code' {
       range: SproutRange
       env: SproutEnv
       growth: SproutGrowth
+      buddy: Shaped<SproutBuddy>
+      others: Shaped<SproutOthers | null>
     }
   }
 }

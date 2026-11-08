@@ -48,6 +48,13 @@ export type TerminalTiles = {
   bars: number[]
 }
 
+/** The pane's one line on syncing to the phone: a dim text, a link to the page, and the buttons that act. */
+export type TerminalSync = {
+  text: string
+  link: { href: string; label: string } | null
+  buttons: { key: string; label: string; isPrimary: boolean; onPress: () => void }[]
+}
+
 export type TerminalView = {
   width: number
   scheme: Scheme
@@ -63,6 +70,7 @@ export type TerminalView = {
   today: string
   /** The rows the docked pane's body has, or null where the frame fits the tree. */
   rows: number | null
+  sync: TerminalSync | null
   on: { feed: () => void; pat: () => void; sass: () => void; range: (range: SproutRange) => void }
 }
 
@@ -555,7 +563,7 @@ export function treeRows(node: unknown, width: number): number {
 }
 
 function paneTree(el: El, view: TerminalView, fit: Fit) {
-  const { Box, Text, Button, Raster } = el
+  const { Box, Text, Button, Raster, Link } = el
   const W = view.width
   const ink = INKS[view.scheme]
   const clay = hex(ink.clay)
@@ -761,6 +769,21 @@ function paneTree(el: El, view: TerminalView, fit: Fit) {
       {trendPart}
       {mergePart}
       {heatParts}
+      {view.sync === null ? null : (
+        <Box flexDirection="row" gap={1} width={W} flexWrap="wrap">
+          <Text dimColor wrap="truncate-end">
+            {view.sync.text}
+          </Text>
+          {view.sync.link === null ? null : <Link href={view.sync.link.href} label={view.sync.link.label} />}
+          {view.sync.buttons.map(button =>
+            button.isPrimary ? (
+              <Button key={button.key} label={button.label} onPress={button.onPress} />
+            ) : (
+              <Button key={button.key} label={button.label} plain dimColor onPress={button.onPress} />
+            ),
+          )}
+        </Box>
+      )}
     </Box>
   )
 }

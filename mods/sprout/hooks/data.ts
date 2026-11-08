@@ -14,7 +14,10 @@ import type {
   SproutScan,
 } from '../types'
 import type { ChunkSpan } from './logic'
+import { withOthers } from './buddy'
 import { DAY_MS, HOUR_MS, MINUTE_MS, RECENT_DAYS, addDays, growthStep, localTime, mergedFrom, planMergeChunks } from './logic'
+import { hydrateBuddy, pullOthers, stopBuddy, syncBuddy } from './sync'
+import { findGh, findNode, homeDir, note } from './tools'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in register.tsx.
 const scanState = atom({ plugin: 'sprout', key: 'scan' } as const, null, { shape: 'scan-1' })
@@ -33,6 +36,7 @@ const petState = atom(
 )
 const envState = atom({ plugin: 'sprout', key: 'env' } as const, { repo: null, tzOffsetMin: null })
 const growthState = atom({ plugin: 'sprout', key: 'growth' } as const, { highest: null, levelUp: null })
+const othersState = atom({ plugin: 'sprout', key: 'others' } as const, null, { shape: 'others-1' })
 
 const POLL_MS = 5 * MINUTE_MS
 const CALENDAR_MS = 6 * HOUR_MS
@@ -42,89 +46,10 @@ export const PARTY_MS = 10 * MINUTE_MS
 const SAMPLE_KEEP_MS = 8 * DAY_MS
 const SAMPLE_CAP = 1500
 const SCAN_TIMEOUT_MS = 9 * MINUTE_MS
-const TOOL_RETRY_MS = HOUR_MS
 
-type Tool = { path: string | null; checkedAt: number }
-
-let node: Tool | null = null
-let gh: Tool | null = null
 let isScanning = false
 let quotaSavedAt = 0
 let timers: Array<{ cancel: () => void }> = []
-
-function note($: EngineInterface, text: string) {
-  try {
-    $.ui.log(`sprout: ${text}`, { to: 'debug' })
-  } catch {}
-}
-
-async function runs($: EngineInterface, argv: string[], check: (stdout: string) => boolean) {
-  try {
-    const result = await $.process.run(argv, { timeoutMs: 10_000 })
-    return result.exitCode === 0 && check(result.stdout)
-  } catch {
-    return false
-  }
-}
-
-function versionDesc(a: string, b: string) {
-  const pa = a.replace(/^v/, '').split('.').map(Number)
-  const pb = b.replace(/^v/, '').split('.').map(Number)
-  for (let i = 0; i < 3; i++) {
-    const d = (pb[i] ?? 0) - (pa[i] ?? 0)
-    if (d !== 0) return d
-  }
-
-  return 0
-}
-
-async function homeDir($: EngineInterface) {
-  return (await $.env.get('HOME')) ?? null
-}
-
-/** The desktop app does not always have the person's shell PATH, so look where version managers put node. */
-async function findNode($: EngineInterface, now: number) {
-  if (node !== null && (node.path !== null || now - node.checkedAt < TOOL_RETRY_MS)) return node.path
-  const home = await homeDir($)
-  const candidates: string[] = []
-  const remembered = await $.store.get('nodePath')
-  if (typeof remembered === 'string') candidates.push(remembered)
-  candidates.push('node', '/opt/homebrew/bin/node', '/usr/local/bin/node')
-  if (home !== null) {
-    try {
-      const listed = await $.fs.list(`${home}/.nvm/versions/node`)
-      const versions = listed.filter(entry => entry.kind === 'dir').map(entry => entry.name)
-      for (const version of versions.sort(versionDesc)) candidates.push(`${home}/.nvm/versions/node/${version}/bin/node`)
-    } catch {}
-    candidates.push(`${home}/.volta/bin/node`, `${home}/.local/share/mise/shims/node`, `${home}/.asdf/shims/node`)
-  }
-  candidates.push('/usr/bin/node')
-  const isModern = (stdout: string) => Number(/^v(\d+)/.exec(stdout.trim())?.[1] ?? 0) >= 18
-  for (const path of [...new Set(candidates)]) {
-    if (await runs($, [path, '--version'], isModern)) {
-      node = { path, checkedAt: now }
-      if (path !== remembered) await $.store.set('nodePath', path)
-      return path
-    }
-  }
-  node = { path: null, checkedAt: now }
-  note($, 'no node found; usage stats are off')
-
-  return null
-}
-
-async function findGh($: EngineInterface, now: number) {
-  if (gh !== null && (gh.path !== null || now - gh.checkedAt < TOOL_RETRY_MS)) return gh.path
-  for (const path of ['gh', '/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh']) {
-    if (await runs($, [path, '--version'], stdout => stdout.includes('gh version'))) {
-      gh = { path, checkedAt: now }
-      return path
-    }
-  }
-  gh = { path: null, checkedAt: now }
-
-  return null
-}
 
 async function graphql($: EngineInterface, query: string): Promise<unknown> {
   const now = await $.clock.now()
@@ -497,7 +422,7 @@ function isLevelUp(value: unknown): value is SproutLevelUp {
 async function syncGrowth($: EngineInterface, now: number) {
   const stored = await $.store.get('highestLevel')
   let highest = typeof stored === 'number' ? stored : null
-  const scan = await read($, scanState)
+  const scan = withOthers(await read($, scanState), await read($, othersState))
   if (scan !== null) {
     const step = growthStep(highest, scan.totals.tokens)
     if (step.highest !== highest) await $.store.set('highestLevel', step.highest)
@@ -575,6 +500,7 @@ async function safely($: EngineInterface, what: string, work: () => Promise<void
 export function stopSprout() {
   for (const timer of timers) timer.cancel()
   timers = []
+  stopBuddy()
 }
 
 export function startSprout($: EngineInterface, cwd: string) {
@@ -595,10 +521,13 @@ export function startSprout($: EngineInterface, cwd: string) {
     await safely($, 'calendar', () => refreshCalendar($, now))
     await safely($, 'growth', () => syncGrowth($, now))
     await runScan($)
+    await safely($, 'buddy others', () => pullOthers($))
     await safely($, 'growth', async () => syncGrowth($, await $.clock.now()))
+    await safely($, 'buddy upload', () => syncBuddy($))
   }
   void (async () => {
     await safely($, 'hydrate', () => hydrate($))
+    await safely($, 'buddy', async () => hydrateBuddy($, await $.clock.now()))
     await cycle(true)
   })()
   timers.push($.clock.every(POLL_MS, () => void cycle(false)))

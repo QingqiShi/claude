@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import type { SproutBucket, SproutIntroKind, SproutIntroPlayed, SproutLimit, SproutPet, SproutRange } from '../types'
+import type { SproutBucket, SproutBuddy, SproutIntroKind, SproutIntroPlayed, SproutLimit, SproutPet, SproutRange } from '../types'
+import { withOthers } from './buddy'
 import { recordLimits, startSprout } from './data'
 import type { LineContext } from './lines'
 import { linesFor } from './lines'
@@ -55,7 +56,8 @@ import {
 import type { Scheme } from './raster'
 import { BUBBLE_ROWS, BUBBLE_UNITS, sceneSvg } from './scene'
 import { memoize } from './svg-kit'
-import type { TerminalView } from './terminal'
+import { buddyServer, cancelConnect, disconnectBuddy, hideOffer, reconnectBuddy, setBuddyServer, startConnect, syncBuddy } from './sync'
+import type { TerminalSync, TerminalView } from './terminal'
 import { terminalPane } from './terminal'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in data.ts.
@@ -76,9 +78,15 @@ const petState = atom(
 const rangeState = atom({ plugin: 'sprout', key: 'range' } as const, '30')
 const envState = atom({ plugin: 'sprout', key: 'env' } as const, { repo: null, tzOffsetMin: null })
 const growthState = atom({ plugin: 'sprout', key: 'growth' } as const, { highest: null, levelUp: null })
+const buddyState = atom(
+  { plugin: 'sprout', key: 'buddy' } as const,
+  { isReady: null, link: null, connect: null, upload: null, error: null, note: null, isOfferHidden: false },
+  { shape: 'buddy-1' },
+)
+const othersState = atom({ plugin: 'sprout', key: 'others' } as const, null, { shape: 'others-1' })
 
 const PANE = 'sprout'
-const TITLE = '芽团'
+const TITLE = '小苗'
 const FEED_MS = 1800
 const PAT_MS = 1200
 const POP_MS = 1000
@@ -142,7 +150,7 @@ async function readModel($: EngineInterface) {
   const tz = env.tzOffsetMin ?? -new Date().getTimezoneOffset()
   const local = localTime(now, tz)
   const today = local.day
-  const scan = await read($, scanState)
+  const scan = withOthers(await read($, scanState), await read($, othersState))
   const quota = await read($, quotaState)
   const github = await read($, githubState)
   const merges = await read($, mergesState)
@@ -150,6 +158,7 @@ async function readModel($: EngineInterface) {
   const pet = await read($, petState)
   const range = await read($, rangeState)
   const growth = await read($, growthState)
+  const buddy = await read($, buddyState)
   const from = rangeFrom(range, today, scan?.firstDay ?? null)
   const mergeDays = merges === null ? [] : mergeCalendar(merges.days, merges.from > from ? merges.from : from, today)
   const totals = scan === null ? null : rangeTotals(scan.days, from, scan.totals.cacheHitRate)
@@ -244,6 +253,7 @@ async function readModel($: EngineInterface) {
     action,
     text,
     isPop: line !== null && now - line.at < POP_MS,
+    buddy,
   }
 }
 
@@ -405,10 +415,90 @@ function githubText(total: number) {
   return `过去一年 ${withCommas(total)} 次`
 }
 
+/** One quiet line on syncing to the phone: the offer, the connect in progress, or the link and its last upload. */
+function syncView($: EngineInterface, buddy: SproutBuddy, now: number): TerminalSync | null {
+  if (buddy.isReady !== true) return null
+  const connect = buddy.connect
+  if (connect !== null) {
+    return {
+      text: `在浏览器里确认连接 · 代码 ${connect.code}`,
+      link: { href: connect.url, label: '打开页面' },
+      buttons: [{ key: 'buddy-cancel', label: '取消', isPrimary: false, onPress: () => void cancelConnect($).catch(() => {}) }],
+    }
+  }
+  const link = buddy.link
+  if (link !== null) {
+    const text =
+      buddy.error === 'unauthorized'
+        ? 'Buddy 不认这台 Mac 了'
+        : buddy.error === 'network'
+          ? '暂时连不上 Buddy，稍后再同步'
+          : buddy.upload === null
+            ? '已连接，等第一次同步'
+            : `已同步到手机 · ${agoText(buddy.upload.at, now)}`
+    return {
+      text,
+      link: { href: `${link.server}/u/${link.user}`, label: '我的页面' },
+      buttons:
+        buddy.error === 'unauthorized'
+          ? [
+              { key: 'buddy-again', label: '重新连接', isPrimary: true, onPress: () => void reconnectBuddy($).catch(() => {}) },
+              { key: 'buddy-off', label: '断开', isPrimary: false, onPress: () => void disconnectBuddy($).catch(() => {}) },
+            ]
+          : [{ key: 'buddy-off', label: '断开', isPrimary: false, onPress: () => void disconnectBuddy($).catch(() => {}) }],
+    }
+  }
+  if (buddy.isOfferHidden && buddy.note === null) return null
+
+  return {
+    text: buddy.note ?? '手机上也想看小苗？',
+    link: null,
+    buttons: [
+      { key: 'buddy-sync', label: '同步到手机', isPrimary: true, onPress: () => void startConnect($).catch(() => {}) },
+      { key: 'buddy-no', label: '不用', isPrimary: false, onPress: () => void hideOffer($, true).catch(() => {}) },
+    ],
+  }
+}
+
+async function runSproutCommand($: EngineInterface, args: string) {
+  const [verb = '', ...rest] = args.trim().split(/\s+/).filter(Boolean)
+  const buddy = await read($, buddyState)
+  switch (verb) {
+    case '': {
+      await $.ui.open({ id: PANE, title: TITLE })
+      return '小苗来了。'
+    }
+    case 'sync': {
+      if (buddy.isReady !== true) return '这台电脑上同步不了：需要 macOS 的钥匙串和 node。'
+      if (buddy.link !== null) {
+        await syncBuddy($, true)
+        const after = await read($, buddyState)
+        return after.error === null ? '已同步到手机。' : after.error === 'unauthorized' ? 'Buddy 不认这台 Mac 了，在面板里点「重新连接」。' : '暂时连不上 Buddy。'
+      }
+      await hideOffer($, false)
+      await startConnect($)
+      const after = await read($, buddyState)
+      return after.connect === null ? (after.note ?? '暂时连不上 Buddy。') : `在浏览器里确认连接，代码 ${after.connect.code}：${after.connect.url}`
+    }
+    case 'server': {
+      const value = rest[0]
+      if (value === undefined) return `Buddy 服务器：${await buddyServer($)}`
+      const server = await setBuddyServer($, value === 'default' ? null : value)
+      return server === null ? '要一个 http(s) 地址，或 default。' : `Buddy 服务器：${server}`
+    }
+    case 'disconnect': {
+      await disconnectBuddy($)
+      return '已断开。钥匙留在这台 Mac 上，再连还是同一台。要连同它的数据一起去掉，在 Buddy 的「我的 Mac」里移除。'
+    }
+    default:
+      return '用法：/sprout、/sprout sync、/sprout server <地址|default>、/sprout disconnect'
+  }
+}
+
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     try {
-      await $.command.register({ name: 'sprout', description: '打开芽团面板' })
+      await $.command.register({ name: 'sprout', description: '打开小苗面板；sync 同步到手机', argumentHint: '[sync | server <url> | disconnect]' })
     } catch {}
     void $.ui.open({ id: PANE, title: TITLE }).catch(() => {})
     void hydrateRange($)
@@ -418,11 +508,7 @@ export const register: Register = on => {
     return started
   })
 
-  on('command.run', { command: 'sprout' }, async $ => {
-    await $.ui.open({ id: PANE, title: TITLE })
-
-    return { text: '芽团来了。' }
-  })
+  on('command.run', { command: 'sprout' }, async ($, e) => ({ text: await runSproutCommand($, e.args) }))
 
   on('session.measure', async ($, e, next) => {
     if (e.rateLimits.length > 0) void recordLimits($, e.rateLimits).catch(() => {})
@@ -486,6 +572,7 @@ export const register: Register = on => {
         github: model.github === null ? null : { levelOn: githubLevels(model.github.start, model.github.levels), heading: githubText(model.github.total) },
         today: model.today,
         rows: e.props.placement === 'dock' ? e.props.scroll.bodyRows : null,
+        sync: syncView($, model.buddy, model.now),
         on: {
           feed: () => void press($, 'feed'),
           pat: () => void press($, 'pat'),
@@ -497,8 +584,9 @@ export const register: Register = on => {
       return terminalPane($.ui.resolve(e), view)
     }
 
-    const { Box, Text, Button, Svg } = $.ui.resolve(e)
+    const { Box, Text, Button, Svg, Link } = $.ui.resolve(e)
     const width = contentWidth(e.props.bodyColumns)
+    const sync = syncView($, model.buddy, model.now)
     const scan = model.scan
     const isStale = model.quota.at !== null && model.now - model.quota.at > STALE_QUOTA_MS
     const sectionHead = (left: string, right: JSX.Element | null) => (
@@ -552,7 +640,7 @@ export const register: Register = on => {
         </Box>
 
         <Box flexDirection="column" gap="sm">
-          <Svg source={sceneFor(model, width)} alt={`芽团，${levelLabel(model.level)}：${model.text}`} />
+          <Svg source={sceneFor(model, width)} alt={`小苗，${levelLabel(model.level)}：${model.text}`} />
           <Box flexDirection="row" flexWrap="nowrap" gap="sm">
             <Button key="feed" label="喂水" onPress={() => void press($, 'feed')} />
             <Button key="pat" label="摸摸" onPress={() => void press($, 'pat')} />
@@ -639,11 +727,25 @@ export const register: Register = on => {
             <Svg source={ghDrawing.svg} alt={`GitHub 贡献，${githubText(github.total)}`} />
           </Box>
         )}
+
+        {sync === null ? null : (
+          <Box flexDirection="row" alignItems="center" gap="sm" flexWrap="wrap">
+            <Text dimColor>{sync.text}</Text>
+            {sync.link === null ? null : <Link href={sync.link.href} label={sync.link.label} />}
+            {sync.buttons.map(button =>
+              button.isPrimary ? (
+                <Button key={button.key} label={button.label} onPress={button.onPress} />
+              ) : (
+                <Button key={button.key} label={button.label} plain dimColor onPress={button.onPress} />
+              ),
+            )}
+          </Box>
+        )}
       </Box>
     )
   }).catch(($, e) => {
     const { Text } = $.ui.resolve(e)
 
-    return <Text dimColor>芽团打了个盹，过会儿再来。</Text>
+    return <Text dimColor>小苗打了个盹，过会儿再来。</Text>
   })
 }

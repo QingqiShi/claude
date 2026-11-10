@@ -507,11 +507,7 @@ export function startSprout($: EngineInterface, cwd: string) {
   stopSprout()
   const cycle = async (isFirst: boolean) => {
     const now = await $.clock.now()
-    await safely($, 'usage', async () => {
-      const usage = await $.session.usage()
-      await recordLimits($, usage.rateLimits)
-      await syncQuota($, now)
-    })
+    await safely($, 'usage', () => syncQuota($, now))
     if (isFirst) await safely($, 'env', () => refreshEnv($, cwd))
     let isNewMerge = false
     await safely($, 'merges', async () => {

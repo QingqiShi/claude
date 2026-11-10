@@ -85,6 +85,21 @@ cp -R /tmp/qingqi-claude/mods/sprout ~/.claude/mods/sprout
 
 想把一台不同步的 Mac 也算进来，就把它的 `~/.claude/projects/` 复制到 `~/.claude/sprout-imports/<device-name>/`。等那台 Mac 自己同步到搭子以后，要删掉这个文件夹，不然它的数据会算两遍。
 
+### 在 Codex 里
+
+同一只宠物也能住进 Codex 的侧栏，以插件的形式安装。在那里它统计的是你的 Codex 用量：用 [`codex/scripts/scan.mjs`](mods/sprout/codex/scripts/scan.mjs) 读取 `~/.codex/` 下的会话文件，向 Codex CLI 询问额度，并按 OpenAI 官网价格页估算花费（价格每天重新读取一次）。
+
+```sh
+codex plugin marketplace add QingqiShi/claude
+codex plugin add sprout@qingqi
+```
+
+重启 Codex，说一句「打开小苗」。它需要 `node` 22.18 或更新的版本，因为 Codex 直接运行这个 mod 的 TypeScript，没有构建步骤。更新时运行 `codex plugin marketplace upgrade qingqi`，再重新添加一次插件；卸载用 `codex plugin remove sprout@qingqi`。宠物的状态保存在 `~/.codex/sprout/`。
+
+在 Codex 里，宠物还会对你的工作有反应：任务跑久了它会泡茶，上下文压缩时留张纸条，测试失败了也有话说。额度紧张时，点天上的云可以向 Tibo 求雨。CatGPT 每天来串一次门。点等级条可以打开成长图鉴。
+
+Codex 部分的代码在 [`mods/sprout/codex/`](mods/sprout/codex)。mod 的 hooks 在那里原样运行，底下是一个小小的、替代 Claude Code 引擎的实现；宿主可以改动的地方都写在 [`hooks/host.ts`](mods/sprout/hooks/host.ts) 里。
+
 ## 这里有什么
 
 - `CLAUDE.md`：我给所有项目的指令

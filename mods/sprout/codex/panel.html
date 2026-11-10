@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Miao</title>
+    <style>
+      :root {
+        --font: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+        --paper: #fff;
+        --ink: #1f1e1d;
+        --muted: #666;
+        --button: #f3f3f3;
+        color-scheme: light;
+        font: 14px var(--font);
+        font-synthesis: none;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --paper: #1f1e1d;
+          --ink: #ececec;
+          --muted: #aaa;
+          --button: #30302e;
+          color-scheme: dark;
+        }
+      }
+      :root[data-theme='dark'] {
+        --paper: #1f1e1d;
+        --ink: #ececec;
+        --muted: #aaa;
+        --button: #30302e;
+        color-scheme: dark;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        -webkit-font-smoothing: antialiased;
+      }
+      svg {
+        display: block;
+        width: 100%;
+        height: auto;
+        font-family: var(--font);
+      }
+      #app {
+        max-width: 512px;
+        margin: 0 auto;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-height: 24px;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+        font-size: 14px;
+      }
+      h1 {
+        font-weight: 500;
+      }
+      h2 {
+        font-weight: 400;
+        color: var(--muted);
+      }
+      .dot {
+        flex: none;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #3f8f4a;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        border: 0;
+        border-radius: 8px;
+        padding: 7px 11px;
+        background: var(--button);
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      button:hover {
+        filter: brightness(0.96);
+      }
+      button:focus-visible {
+        outline: 2px solid #2684ff;
+        outline-offset: 2px;
+      }
+      button.plain {
+        padding: 2px 6px;
+        background: transparent;
+        color: var(--muted);
+      }
+      button.plain:hover {
+        background: var(--button);
+        filter: none;
+      }
+      button[aria-pressed='true'] {
+        color: var(--ink);
+      }
+      .project {
+        margin-left: auto;
+        max-width: 65%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .scene,
+      .chart {
+        line-height: 0;
+      }
+      .scene-hotspot {
+        cursor: pointer;
+      }
+      .actions {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      .head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        min-height: 21px;
+        margin-bottom: 10px;
+      }
+      .note {
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .note.over {
+        color: #bf4536;
+      }
+      .window + .window {
+        margin-top: 14px;
+      }
+      .window .note {
+        margin-top: 8px;
+      }
+      .range {
+        display: flex;
+        gap: 8px;
+      }
+      dialog {
+        width: calc(100% - 24px);
+        max-width: 1080px;
+        max-height: calc(100vh - 24px);
+        padding: 16px;
+        border: 1px solid var(--button);
+        border-radius: 14px;
+        background: var(--paper);
+        color: var(--ink);
+      }
+      dialog::backdrop {
+        background: rgba(0, 0, 0, 0.48);
+      }
+      .atlas-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .atlas-head h2 {
+        color: var(--ink);
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .atlas-head button {
+        font-size: 22px;
+        line-height: 1;
+      }
+      .atlas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: 12px;
+      }
+      .card {
+        min-width: 0;
+        padding: 12px;
+        border: 1px solid var(--button);
+        border-radius: 12px;
+      }
+      .card.current {
+        border-color: #3d83c8;
+        box-shadow: inset 0 0 0 1px #3d83c8;
+      }
+      .card.locked .portrait {
+        opacity: 0.55;
+        filter: saturate(0.3);
+      }
+      .card .name {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 8px;
+        margin: 12px 0 8px;
+      }
+      .card h3 {
+        font-weight: 600;
+      }
+      .card p,
+      .card .name span {
+        font-size: 13px;
+        line-height: 1.5;
+        color: var(--muted);
+      }
+      .card p {
+        margin-bottom: 9px;
+      }
+      .card .eta {
+        font-size: 12px;
+        margin: 0;
+      }
+      .badge {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 99px;
+        background: var(--button);
+        font-size: 12px;
+      }
+      .badge.current {
+        color: #2875ba;
+        background: rgba(50, 135, 220, 0.14);
+      }
+      .badge.unlocked {
+        color: #388345;
+        background: rgba(63, 143, 74, 0.12);
+      }
+      progress {
+        display: block;
+        width: 100%;
+        height: 7px;
+        margin: 10px 0;
+        accent-color: #3f8f4a;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app"><p class="note">小苗正在醒来… Miao is waking up…</p></main>
+    <dialog id="atlas"></dialog>
+    <script>
+      // The page talks to Codex with the MCP Apps protocol: JSON-RPC over postMessage. The server draws
+      // everything; the page shows the sections it sends and tells it what was pressed.
+      const app = document.getElementById('app')
+      const atlas = document.getElementById('atlas')
+      const pending = new Map()
+      const shown = new Map()
+      let nextId = 0
+      let context = {}
+      let theme = null
+      let locale = navigator.language
+      let sections = []
+      let followUp
+
+      const post = message => parent.postMessage({ jsonrpc: '2.0', ...message }, '*')
+      const request = (method, params) =>
+        new Promise((resolve, reject) => {
+          const id = ++nextId
+          pending.set(id, { resolve, reject })
+          post({ id, method, params })
+        })
+
+      // The drawings follow the system's color scheme. A host that says its own theme takes over.
+      const themed = html =>
+        theme === null ? html : html.replaceAll('@media (prefers-color-scheme: light)', theme === 'light' ? '@media all' : '@media not all')
+
+      function paint() {
+        const focused = document.activeElement?.closest?.('[data-action]')?.dataset.action
+        const keys = sections.map(section => section.key)
+        for (const element of [...app.children]) if (!keys.includes(element.dataset.key)) element.remove()
+        let previous = null
+        for (const { key, html } of sections) {
+          let element = [...app.children].find(child => child.dataset.key === key)
+          if (shown.get(key) !== html || element === undefined) {
+            const template = document.createElement('template')
+            template.innerHTML = themed(html)
+            const fresh = template.content.firstElementChild
+            fresh.dataset.key = key
+            if (element === undefined) app.insertBefore(fresh, previous === null ? app.firstChild : previous.nextSibling)
+            else element.replaceWith(fresh)
+            element = fresh
+            shown.set(key, html)
+          }
+          previous = element
+        }
+        if (focused && document.activeElement === document.body) app.querySelector(`[data-action="${focused}"]`)?.focus({ preventScroll: true })
+      }
+
+      async function view(extra = {}) {
+        const width = app.clientWidth || innerWidth
+        const result = await request('tools/call', { name: 'sprout_view', arguments: { width, lang: locale, ...context, ...extra } })
+        const data = result?.structuredContent
+        if (result?.isError || !data) return
+        sections = data.sections
+        paint()
+        if (data.atlas) {
+          atlas.innerHTML = themed(data.atlas)
+          if (!atlas.open) atlas.showModal()
+        }
+      }
+
+      function act(action) {
+        if (action === 'atlas') return view({ atlas: true })
+        if (action === 'atlas-close') return atlas.close()
+        if (action === 'refresh') return view({ refresh: true })
+        if (action.startsWith('range-')) return view({ range: action.slice(6) })
+        clearTimeout(followUp)
+        // The scene shows the action for a few seconds. Draw again when it is over.
+        followUp = setTimeout(view, action === 'pray' ? 4200 : 3000)
+        return view({ action })
+      }
+
+      function setTheme(next) {
+        if (next !== 'light' && next !== 'dark') return
+        theme = next
+        document.documentElement.dataset.theme = next
+        shown.clear()
+        paint()
+      }
+
+      addEventListener('message', event => {
+        const message = event.data
+        if (!message || message.jsonrpc !== '2.0') return
+        if (message.method === undefined) {
+          const waiting = pending.get(message.id)
+          pending.delete(message.id)
+          if (message.error) waiting?.reject(new Error(message.error.message))
+          else waiting?.resolve(message.result)
+          return
+        }
+        if (message.method === 'ui/notifications/tool-result') {
+          const sent = message.params?.structuredContent
+          if (sent?.threadId || sent?.cwd) context = { threadId: sent.threadId, cwd: sent.cwd }
+          void view()
+        } else if (message.method === 'ui/notifications/host-context-changed') setTheme(message.params?.theme)
+        if (message.id !== undefined) post({ id: message.id, result: {} })
+      })
+
+      document.addEventListener('click', event => {
+        if (event.target === atlas) return atlas.close()
+        const action = event.target.closest?.('[data-action]')?.dataset.action
+        if (action) void act(action)
+      })
+      document.addEventListener('keydown', event => {
+        const target = event.target.closest?.('[data-action]')
+        if (target && target.tagName !== 'BUTTON' && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault()
+          void act(target.dataset.action)
+        }
+      })
+
+      async function start() {
+        const host = await request('ui/initialize', { appInfo: { name: 'sprout', version: '1' }, appCapabilities: {}, protocolVersion: '2026-01-26' })
+        locale = host?.hostContext?.locale ?? locale
+        setTheme(host?.hostContext?.theme)
+        post({ method: 'ui/notifications/initialized' })
+        new ResizeObserver(() => post({ method: 'ui/notifications/size-changed', params: { width: document.documentElement.scrollWidth, height: document.documentElement.scrollHeight } })).observe(document.body)
+        let width = app.clientWidth
+        let resized
+        new ResizeObserver(() => {
+          if (app.clientWidth === width) return
+          width = app.clientWidth
+          clearTimeout(resized)
+          resized = setTimeout(view, 120)
+        }).observe(app)
+        await view()
+        setInterval(() => document.hidden || view(), 15_000)
+      }
+      if (parent !== window) void start()
+    </script>
+  </body>
+</html>

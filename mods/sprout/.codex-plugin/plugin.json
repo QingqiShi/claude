@@ -1,0 +1,14 @@
+{
+  "name": "sprout",
+  "version": "0.5.1",
+  "requires_local_executor": true,
+  "description": "小苗 (Miao): a cheeky pixel pet in Codex's side panel, with your quota forecast, your Codex usage over time, your merged PRs and your GitHub contributions.",
+  "interface": {
+    "displayName": "小苗 Miao",
+    "shortDescription": "A pixel pet with your usage and quota",
+    "developerName": "Qingqi Shi",
+    "defaultPrompt": "Open Miao and show my Codex usage and quota."
+  },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

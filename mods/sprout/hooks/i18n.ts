@@ -1,4 +1,8 @@
-import type { EngineInterface } from 'claude-code'
+// Both hosts can use the language helpers without importing a UI runtime.
+type LanguageHost = {
+  settings: { read(input: { key: 'language' }): Promise<unknown> }
+  env: { get(key: string): Promise<string | null | undefined> }
+}
 
 export type Lang = 'zh' | 'en'
 
@@ -12,7 +16,7 @@ export function langOf(setting: unknown, locale: string | undefined): Lang {
   return locale !== undefined && /^zh(?![a-z])/i.test(locale) ? 'zh' : 'en'
 }
 
-export async function loadLang($: EngineInterface) {
+export async function loadLang($: LanguageHost) {
   let setting: unknown
   try {
     setting = await $.settings.read({ key: 'language' })

@@ -17,6 +17,8 @@ import type { ChunkSpan } from './logic'
 import { withOthers } from './buddy'
 import { DAY_MS, HOUR_MS, MINUTE_MS, RECENT_DAYS, addDays, growthStep, localTime, mergedFrom, planMergeChunks } from './logic'
 import { hydrateBuddy, pollVisitors, pullOthers, stopBuddy, syncBuddy } from './sync'
+import type { Host } from './host'
+import { claude } from './host'
 import { findGh, findNode, homeDir, note } from './tools'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in register.tsx.
@@ -104,30 +106,34 @@ export function parseScan(stdout: string, ranAt: number): SproutScan | null {
   }
 }
 
-export async function runScan($: EngineInterface) {
+async function claudeScanArgs($: EngineInterface, home: string) {
+  const config = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${home}/.claude`
+  const script = `${$.plugin.root}/scripts/scan.mjs`
+  if (!(await $.fs.exists(script))) return null
+  const roots = [`${config}/projects`]
+  try {
+    const imports = await $.fs.list(`${config}/sprout-imports`)
+    for (const entry of imports.filter(item => item.kind === 'dir').sort((a, b) => a.name.localeCompare(b.name))) {
+      const dir = `${config}/sprout-imports/${entry.name}`
+      roots.push((await $.fs.exists(`${dir}/projects`)) ? `${dir}/projects` : dir)
+    }
+  } catch {}
+
+  return [script, ...roots.flatMap(root => ['--projects', root]), '--cache', `${config}/sprout-cache/scan.json`]
+}
+
+export async function runScan($: EngineInterface, host: Host = claude) {
   if (isScanning) return
   isScanning = true
   try {
     const now = await $.clock.now()
     const home = await homeDir($)
     if (home === null) return
-    const config = (await $.env.get('CLAUDE_CONFIG_DIR')) ?? `${home}/.claude`
-    const script = `${$.plugin.root}/scripts/scan.mjs`
-    if (!(await $.fs.exists(script))) return
+    const argv = host.scanArgs ?? (await claudeScanArgs($, home))
+    if (argv === null) return
     const path = await findNode($, now)
     if (path === null) return
-    const roots = [`${config}/projects`]
-    try {
-      const imports = await $.fs.list(`${config}/sprout-imports`)
-      for (const entry of imports.filter(item => item.kind === 'dir').sort((a, b) => a.name.localeCompare(b.name))) {
-        const dir = `${config}/sprout-imports/${entry.name}`
-        roots.push((await $.fs.exists(`${dir}/projects`)) ? `${dir}/projects` : dir)
-      }
-    } catch {}
-    const result = await $.process.run(
-      [path, script, ...roots.flatMap(root => ['--projects', root]), '--cache', `${config}/sprout-cache/scan.json`],
-      { timeoutMs: SCAN_TIMEOUT_MS },
-    )
+    const result = await $.process.run([path, ...argv], { timeoutMs: SCAN_TIMEOUT_MS })
     if (result.exitCode !== 0) {
       note($, `scan exited ${result.exitCode}: ${result.stderr.slice(0, 300)}`)
       return
@@ -191,12 +197,14 @@ async function syncQuota($: EngineInterface, now: number) {
   if (JSON.stringify(merged) !== JSON.stringify(mine)) await update($, quotaState, () => merged)
 }
 
-export async function recordLimits($: EngineInterface, limits: readonly SessionRateLimit[]) {
+/** `readAt` is for a reading that is older than now, such as one a host finds in a log. */
+export async function recordLimits($: EngineInterface, limits: readonly SessionRateLimit[], readAt?: number) {
   const five = toLimit(limits.find(limit => limit.kind === 'five_hour'))
   const week = toLimit(limits.find(limit => limit.kind === 'seven_day'))
   if (five === null && week === null) return
-  const at = await $.clock.now()
+  const at = readAt ?? (await $.clock.now())
   const current = await read($, quotaState)
+  if (current.at !== null && at < current.at) return
   const last = current.samples.at(-1)
   if (last !== undefined && last.five === five?.pct && last.week === week?.pct && current.at !== null && at - current.at < 2 * MINUTE_MS) return
   await update($, quotaState, quota => {
@@ -503,7 +511,7 @@ export function stopSprout() {
   stopBuddy()
 }
 
-export function startSprout($: EngineInterface, cwd: string) {
+export function startSprout($: EngineInterface, cwd: string, host: Host = claude) {
   stopSprout()
   const cycle = async (isFirst: boolean) => {
     const now = await $.clock.now()
@@ -516,7 +524,7 @@ export function startSprout($: EngineInterface, cwd: string) {
     await safely($, 'merge days', () => refreshMerges($, now, isNewMerge))
     await safely($, 'calendar', () => refreshCalendar($, now))
     await safely($, 'growth', () => syncGrowth($, now))
-    await runScan($)
+    await runScan($, host)
     await safely($, 'buddy others', () => pullOthers($))
     await safely($, 'growth', async () => syncGrowth($, await $.clock.now()))
     await safely($, 'buddy upload', () => syncBuddy($))

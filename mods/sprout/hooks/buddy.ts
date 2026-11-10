@@ -9,11 +9,13 @@ import type {
   SproutQuota,
   SproutScan,
   SproutUpload,
+  SproutVisitorCounts,
 } from '../types'
 import { MINUTE_MS, hashOf } from './logic'
 
 export const BUDDY_DEFAULT_SERVER = 'https://buddy.qingqi.dev'
 export const UPLOAD_EVERY_MS = 5 * MINUTE_MS
+export const VISITORS_EVERY_MS = 15 * MINUTE_MS
 const MAX_DAYS = 4000
 const MAX_SAMPLES = 2000
 const MAX_NAME = 64
@@ -120,6 +122,23 @@ export function shouldUpload(last: SproutUpload | null, now: number, hash: strin
   if (last.hash === hash) return false
 
   return now - last.at >= UPLOAD_EVERY_MS
+}
+
+/** A visitors read is due when this Mac has not heard from Buddy, by an upload or a read, for 15 minutes. */
+export function isVisitorsDue(lastUpload: number | null, lastPoll: number | null, now: number) {
+  const contact = Math.max(lastUpload ?? 0, lastPoll ?? 0)
+
+  return now - contact >= VISITORS_EVERY_MS
+}
+
+/** The `visitors` counts of a Buddy reply, or null when the reply has none, as an older Buddy's does. */
+export function parseVisitors(value: unknown): SproutVisitorCounts | null {
+  const visitors = (value as { visitors?: unknown } | null)?.visitors
+  if (typeof visitors !== 'object' || visitors === null) return null
+  const { fed, patted } = visitors as { fed?: unknown; patted?: unknown }
+  if (typeof fed !== 'number' || typeof patted !== 'number' || !Number.isFinite(fed) || !Number.isFinite(patted)) return null
+
+  return { fed: whole(fed), patted: whole(patted) }
 }
 
 /** The scan with the other Macs' days added, day by day, so that the pane shows what every Mac spent. */

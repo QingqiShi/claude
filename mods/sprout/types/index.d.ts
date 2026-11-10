@@ -48,8 +48,11 @@ export type SproutBucket =
   | 'streak'
   | 'levelup'
   | 'broken'
+  | 'visitFeed'
+  | 'visitPat'
 
-export type SproutLine = { bucket: SproutBucket; index: number; at: number }
+/** `count`, on a visitor line, is how many times visitors watered or patted since the pet last said so. */
+export type SproutLine = { bucket: SproutBucket; index: number; at: number; count?: number }
 
 export type SproutPet = {
   action: 'feed' | 'pat' | null
@@ -96,6 +99,15 @@ export type SproutBuddy = {
   isOfferHidden: boolean
 }
 
+/** How often visitors watered and patted the pet on its Buddy page. */
+export type SproutVisitorCounts = { fed: number; patted: number }
+
+/**
+ * Kept in the store as `buddyVisitors`, shared by every session on this Mac: the counts Buddy last told, the counts
+ * the pet already reacted to, and when Buddy told them.
+ */
+export type SproutVisitors = SproutVisitorCounts & { seenFed: number; seenPatted: number; at: number }
+
 /** What the account's other Macs uploaded to Buddy, pulled back so that the pane shows every Mac's total. */
 export type SproutOthers = { fetchedAt: number; firstDay: string | null; days: SproutDay[] }
 
@@ -113,6 +125,7 @@ declare module 'claude-code' {
       growth: SproutGrowth
       buddy: Shaped<SproutBuddy>
       others: Shaped<SproutOthers | null>
+      visitors: Shaped<SproutVisitors | null>
     }
   }
 }

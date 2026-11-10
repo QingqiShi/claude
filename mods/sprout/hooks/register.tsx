@@ -8,8 +8,10 @@ import type { LineContext } from './lines'
 import { linesFor } from './lines'
 import type { Forecast, Mood } from './logic'
 import {
+  FEED_MS,
   FIVE_HOUR,
   MINUTE_MS,
+  PAT_MS,
   SEVEN_DAY,
   addDays,
   agoText,
@@ -86,10 +88,9 @@ const buddyState = atom(
   { shape: 'buddy-1' },
 )
 const othersState = atom({ plugin: 'sprout', key: 'others' } as const, null, { shape: 'others-1' })
+const visitorsState = atom({ plugin: 'sprout', key: 'visitors' } as const, null, { shape: 'visitors-1' })
 
 const PANE = 'sprout'
-const FEED_MS = 1800
-const PAT_MS = 1200
 const POP_MS = 1000
 const LINE_FRESH_MS = 5 * MINUTE_MS
 const AUTO_LINE_MS = 10 * MINUTE_MS
@@ -166,6 +167,7 @@ async function readModel($: EngineInterface) {
   const range = await read($, rangeState)
   const growth = await read($, growthState)
   const buddy = await read($, buddyState)
+  const visitors = await read($, visitorsState)
   const from = rangeFrom(range, today, scan?.firstDay ?? null)
   const mergeDays = merges === null ? [] : mergeCalendar(merges.days, merges.from > from ? merges.from : from, today)
   const totals = scan === null ? null : rangeTotals(scan.days, from, scan.totals.cacheHitRate)
@@ -208,6 +210,7 @@ async function readModel($: EngineInterface) {
     .map(w => w.forecast?.fullAt ?? null)
     .filter((at): at is number => at !== null && at > now)
     .sort((a, b) => a - b)[0]
+  const visitCount = pet.line?.count ?? 0
   const context: LineContext = {
     streak,
     lost,
@@ -221,8 +224,9 @@ async function readModel($: EngineInterface) {
     fullAt: fullAt === undefined ? null : whenText(fullAt, now, tz),
     reset: fiveWindow?.limit.resetsAt == null ? null : whenText(fiveWindow.limit.resetsAt, now, tz),
     pr: isParty ? `#${party.number}` : null,
-    fed: pet.fed,
-    patted: pet.patted,
+    fed: pet.fed + (visitors?.fed ?? 0),
+    patted: pet.patted + (visitors?.patted ?? 0),
+    visits: visitCount >= 2 ? visitCount : null,
     time: `${String(local.hour).padStart(2, '0')}:${String(local.minute).padStart(2, '0')}`,
   }
   const moodKey = bucketsFor(mood, local.hour, streak, { isLevelUp, lost })[0] ?? 'happy'

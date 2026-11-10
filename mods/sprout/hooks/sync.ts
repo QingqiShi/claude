@@ -1,10 +1,20 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface } from 'claude-code'
 
-import type { SproutBuddy, SproutBuddyLink, SproutConnect, SproutOthers, SproutUpload } from '../types'
-import { BUDDY_DEFAULT_SERVER, machineName, normalizeServer, parseOthers, shouldUpload, uploadBodyOf, uploadHashOf } from './buddy'
+import type { SproutBucket, SproutBuddy, SproutBuddyLink, SproutConnect, SproutOthers, SproutPet, SproutUpload, SproutVisitorCounts, SproutVisitors } from '../types'
+import {
+  BUDDY_DEFAULT_SERVER,
+  isVisitorsDue,
+  machineName,
+  normalizeServer,
+  parseOthers,
+  parseVisitors,
+  shouldUpload,
+  uploadBodyOf,
+  uploadHashOf,
+} from './buddy'
 import { t } from './i18n'
-import { HOUR_MS, MINUTE_MS } from './logic'
+import { FEED_MS, HOUR_MS, MINUTE_MS, PAT_MS } from './logic'
 import { findNode, note } from './tools'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in register.tsx.
@@ -30,8 +40,17 @@ const buddyState = atom(
   { shape: 'buddy-1' },
 )
 const othersState = atom({ plugin: 'sprout', key: 'others' } as const, null, { shape: 'others-1' })
+const visitorsState = atom({ plugin: 'sprout', key: 'visitors' } as const, null, { shape: 'visitors-1' })
 
-const STORE = { link: 'buddy', upload: 'buddyUpload', server: 'buddyServer', others: 'buddyOthers', offer: 'buddyOffer' } as const
+const STORE = {
+  link: 'buddy',
+  upload: 'buddyUpload',
+  server: 'buddyServer',
+  others: 'buddyOthers',
+  offer: 'buddyOffer',
+  visitors: 'buddyVisitors',
+  visitorsPolled: 'buddyVisitorsPolled',
+} as const
 const SECURITY = '/usr/bin/security'
 const OPEN = '/usr/bin/open'
 const OTHERS_MS = HOUR_MS
@@ -61,6 +80,11 @@ function isUpload(value: unknown): value is SproutUpload {
 function isOthers(value: unknown): value is SproutOthers {
   const v = value as SproutOthers | null
   return typeof v === 'object' && v !== null && typeof v.fetchedAt === 'number' && Array.isArray(v.days)
+}
+
+function isVisitors(value: unknown): value is SproutVisitors {
+  const v = value as SproutVisitors | null
+  return typeof v === 'object' && v !== null && [v.fed, v.patted, v.seenFed, v.seenPatted, v.at].every(n => typeof n === 'number')
 }
 
 async function patch($: EngineInterface, change: Partial<SproutBuddy>) {
@@ -137,21 +161,23 @@ export async function setBuddyServer($: EngineInterface, value: string | null) {
 
 async function forgetLink($: EngineInterface) {
   stopBuddy()
-  for (const key of [STORE.link, STORE.upload, STORE.others]) {
+  for (const key of [STORE.link, STORE.upload, STORE.others, STORE.visitors, STORE.visitorsPolled]) {
     try {
       await $.store.delete(key)
     } catch {}
   }
   await update($, othersState, () => null)
+  await update($, visitorsState, () => null)
   await patch($, { link: null, connect: null, upload: null, error: null, note: null })
 }
 
 export async function hydrateBuddy($: EngineInterface, now: number) {
-  const [link, upload, others, offer] = await Promise.all([
+  const [link, upload, others, offer, visitors] = await Promise.all([
     $.store.get(STORE.link),
     $.store.get(STORE.upload),
     $.store.get(STORE.others),
     $.store.get(STORE.offer),
+    $.store.get(STORE.visitors),
   ])
   const isReady = (await $.fs.exists(SECURITY)) && (await findNode($, now)) !== null
   const current = await read($, buddyState)
@@ -163,6 +189,7 @@ export async function hydrateBuddy($: EngineInterface, now: number) {
     connect: current.connect !== null && current.connect.expiresAt > now ? current.connect : null,
   })
   if (isOthers(others) && (await read($, othersState)) === null) await update($, othersState, () => others)
+  if (isLink(link) && isVisitors(visitors)) await showVisitors($, visitors)
   if (current.connect !== null && current.connect.expiresAt > now) startPolling($, current.connect)
 }
 
@@ -258,7 +285,7 @@ export async function pollConnect($: EngineInterface) {
       connectedAt: now,
     }
     await $.store.set(STORE.link, link)
-    await $.store.delete(STORE.upload)
+    for (const key of [STORE.upload, STORE.visitors, STORE.visitorsPolled]) await $.store.delete(key)
     await patch($, { connect: null, link, upload: null, error: null, note: null })
     try {
       $.ui.toast(t('连上了，手机上也能看到小苗了', 'Connected. Now you can see Miao on your phone too'))
@@ -275,6 +302,16 @@ async function signed($: EngineInterface, link: SproutBuddyLink, command: 'sign-
   const signature = reply?.signature
 
   return typeof signature === 'string' ? signature : null
+}
+
+/** A signed GET of `/api/v1/u/<user>/<path>`, or null when the read cannot be signed. */
+async function signedRead($: EngineInterface, link: SproutBuddyLink, path: 'others' | 'visitors', now: number) {
+  const signature = await signed($, link, 'sign-read', ['--at', String(now)])
+  if (signature === null) return null
+
+  return fetchJson($, `${link.server}/api/v1/u/${link.user}/${path}`, {
+    headers: { 'Buddy-Machine': link.machine, 'Buddy-Signature': signature, 'Buddy-At': String(now) },
+  })
 }
 
 /** Drops the link but keeps the key, then connects again: Buddy gives the same key its old machine id unless the person removed it there. */
@@ -323,6 +360,8 @@ export async function syncBuddy($: EngineInterface, isForced = false) {
       const upload: SproutUpload = { at: now, hash }
       await $.store.set(STORE.upload, upload)
       await patch($, { upload, error: null })
+      const counts = parseVisitors(parseJson(reply.text))
+      if (counts !== null) await learnVisitors($, counts)
     } else if (reply.status === 401) {
       await patch($, { error: 'unauthorized' })
     } else {
@@ -342,11 +381,8 @@ export async function pullOthers($: EngineInterface, isForced = false) {
   const now = await $.clock.now()
   const current = await read($, othersState)
   if (!isForced && current !== null && now - current.fetchedAt < OTHERS_MS) return
-  const signature = await signed($, link, 'sign-read', ['--at', String(now)])
-  if (signature === null) return
-  const reply = await fetchJson($, `${link.server}/api/v1/u/${link.user}/others`, {
-    headers: { 'Buddy-Machine': link.machine, 'Buddy-Signature': signature, 'Buddy-At': String(now) },
-  })
+  const reply = await signedRead($, link, 'others', now)
+  if (reply === null) return
   if (reply.status === 401) {
     await patch($, { error: 'unauthorized' })
     return
@@ -356,6 +392,62 @@ export async function pullOthers($: EngineInterface, isForced = false) {
   if (others === null) return
   await $.store.set(STORE.others, others)
   if (JSON.stringify(current) !== JSON.stringify(others)) await update($, othersState, () => others)
+}
+
+async function showVisitors($: EngineInterface, visitors: SproutVisitors | null) {
+  if (JSON.stringify(await read($, visitorsState)) !== JSON.stringify(visitors)) await update($, visitorsState, () => visitors)
+}
+
+/**
+ * Keeps the counts Buddy told and lets the pet react when visitors watered or patted it since the last counts. The first
+ * counts after a link are only kept, as they are history. The seen counts go to the store before the pet moves, so
+ * another session that reads the store later finds nothing new and stays still.
+ */
+async function learnVisitors($: EngineInterface, counts: SproutVisitorCounts) {
+  const stored = await $.store.get(STORE.visitors)
+  const last = isVisitors(stored) ? stored : null
+  const now = await $.clock.now()
+  const visitors: SproutVisitors = { ...counts, seenFed: counts.fed, seenPatted: counts.patted, at: now }
+  await $.store.set(STORE.visitors, visitors)
+  await showVisitors($, visitors)
+  if (last === null) return
+  const newFed = counts.fed - last.seenFed
+  const newPatted = counts.patted - last.seenPatted
+  if (newFed > 0) await react($, 'feed', newFed)
+  else if (newPatted > 0) await react($, 'pat', newPatted)
+}
+
+async function react($: EngineInterface, kind: 'feed' | 'pat', count: number) {
+  const now = await $.clock.now()
+  const bucket: SproutBucket = kind === 'feed' ? 'visitFeed' : 'visitPat'
+  await update($, petState, (pet: SproutPet) => ({ ...pet, action: kind, actionAt: now, line: { bucket, index: Math.floor(now / 1000) % 97, at: now, count } }))
+  $.clock.after(kind === 'feed' ? FEED_MS : PAT_MS, () => {
+    void update($, petState, (pet: SproutPet) => (pet.actionAt === now ? { ...pet, action: null } : pet)).catch(() => {})
+  })
+}
+
+/**
+ * Reads the visitors' counts when this Mac has not heard from Buddy for 15 minutes, by an upload or by such a read. Every
+ * session keeps both times in the store, so a Mac with many sessions open still reads once per 15 minutes.
+ */
+export async function pollVisitors($: EngineInterface) {
+  const buddy = await read($, buddyState)
+  const link = buddy.link
+  if (link === null || buddy.isReady !== true) return
+  const [upload, polled, stored] = await Promise.all([$.store.get(STORE.upload), $.store.get(STORE.visitorsPolled), $.store.get(STORE.visitors)])
+  await showVisitors($, isVisitors(stored) ? stored : null)
+  const now = await $.clock.now()
+  if (!isVisitorsDue(isUpload(upload) ? upload.at : null, typeof polled === 'number' ? polled : null, now)) return
+  await $.store.set(STORE.visitorsPolled, now)
+  const reply = await signedRead($, link, 'visitors', now)
+  if (reply === null) return
+  if (reply.status === 401) {
+    await patch($, { error: 'unauthorized' })
+    return
+  }
+  if (reply.status !== 200) return
+  const counts = parseVisitors(parseJson(reply.text))
+  if (counts !== null) await learnVisitors($, counts)
 }
 
 /**

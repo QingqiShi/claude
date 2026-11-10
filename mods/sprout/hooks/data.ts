@@ -16,7 +16,7 @@ import type {
 import type { ChunkSpan } from './logic'
 import { withOthers } from './buddy'
 import { DAY_MS, HOUR_MS, MINUTE_MS, RECENT_DAYS, addDays, growthStep, localTime, mergedFrom, planMergeChunks } from './logic'
-import { hydrateBuddy, pullOthers, stopBuddy, syncBuddy } from './sync'
+import { hydrateBuddy, pollVisitors, pullOthers, stopBuddy, syncBuddy } from './sync'
 import { findGh, findNode, homeDir, note } from './tools'
 
 // The engine reads state keys off each file's own source, so these atoms are written here and again in register.tsx.
@@ -520,6 +520,7 @@ export function startSprout($: EngineInterface, cwd: string) {
     await safely($, 'buddy others', () => pullOthers($))
     await safely($, 'growth', async () => syncGrowth($, await $.clock.now()))
     await safely($, 'buddy upload', () => syncBuddy($))
+    await safely($, 'buddy visitors', () => pollVisitors($))
   }
   void (async () => {
     await safely($, 'hydrate', () => hydrate($))

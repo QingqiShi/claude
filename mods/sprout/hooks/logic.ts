@@ -5,6 +5,8 @@ import { LEVELS, MAX_LEVEL, levelInfo } from './levels'
 export const MINUTE_MS = 60_000
 export const HOUR_MS = 60 * MINUTE_MS
 export const DAY_MS = 24 * HOUR_MS
+export const FEED_MS = 1800
+export const PAT_MS = 1200
 
 export const FIVE_HOUR = { windowMs: 5 * HOUR_MS, lookbackMs: HOUR_MS }
 export const SEVEN_DAY = { windowMs: 7 * DAY_MS, lookbackMs: 24 * HOUR_MS }

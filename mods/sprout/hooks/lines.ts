@@ -14,8 +14,11 @@ export type LineContext = {
   fullAt: string | null
   reset: string | null
   pr: string | null
+  /** The own presses and the visitors' together. */
   fed: number
   patted: number
+  /** How many times visitors watered or patted since the pet last said so; null below 2, so that no line says "1 times". */
+  visits: number | null
   time: string
 }
 
@@ -128,6 +131,18 @@ export const LINES: Record<SproutBucket, readonly string[]> = {
     '轻点！我不是你那能随便 rebase 的分支。',
     '摸够了吗？摸够了去写代码。',
     '跳一下给你看，满意了吧？',
+  ],
+  visitFeed: [
+    '刚才有人在网页上给我浇水了！比你勤快多了。',
+    '网页上有人给我浇了 {visits} 次水，你学着点。',
+    '有人隔着屏幕给我浇水，你的朋友都比你靠谱。',
+    '网上有人喂我喝水，看来我比你红。',
+  ],
+  visitPat: [
+    '刚才有人在网页上摸了摸我！手法比你温柔。',
+    '网页上有人摸了我 {visits} 下，你的位置不保了。',
+    '有人隔着网线摸我头，芽都翘起来了。',
+    '网上有人摸我，你吃醋了没？',
   ],
   night: [
     '凌晨 {time} 还在写？你的头发不同意。',
@@ -252,6 +267,18 @@ export const LINES_EN: Record<SproutBucket, readonly string[]> = {
     "Gently! I'm not a branch you can rebase at will.",
     'Done patting? Then go write code.',
     'There, I jumped. Happy now?',
+  ],
+  visitFeed: [
+    'Someone just watered me from the web! More often than you do.',
+    'Someone on the web watered me {visits} times. Take notes.',
+    'A stranger watered me through a screen. Your friends beat you.',
+    "Someone online gave me water. Guess I'm more popular than you.",
+  ],
+  visitPat: [
+    'Someone just patted me from the web! Gentler than you.',
+    'Someone on the web patted me {visits} times. Your job is at risk.',
+    'A pat over the internet. My sprout is standing up.',
+    'Someone online patted me. Jealous?',
   ],
   night: [
     'Still coding at {time}? Your hair disagrees.',

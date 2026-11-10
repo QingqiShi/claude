@@ -121,23 +121,34 @@ function forget(cache, key) {
 }
 
 /** The running total of a thread where a fork left it: before `ordinal` when the fork names one, else at `at`. */
-async function totalAtFork(files, thread, at, ordinal, visiting = new Set()) {
+async function totalAtFork(files, thread, at, ordinal, checkpointCache, visiting = new Set()) {
   const file = files.get(thread);
   if (!file || visiting.has(thread)) return null;
-  visiting.add(thread);
-  let state = freshState();
-  let inherited = null;
-  let best = null;
-  try {
-    for await (const { line } of linesOf(file, 0)) {
-      if (state.fork && !state.lane && inherited === null) inherited = (await totalAtFork(files, state.fork, state.forkAt, state.forkOrdinal, visiting)) ?? false;
-      for (const point of consumeLine(state, line, inherited || null).checkpoints) {
-        if (point.thread !== thread) continue;
-        const isBefore = ordinal === null ? point.at <= at : point.ordinal !== null && point.ordinal < ordinal;
-        if (isBefore) best = point.total;
+  let points = checkpointCache.get(thread);
+  if (points === undefined) {
+    // Many forks leave the same large, often compressed parent at different points.
+    // Read that parent's checkpoints once; each fork still selects its own boundary.
+    visiting.add(thread);
+    const state = freshState();
+    let inherited = null;
+    points = [];
+    try {
+      for await (const { line } of linesOf(file, 0)) {
+        if (state.fork && !state.lane && inherited === null) inherited = (await totalAtFork(files, state.fork, state.forkAt, state.forkOrdinal, checkpointCache, visiting)) ?? false;
+        for (const point of consumeLine(state, line, inherited || null).checkpoints) {
+          if (point.thread === thread) points.push(point);
+        }
       }
+      checkpointCache.set(thread, points);
+    } catch {} finally {
+      visiting.delete(thread);
     }
-  } catch {}
+  }
+  let best = null;
+  for (const point of points) {
+    const isBefore = ordinal === null ? point.at <= at : point.ordinal !== null && point.ordinal < ordinal;
+    if (isBefore) best = point.total;
+  }
   return best;
 }
 
@@ -215,6 +226,7 @@ async function main() {
     if (thread) threads.set(thread, source);
   }
 
+  const checkpointCache = new Map();
   let isChanged = false;
   for (const [key, source] of sources) {
     let st;
@@ -233,7 +245,7 @@ async function main() {
     let inherited = null;
     try {
       for await (const next of linesOf(source, offset, isZst ? undefined : st.size - 1)) {
-        if (state.fork && !state.lane && inherited === null) inherited = (await totalAtFork(threads, state.fork, state.forkAt, state.forkOrdinal)) ?? false;
+        if (state.fork && !state.lane && inherited === null) inherited = (await totalAtFork(threads, state.fork, state.forkAt, state.forkOrdinal, checkpointCache)) ?? false;
         const out = consumeLine(state, next.line, inherited || null);
         for (const receipt of out.receipts) record(cache, receipt);
         for (const alias of out.aliases) forget(cache, alias.estimate);

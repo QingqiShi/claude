@@ -1,6 +1,6 @@
 {
   "name": "sprout",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "requires_local_executor": true,
   "description": "小苗 (Miao): a cheeky pixel pet in Codex's side panel, with your quota forecast, your Codex usage over time, your merged PRs and your GitHub contributions.",
   "interface": {

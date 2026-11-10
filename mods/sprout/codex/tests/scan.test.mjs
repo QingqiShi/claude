@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -111,6 +111,27 @@ test("a fork whose parent is not on disk does not count what it inherited", () =
   withHome((home) => {
     writeFileSync(join(home, "sessions/child.jsonl"), body(meta("child", "gone"), count(100, 101), count(120, 102)));
     assert.equal(scan(home).totals.tokens, 20);
+  });
+});
+
+test("forks at different boundaries share one parent checkpoint read per scan", () => {
+  withHome((home) => {
+    const parent = join(home, "archived_sessions/parent.jsonl.zst");
+    writeFileSync(parent, zstdCompressSync(Buffer.from(body(meta("parent"), count(100, 0, 2), count(200, 50, 3)))));
+    for (let i = 0; i < 8; i++) {
+      const base = i % 2 === 0 ? 100 : 200;
+      writeFileSync(join(home, `sessions/child-${i}.jsonl`), body(meta(`child-${i}`, "parent", i % 2 === 0 ? 3 : 4), count(base + 10, 101)));
+    }
+    const reads = join(home, "reads.json");
+    const probe = join(home, "probe.mjs");
+    writeFileSync(probe, `import fs from 'node:fs';
+const original = fs.createReadStream; let reads = 0;
+fs.createReadStream = function(file, ...args) { if (String(file) === ${JSON.stringify(parent)}) reads++; return original.call(this, file, ...args); };
+process.once('exit', () => fs.writeFileSync(${JSON.stringify(reads)}, JSON.stringify(reads)));
+`);
+    const output = JSON.parse(execFileSync(process.execPath, ["--import", probe, SCAN, "--sessions", join(home, "sessions"), "--sessions", join(home, "archived_sessions"), "--cache", join(home, "cache.json")], { encoding: "utf8" }));
+    assert.equal(output.totals.tokens, 280, "each child contributes only its ten new tokens at its own fork boundary");
+    assert.equal(JSON.parse(readFileSync(reads, "utf8")), 3, "one metadata read, one checkpoint read and one ordinary usage read, regardless of the number of forks");
   });
 });
 

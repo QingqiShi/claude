@@ -28,6 +28,10 @@ mods/**/node_modules/
 mods/**/.playwright-cli/
 !docs/
 !docs/**
+!.agents/
+!.agents/**
+!.github/
+!.github/**
 
 # Third-party skills: reinstalled via bootstrap.sh, never vendored here.
 # (Must come after the !skills/** allow-list to override it.)

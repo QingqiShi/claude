@@ -74,7 +74,16 @@ export const SPARKLES: ReadonlyArray<[number, number]> = [
   [-1, 5],
 ]
 
+export type SceneDecoration = {
+  css?: (id: string) => string
+  belowPet?: (id: string) => string
+  abovePet?: (layout: Layout, id: string) => string
+  pet?: (markup: string, id: string) => string
+  level?: (markup: string, x: number, width: number) => string
+  bodyClass?: string
+}
 export type SceneInput = {
+  decoration?: SceneDecoration
   width: number
   mood: Mood
   action: 'feed' | 'pat' | null
@@ -203,10 +212,11 @@ function petSvg(input: SceneInput, layout: Layout, id: string) {
       .join('')
   }
 
-  const bodyClass = input.action === 'pat' ? 'hop' : input.isConfetti ? 'party' : input.mood
+  const bodyClass = input.decoration?.bodyClass ?? (input.action === 'pat' ? 'hop' : input.isConfetti ? 'party' : input.mood)
   const back = level.isGold === true ? goldSvg(layout, id, input.mood === 'sleep') : ''
-  const pet = `<g transform="translate(${n(layout.x0)},${n(layout.y0)}) scale(${layout.s.toFixed(3)})" shape-rendering="crispEdges">${back}<g class="${bodyClass}-${id}"><g class="sway-${id}${input.mood === 'worry' ? ` fast-${id}` : ''}">${crown}</g>${body}<g class="eyes-${id}">${openEyes}</g></g>${fx}</g>`
+  let pet = `<g transform="translate(${n(layout.x0)},${n(layout.y0)}) scale(${layout.s.toFixed(3)})" shape-rendering="crispEdges">${back}<g class="${bodyClass}-${id}"><g class="sway-${id}${input.mood === 'worry' ? ` fast-${id}` : ''}">${crown}</g>${body}<g class="eyes-${id}">${openEyes}</g></g>${fx}</g>`
 
+  pet = input.decoration?.pet?.(pet, id) ?? pet
   return level.isSeed === true ? `<g clip-path="url(#soil-${id})">${pet}</g>` : pet
 }
 
@@ -263,7 +273,8 @@ function levelSvg(input: SceneInput) {
     return `<rect x="${n(px + i * 11)}" y="138" width="8" height="4" fill="${isOn ? '#8FD17A' : 'rgba(255,255,255,0.22)'}"/>${isOn ? `<rect x="${n(px + i * 11)}" y="141" width="8" height="1" fill="#3F8F4A"/>` : ''}`
   }).join('')
 
-  return `<g shape-rendering="crispEdges"><rect x="${x - 5}" y="131" width="${n(end - x + 11)}" height="16" fill="rgba(0,0,0,0.32)"/><rect x="${x - 3}" y="129" width="${n(end - x + 7)}" height="2" fill="rgba(0,0,0,0.32)"/><rect x="${x - 3}" y="147" width="${n(end - x + 7)}" height="2" fill="rgba(0,0,0,0.32)"/>${pips}</g><text x="${x + 1}" y="144" font-size="${size}" fill="rgba(0,0,0,0.6)">${label}</text><text x="${x}" y="143" font-size="${size}" fill="#F4F1E6">${label}</text>`
+  const markup = `<g shape-rendering="crispEdges"><rect x="${x - 5}" y="131" width="${n(end - x + 11)}" height="16" fill="rgba(0,0,0,0.32)"/><rect x="${x - 3}" y="129" width="${n(end - x + 7)}" height="2" fill="rgba(0,0,0,0.32)"/><rect x="${x - 3}" y="147" width="${n(end - x + 7)}" height="2" fill="rgba(0,0,0,0.32)"/>${pips}</g><text x="${x + 1}" y="144" font-size="${size}" fill="rgba(0,0,0,0.6)">${label}</text><text x="${x}" y="143" font-size="${size}" fill="#F4F1E6">${label}</text>`
+  return input.decoration?.level?.(markup, x - 5, end - x + 11) ?? markup
 }
 
 export type SkyPalette = { top: string; bottom: string; ground: string; tuft: string; light: string; cloud: string; glow: string }
@@ -280,7 +291,7 @@ export function skyPalette(isDay: boolean, isWorry: boolean): SkyPalette {
     : { top: '#0E1A33', bottom: '#24406A', ground: '#16301F', tuft: '#2F6B3F', light: '#FFF1B8', cloud: '#FFFFFF', glow: '#8FD17A' }
 }
 
-function skySvg(input: SceneInput, layout: Layout, id: string) {
+function skySvg(input: SceneInput, layout: Layout, id: string, petX = PET_CX) {
   const W = input.width
   const isWorry = input.mood === 'worry'
   const { top, bottom, ground, tuft, light, cloud: cloudFill, glow } = skyPalette(input.isDay, isWorry)
@@ -294,7 +305,7 @@ function skySvg(input: SceneInput, layout: Layout, id: string) {
     const cloud = (cx: number, cy: number, k: number, delay: number) =>
       `<g class="cloud-${id}" style="animation-delay:${delay}s" shape-rendering="crispEdges" fill="${cloudFill}" opacity=".92"><rect x="${cx}" y="${cy + 4 * k}" width="${22 * k}" height="${4 * k}"/><rect x="${cx + 4 * k}" y="${cy}" width="${8 * k}" height="${4 * k}"/><rect x="${cx + 10 * k}" y="${cy - 2 * k}" width="${6 * k}" height="${6 * k}"/></g>`
     s += cloud(Math.round(W * 0.36), 16, 1.5, 0) + cloud(Math.round(W * 0.62), 30, 1, 1.4)
-    s += `<ellipse cx="${PET_CX}" cy="128" rx="${n(10 * layout.s)}" ry="16" fill="url(#glow-${id})"/>`
+    s += `<ellipse cx="${petX}" cy="128" rx="${n(10 * layout.s)}" ry="16" fill="url(#glow-${id})"/>`
     s += `<rect y="${GROUND_Y}" width="${W}" height="${SCENE_HEIGHT - GROUND_Y}" fill="${ground}"/>`
     for (let x = 0; x < W; x += 9) {
       const hh = 2 + Math.round(random() * 3)
@@ -315,7 +326,7 @@ function skySvg(input: SceneInput, layout: Layout, id: string) {
   }
   const mx = W - 40
   s += `<g shape-rendering="crispEdges" fill="${light}"><rect x="${mx + 2}" y="12" width="12" height="12"/><rect x="${mx}" y="14" width="2" height="8"/><rect x="${mx + 14}" y="14" width="2" height="8"/><rect x="${mx + 4}" y="10" width="8" height="2"/><rect x="${mx + 4}" y="24" width="8" height="2"/></g><rect x="${mx + 6}" y="12" width="10" height="10" fill="${top}" opacity=".9" shape-rendering="crispEdges"/>`
-  s += `<ellipse class="glow-${id}" cx="${PET_CX}" cy="128" rx="${n(10 * layout.s)}" ry="18" fill="url(#glow-${id})"/>`
+  s += `<ellipse class="glow-${id}" cx="${petX}" cy="128" rx="${n(10 * layout.s)}" ry="18" fill="url(#glow-${id})"/>`
   s += `<rect y="${GROUND_Y}" width="${W}" height="${SCENE_HEIGHT - GROUND_Y}" fill="${ground}"/>`
   for (let x = 0; x < W; x += 9) {
     const hh = 2 + Math.round(random() * 3)
@@ -413,5 +424,13 @@ export function sceneSvg(input: SceneInput) {
   const W = input.width
   const layout = layoutOf(input.level)
 
-  return `${svgOpen(W, SCENE_HEIGHT)}${sceneCss(id)}<defs><clipPath id="clip-${id}"><rect width="${W}" height="${SCENE_HEIGHT}" rx="10"/></clipPath><clipPath id="soil-${id}"><rect width="${W}" height="${GROUND_Y}"/></clipPath></defs><g clip-path="url(#clip-${id})">${skySvg(input, layout, id)}${input.isConfetti ? confettiSvg(id) : ''}${petSvg(input, layout, id)}${input.mood === 'sleep' ? sleepSvg(layout, id) : ''}${levelSvg(input)}${bubbleSvg(input, layout, id)}</g></svg>`
+  return `${svgOpen(W, SCENE_HEIGHT)}${sceneCss(id)}${input.decoration?.css?.(id) ?? ''}<defs><clipPath id="clip-${id}"><rect width="${W}" height="${SCENE_HEIGHT}" rx="10"/></clipPath><clipPath id="soil-${id}"><rect width="${W}" height="${GROUND_Y}"/></clipPath></defs><g clip-path="url(#clip-${id})">${skySvg(input, layout, id)}${input.decoration?.belowPet?.(id) ?? ''}${input.isConfetti ? confettiSvg(id) : ''}${petSvg(input, layout, id)}${input.mood === 'sleep' ? sleepSvg(layout, id) : ''}${input.decoration?.abovePet?.(layout, id) ?? ''}${levelSvg(input)}${bubbleSvg(input, layout, id)}</g></svg>`
+}
+
+/** The atlas uses the same sprites and sky as the pet, without its speech bubble or HUD. */
+export function portraitSvg(level: number, isDay: boolean) {
+  const input: SceneInput = { width:200, level, isDay, mood:'happy', action:null, isConfetti:false, pips:0, rows:[], isPop:false }
+  const id = uid('portrait',level,Number(isDay))
+  const layout = layoutOf(level)
+  return `${svgOpen(200,SCENE_HEIGHT)}${sceneCss(id)}<defs><clipPath id="clip-${id}"><rect width="200" height="150" rx="10"/></clipPath><clipPath id="soil-${id}"><rect width="200" height="126"/></clipPath></defs><g clip-path="url(#clip-${id})">${skySvg(input,layout,id,100)}<g transform="translate(44,0)">${petSvg(input,layout,id)}</g></g></svg>`
 }

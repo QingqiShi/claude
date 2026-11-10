@@ -1,0 +1,12 @@
+{
+  "name": "qingqi",
+  "interface": { "displayName": "Qingqi" },
+  "plugins": [
+    {
+      "name": "sprout",
+      "source": { "source": "local", "path": "./mods/sprout" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

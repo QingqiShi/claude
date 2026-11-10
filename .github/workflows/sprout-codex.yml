@@ -1,0 +1,20 @@
+name: Sprout for Codex
+on:
+  push:
+    branches: [main]
+    paths: ['mods/sprout/**', '.github/workflows/sprout-codex.yml']
+  pull_request:
+    paths: ['mods/sprout/**', '.github/workflows/sprout-codex.yml']
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['22.18.0', '24']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: node --import ./codex/loader.mjs --test "codex/tests/*.test.*"
+        working-directory: mods/sprout

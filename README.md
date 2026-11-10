@@ -85,6 +85,21 @@ What goes up is what the page shows: tokens and cost by day, the quota readings,
 
 To count a Mac that does not sync, copy its `~/.claude/projects/` into `~/.claude/sprout-imports/<device-name>/`. Once that Mac syncs to Buddy itself, remove its folder, or its days count twice.
 
+### In Codex
+
+The same pet lives in Codex's side panel, as a plugin. It counts your Codex usage instead: it reads the session files under `~/.codex/` with [`codex/scripts/scan.mjs`](mods/sprout/codex/scripts/scan.mjs), asks the Codex CLI for your quota, and prices the tokens from OpenAI's pricing page, which it reads again once a day.
+
+```sh
+codex plugin marketplace add QingqiShi/claude
+codex plugin add sprout@qingqi
+```
+
+Restart Codex and say “open Miao”. It needs `node` 22.18 or newer, because Codex runs the mod's TypeScript as it is, with no build. To update, run `codex plugin marketplace upgrade qingqi` and add the plugin again; to remove it, `codex plugin remove sprout@qingqi`. The pet's state stays in `~/.codex/sprout/`.
+
+In Codex the pet also reacts to the work: it makes tea during a long task, leaves a note when the context is compacted, and has words for a failed test. When the quota is tight, click the cloud to ask Tibo for rain. CatGPT visits once a day. Click the level bar for the growth atlas.
+
+The code for Codex is in [`mods/sprout/codex/`](mods/sprout/codex). The hooks of the mod run there unchanged, on a small stand-in for Claude Code's engine; [`hooks/host.ts`](mods/sprout/hooks/host.ts) names what a host may change.
+
 ## What is here
 
 - `CLAUDE.md`: my instructions for every project

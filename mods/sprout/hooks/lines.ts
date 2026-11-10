@@ -311,10 +311,28 @@ export function fill(line: string, context: LineContext): string | null {
   return isMissing ? null : text
 }
 
+type Pools = Record<string, readonly string[]>
+
+const more: { zh: Pools; en: Pools } = { zh: {}, en: {} }
+const moods = new Set<string>(['happy', 'worry', 'sleep', 'party', 'night', 'streak', 'levelup', 'broken'])
+
+/** A host adds its own lines here: to a bucket of the pane, or to a bucket of its own. A line from a mood bucket goes when the mood does. */
+export function addLines(zh: Pools, en: Pools, moodBuckets: readonly string[] = []) {
+  more.zh = zh
+  more.en = en
+  for (const bucket of moodBuckets) moods.add(bucket)
+}
+
+export function isMood(bucket: string) {
+  return moods.has(bucket)
+}
+
 export function linesFor(buckets: readonly SproutBucket[], context: LineContext) {
   const out: { bucket: SproutBucket; text: string }[] = []
+  const isZh = lang() === 'zh'
   for (const bucket of buckets) {
-    for (const line of (lang() === 'zh' ? LINES : LINES_EN)[bucket]) {
+    const own: Pools = isZh ? LINES : LINES_EN
+    for (const line of [...(own[bucket] ?? []), ...((isZh ? more.zh : more.en)[bucket] ?? [])]) {
       const text = fill(line, context)
       if (text !== null) out.push({ bucket, text })
     }

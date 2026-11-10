@@ -24,6 +24,8 @@ skills/**/evals/results/
 !update.sh
 !mods/
 !mods/**
+mods/**/node_modules/
+mods/**/.playwright-cli/
 !docs/
 !docs/**
 

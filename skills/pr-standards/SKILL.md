@@ -9,9 +9,11 @@ description: My standards for a pull request: the title and branch convention, w
 
 Conventional Commits, lowercase: the commit, the PR title, and the branch (`<type>/<kebab-desc>`) all carry the same type. Recheck the type whenever the WHY changes, because the WHY decides what the change is. In a worktree, rename the branch the harness created instead of branching off it.
 
+The titles of past PRs show how a title reads in this repository. Their descriptions are not a model: one habit copied from them, such as opening with "The owner asked for…", spreads to every PR after it. Write the description from this standard alone.
+
 ## The WHY comes from the person, not the diff
 
-Lead the description with why the change was made, as the conversation told you. The diff is ground truth for what changed and can confirm a reason, but it cannot supply one: a plausible motive read off the code is a guess, and a guessed WHY is the one error a reviewer cannot detect. Where no reason was given, write "motivation not recorded" at that point and open the PR as a draft, then end the turn by asking the person in chat why the change was made. Do not leave the gap for them to fill on GitHub: only they can supply the reason, so the run ends on that question. When the answer comes, write the WHY in, recheck the type, and mark the PR ready.
+Lead the description with why the change was made, as the conversation told you. The diff is ground truth for what changed and can confirm a reason, but it cannot supply one: a plausible motive read off the code is a guess, and a guessed WHY is the one error a reviewer cannot detect. State the reason itself, not who gave it: "The owner asked for a new Slider" reports a request and leaves out what the change is for. Where no reason was given, write "motivation not recorded" at that point and open the PR as a draft, then end the turn by asking the person in chat why the change was made. Do not leave the gap for them to fill on GitHub: only they can supply the reason, so the run ends on that question. When the answer comes, write the WHY in, recheck the type, and mark the PR ready.
 
 ## Description
 

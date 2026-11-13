@@ -10,7 +10,7 @@ A task is done when the user can open the result and find what they asked for, w
 
 The user reads your reports on a phone, without the session in their head. Write so that they understand on the first read: explain a term that they did not use first, and show a layout or a visual choice instead of describing it.
 
-In a worktree, use `git checkout origin/main` instead of `git checkout main`, because another worktree usually has `main` checked out.
+In a worktree, check out the default branch through the remote (`git checkout origin/main`, or `origin/master` where that is the default), not by its local name, because another worktree usually has the local branch checked out.
 
 Under `vercel env run`, `node` runs the Vercel CLI, so `vercel env run -- node <file>` deploys that file to a new Vercel project without asking; use `pnpm exec tsx <file>` there instead.
 

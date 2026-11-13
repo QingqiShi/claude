@@ -7,7 +7,9 @@ import subprocess
 import tempfile
 import unittest
 
-HOOK = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "clear-stale-handoff.py")
+HOOKS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HOOK = os.path.join(HOOKS, "clear-stale-handoff.py")
+RULES = os.path.join(HOOKS, "session-memory.md")
 
 
 class ClearStaleHandoffTest(unittest.TestCase):
@@ -50,8 +52,27 @@ class ClearStaleHandoffTest(unittest.TestCase):
 
     def test_terminal_continued_session_keeps_handoff(self):
         for source in ("clear", "compact", "resume", "fork"):
-            self.assertEqual(self.run_hook(source), "")
+            context = self.context(self.run_hook(source))
+            self.assertIn(self.handoff, context)
+            self.assertIn("Read it before you start", context)
             self.assertTrue(os.path.isfile(self.handoff))
+
+    def test_every_start_carries_the_rules(self):
+        with open(RULES, encoding="utf-8") as file:
+            rules = file.read().strip()
+        for source, host_session_id in (("startup", None), ("clear", None), ("startup", "local_abc"), ("compact", "local_abc")):
+            self.assertIn(rules, self.context(self.run_hook(source, host_session_id)))
+
+    def test_terminal_outside_a_repository_says_nothing(self):
+        result = subprocess.run(
+            ["python3", HOOK],
+            input=json.dumps({"cwd": os.path.realpath(self.temp.name), "source": "startup"}),
+            capture_output=True,
+            text=True,
+            check=True,
+            env={key: value for key, value in os.environ.items() if key != "CLAUDE_CODE_HOST_SESSION_ID"},
+        )
+        self.assertEqual(result.stdout, "")
 
     def test_desktop_startup_without_file_names_path_and_leaves_repo_handoff(self):
         output = self.run_hook("startup", "local_abc")

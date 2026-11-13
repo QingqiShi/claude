@@ -94,7 +94,7 @@ npm install -g "$PLAYWRIGHT_CLI_PKG"
 ( cd "$(dirname "$CLAUDE_DIR")" && playwright-cli install --skills ) \
   || warn "  (playwright-cli install --skills failed)"
 
-# 6. Global git ignore for HANDOFF.md (session memory required by CLAUDE.md) --
+# 6. Global git ignore for HANDOFF.md (session memory, see hooks/session-memory.md) --
 GLOBAL_IGNORE="$(git config --global --get core.excludesfile || true)"
 GLOBAL_IGNORE="${GLOBAL_IGNORE/#\~/$HOME}"
 GLOBAL_IGNORE="${GLOBAL_IGNORE:-${XDG_CONFIG_HOME:-$HOME/.config}/git/ignore}"

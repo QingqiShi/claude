@@ -133,6 +133,7 @@
       "Hogging the keyboard"
     ]
   },
+  "promptCacheTtl": "1h",
   "effortLevel": "xhigh",
   "modelSettings": {
     "claude-opus-5-5": {
@@ -151,7 +152,6 @@
   "skipWorkflowUsageWarning": true,
   "preferredNotifChannel": "ghostty",
   "autoCompactEnabled": true,
-  "promptCacheTtl": "1h",
   "teammateMode": "auto",
   "remoteControlAtStartup": false,
   "inputNeededNotifEnabled": true,
@@ -183,5 +183,6 @@
       "**Repository visibility**: public. Every repository I work in is public, so a commit or push anywhere publishes to the internet. Treat a repository as private only when the transcript shows it."
     ]
   },
-  "voiceEnabled": true
+  "voiceEnabled": true,
+  "advisorModel": "fable"
 }

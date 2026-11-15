@@ -481,13 +481,6 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('agent.spawn', async ($, e, next) => {
-    const spawned = await next(e)
-    requestRefresh?.()
-
-    return spawned
-  }).catch(($, e, next) => next(e))
-
   on('turn.start', async ($, e, next) => {
     if (e.agentId !== undefined) requestRefresh?.()
 

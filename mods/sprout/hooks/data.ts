@@ -505,6 +505,12 @@ async function safely($: EngineInterface, what: string, work: () => Promise<void
   }
 }
 
+/** Shows what earlier sessions saved. It reads the store alone, so it can run before the session has started. */
+export async function loadSaved($: EngineInterface) {
+  await safely($, 'hydrate', () => hydrate($))
+  await safely($, 'buddy', async () => hydrateBuddy($, await $.clock.now()))
+}
+
 export function stopSprout() {
   for (const timer of timers) timer.cancel()
   timers = []
@@ -531,8 +537,7 @@ export function startSprout($: EngineInterface, cwd: string, host: Host = claude
     await safely($, 'buddy visitors', () => pollVisitors($))
   }
   void (async () => {
-    await safely($, 'hydrate', () => hydrate($))
-    await safely($, 'buddy', async () => hydrateBuddy($, await $.clock.now()))
+    await loadSaved($)
     await cycle(true)
   })()
   timers.push($.clock.every(POLL_MS, () => void cycle(false)))

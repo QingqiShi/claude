@@ -2,7 +2,7 @@ import { atom, read } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { SproutBuddy } from '../types'
-import { recordLimits, startSprout } from './data'
+import { loadSaved, recordLimits, startSprout } from './data'
 import { agoText, formatTokens, formatUsd, withCommas } from './logic'
 import { loadLang, t } from './i18n'
 import { levelLabel } from './levels'
@@ -156,6 +156,7 @@ export const register: Register = on => {
     } catch {}
     void $.ui.open({ id: PANE, title: title() }).catch(() => {})
     void hydrateRange($)
+    void loadSaved($)
     const started = await next(e)
     startSprout($, e.cwd)
 

@@ -262,3 +262,27 @@ test('a new session starts on the range chosen last', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: '自 8 月 11 日起' })).toBeTruthy()
   await ui.unmount()
 })
+
+test('a new session shows the saved numbers before its start has finished', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  on('settings.read', () => ({ value: { language: '中文' } }))
+  mock.store(on, { scan: SCAN, range: 'all' })
+  on('command.register', () => ({ value: { command: 'sprout' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  let loaded = () => {}
+  const isLoaded = new Promise<void>(resolve => (loaded = resolve))
+  on('state.set', async (_, e, next) => {
+    const set = await next(e)
+    if (e.key === 'scan') loaded()
+    return set
+  })
+  on('session.start', async (_, e) => {
+    await isLoaded
+    return { cwd: e.cwd }
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: '自 8 月 11 日起' })).toBeTruthy()
+  await ui.unmount()
+})

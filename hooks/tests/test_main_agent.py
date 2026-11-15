@@ -8,11 +8,11 @@ import tempfile
 import unittest
 
 HOOKS = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-HOOK = os.path.join(HOOKS, "clear-stale-handoff.py")
-RULES = os.path.join(HOOKS, "session-memory.md")
+HOOK = os.path.join(HOOKS, "main-agent.py")
+INSTRUCTIONS = os.path.join(HOOKS, "main-agent.md")
 
 
-class ClearStaleHandoffTest(unittest.TestCase):
+class MainAgentTest(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.repo = os.path.join(os.path.realpath(self.temp.name), "repo")
@@ -25,14 +25,14 @@ class ClearStaleHandoffTest(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
-    def run_hook(self, source, host_session_id=None):
+    def run_hook(self, source, host_session_id=None, cwd=None, **fields):
         env = {key: value for key, value in os.environ.items() if key != "CLAUDE_CODE_HOST_SESSION_ID"}
         env["CLAUDE_HANDOFF_DIR"] = self.handoff_dir
         if host_session_id is not None:
             env["CLAUDE_CODE_HOST_SESSION_ID"] = host_session_id
         result = subprocess.run(
             ["python3", HOOK],
-            input=json.dumps({"cwd": self.repo, "source": source}),
+            input=json.dumps({"cwd": cwd or self.repo, "source": source, **fields}),
             capture_output=True,
             text=True,
             check=True,
@@ -57,22 +57,20 @@ class ClearStaleHandoffTest(unittest.TestCase):
             self.assertIn("Read it before you start", context)
             self.assertTrue(os.path.isfile(self.handoff))
 
-    def test_every_start_carries_the_rules(self):
-        with open(RULES, encoding="utf-8") as file:
-            rules = file.read().strip()
-        for source, host_session_id in (("startup", None), ("clear", None), ("startup", "local_abc"), ("compact", "local_abc")):
-            self.assertIn(rules, self.context(self.run_hook(source, host_session_id)))
+    def test_every_start_of_the_main_agent_carries_the_instructions(self):
+        with open(INSTRUCTIONS, encoding="utf-8") as file:
+            instructions = file.read().strip()
+        for source, host_session_id in (("startup", None), ("compact", None), ("startup", "local_abc"), ("compact", "local_abc")):
+            self.assertIn(instructions, self.context(self.run_hook(source, host_session_id)))
 
-    def test_terminal_outside_a_repository_says_nothing(self):
-        result = subprocess.run(
-            ["python3", HOOK],
-            input=json.dumps({"cwd": os.path.realpath(self.temp.name), "source": "startup"}),
-            capture_output=True,
-            text=True,
-            check=True,
-            env={key: value for key, value in os.environ.items() if key != "CLAUDE_CODE_HOST_SESSION_ID"},
-        )
-        self.assertEqual(result.stdout, "")
+    def test_compaction_in_a_sub_agent_says_nothing(self):
+        for host_session_id in (None, "local_abc"):
+            output = self.run_hook("compact", host_session_id, agent_id="a4e006acfb8630da1", agent_type="general-purpose")
+            self.assertEqual(output, "")
+
+    def test_terminal_outside_a_repository_names_no_handoff_file(self):
+        context = self.context(self.run_hook("startup", cwd=os.path.realpath(self.temp.name)))
+        self.assertNotIn("Your handoff file is", context)
 
     def test_desktop_startup_without_file_names_path_and_leaves_repo_handoff(self):
         output = self.run_hook("startup", "local_abc")

@@ -1,10 +1,12 @@
-// Prices in USD per million tokens. Source: claude-api skill, shared/models.md and shared/model-migration.md (2026-10-06).
+// Prices in USD per million tokens. Source: claude-api skill, shared/models.md and shared/model-migration.md (2026-11-03).
 // Models that are not listed here are not priced.
 export const PRICING_VERSION = 1;
 
 const flat = (input, output, cacheRead) => ({ input, output, cacheRead });
 
 export const PRICES = {
+  "claude-fable-5-2": flat(8, 40, 0.2),
+  "claude-mythos-5-2": flat(8, 40, 0.2),
   "claude-fable-5-1": flat(10, 50, 0.25),
   "claude-mythos-5-1": flat(10, 50, 0.25),
   "claude-fable-5": flat(10, 50, 1),

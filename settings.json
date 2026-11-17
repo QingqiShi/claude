@@ -144,6 +144,7 @@
       "autoCompactWindow": 400000
     }
   },
+  "advisorModel": "fable",
   "promptSuggestionEnabled": false,
   "awaySummaryEnabled": false,
   "tui": "fullscreen",
@@ -184,5 +185,5 @@
     ]
   },
   "voiceEnabled": true,
-  "advisorModel": "fable"
+  "language": "中文"
 }

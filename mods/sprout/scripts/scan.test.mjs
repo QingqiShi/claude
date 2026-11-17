@@ -120,3 +120,24 @@ test("prices a day at the price of that day, so a price change leaves the days b
     ],
   );
 });
+
+test("splits each day by model, and the model rows add up to the day", () => {
+  const env = setup();
+  const haiku = { model: "claude-haiku-5-5-20261001" };
+  fs.writeFileSync(
+    path.join(env.projects, "a", "s.jsonl"),
+    line("m1", 30, { usage: { cache_read_input_tokens: 500, cache_creation_input_tokens: 70 } }) +
+      line("m2", 4, { ...haiku, usage: { input_tokens: 200_000 } }) +
+      line("m3", 6, { ...haiku, usage: { cache_creation_input_tokens: 90, cache_creation: { ephemeral_5m_input_tokens: 40, ephemeral_1h_input_tokens: 50 } } }),
+  );
+  const [day] = run(env).days;
+  assert.deepEqual(Object.keys(day.models).sort(), ["claude-haiku-5-5", "claude-haiku-5-5+long", "claude-opus-5-5"]);
+  const rows = Object.values(day.models);
+  const sum = (i) => rows.reduce((s, r) => s + r[i], 0);
+  assert.equal(sum(0), day.input);
+  assert.equal(sum(1), day.output);
+  assert.equal(sum(2), day.cacheRead);
+  assert.equal(sum(3) + sum(4), day.cacheWrite);
+  assert.equal(sum(5), day.messages);
+  assert.deepEqual(day.models["claude-haiku-5-5"], [10, 6, 0, 40, 50, 1]);
+});

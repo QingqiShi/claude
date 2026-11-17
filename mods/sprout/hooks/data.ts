@@ -2,6 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, SessionRateLimit } from 'claude-code'
 
 import type {
+  SproutDay,
   SproutGithub,
   SproutLevelUp,
   SproutLimit,
@@ -14,7 +15,7 @@ import type {
   SproutScan,
 } from '../types'
 import type { ChunkSpan } from './logic'
-import { withOthers } from './buddy'
+import { modelRowsOf, withOthers } from './buddy'
 import { DAY_MS, HOUR_MS, MINUTE_MS, RECENT_DAYS, addDays, growthStep, localTime, mergedFrom, planMergeChunks } from './logic'
 import { hydrateBuddy, pollVisitors, pullOthers, stopBuddy, syncBuddy } from './sync'
 import type { Host } from './host'
@@ -69,7 +70,7 @@ async function graphql($: EngineInterface, query: string): Promise<unknown> {
 type RawScan = {
   version?: number
   firstDay?: string | null
-  days?: Array<{ day?: string; input?: number; output?: number; cacheRead?: number; cacheWrite?: number; costUsd?: number }>
+  days?: Array<{ day?: string; input?: number; output?: number; cacheRead?: number; cacheWrite?: number; costUsd?: number; models?: unknown }>
   totals?: { tokens?: number; costUsd?: number; cacheHitRate?: number }
 }
 
@@ -85,13 +86,19 @@ export function parseScan(stdout: string, ranAt: number): SproutScan | null {
   if (raw.version !== 1 || !Array.isArray(raw.days)) return null
   const days = raw.days
     .filter(d => typeof d.day === 'string')
-    .map(d => ({
-      day: d.day as string,
-      tokens: (d.input ?? 0) + (d.output ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
-      costUsd: d.costUsd ?? 0,
-      cacheRead: d.cacheRead ?? 0,
-      promptTokens: (d.input ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
-    }))
+    .map(d => {
+      const day: SproutDay = {
+        day: d.day as string,
+        tokens: (d.input ?? 0) + (d.output ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
+        costUsd: d.costUsd ?? 0,
+        cacheRead: d.cacheRead ?? 0,
+        promptTokens: (d.input ?? 0) + (d.cacheRead ?? 0) + (d.cacheWrite ?? 0),
+      }
+      const models = modelRowsOf(d.models)
+      if (models !== null) day.models = models
+
+      return day
+    })
 
   return {
     ranAt,

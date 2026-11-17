@@ -1,5 +1,18 @@
-/** `cacheRead` and `promptTokens` (fresh input, cache reads and cache writes) are absent in scans stored before they were kept. */
-export type SproutDay = { day: string; tokens: number; costUsd: number; cacheRead?: number; promptTokens?: number }
+/** One model's usage on one day; `input` is the fresh input, without cache reads and writes. It has no cost: the price list prices it when it is read. */
+export type SproutModelRow = [input: number, output: number, cacheRead: number, cacheWrite5m: number, cacheWrite1h: number, messages: number]
+
+/**
+ * `cacheRead` and `promptTokens` (fresh input, cache reads and cache writes) are absent in scans stored before they were kept.
+ * `models` is keyed by price key (the model id, with `+long` for a long-prompt rate); this Mac's Claude scan alone has it.
+ */
+export type SproutDay = {
+  day: string
+  tokens: number
+  costUsd: number
+  cacheRead?: number
+  promptTokens?: number
+  models?: Record<string, SproutModelRow>
+}
 
 export type SproutTotals = { tokens: number; costUsd: number; cacheHitRate: number }
 

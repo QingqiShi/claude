@@ -106,3 +106,17 @@ test("counts a message once across two roots", () => {
   assert.equal(out.totals.messages, 3);
   assert.equal(out.totals.output, 21);
 });
+
+test("prices a day at the price of that day, so a price change leaves the days before it as they were", () => {
+  const env = setup();
+  const cacheRead = { input_tokens: 0, cache_read_input_tokens: 1_000_000 };
+  const sonnet = (id, day) => line(id, 0, { model: "claude-sonnet-5-5", timestamp: `${day}T12:00:00.000Z`, usage: cacheRead });
+  fs.writeFileSync(path.join(env.projects, "a", "s.jsonl"), sonnet("m1", "2026-10-06") + sonnet("m2", "2026-10-07"));
+  assert.deepEqual(
+    run(env).days.map((d) => [d.day, d.costUsd]),
+    [
+      ["2026-10-06", 0.2],
+      ["2026-10-07", 0.1],
+    ],
+  );
+});

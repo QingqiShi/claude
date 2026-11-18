@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { PRICES, PRICING_VERSION, costUsd, normalizeModel, priceKey } from "./pricing.mjs";
+import { PRICING_VERSION, costUsd, normalizeModel, priceKey, priceOn } from "./pricing.mjs";
 
 const CACHE_VERSION = 1;
 const CHUNK = 8 * 1024 * 1024;
@@ -160,13 +160,14 @@ function buildOutput(cache) {
     const row = { day, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, messages: 0 };
     for (const [key, b] of Object.entries(cache.days[day])) {
       if (b[5] <= 0) continue;
-      if (!PRICES[key]) unpriced.add(key);
+      const price = priceOn(key, day);
+      if (!price) unpriced.add(key);
       row.input += b[0];
       row.output += b[1];
       row.cacheRead += b[2];
       row.cacheWrite += b[3] + b[4];
       row.messages += b[5];
-      row.costUsd += costUsd(key, { input: b[0], output: b[1], cacheRead: b[2], write5m: b[3], write1h: b[4] });
+      row.costUsd += costUsd(price, { input: b[0], output: b[1], cacheRead: b[2], write5m: b[3], write1h: b[4] });
     }
     if (row.messages <= 0) continue;
     days.push(row);

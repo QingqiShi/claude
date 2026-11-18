@@ -2,7 +2,8 @@ import { expect, test } from 'claude-code/testing'
 
 import type { UploadInput } from '../hooks/buddy'
 import { UPLOAD_EVERY_MS, machineName, normalizeServer, parseOthers, shouldUpload, uploadBodyOf, uploadHashOf, withOthers } from '../hooks/buddy'
-import type { SproutScan } from '../types'
+import { addDays } from '../hooks/logic'
+import type { SproutModelRow, SproutScan } from '../types'
 
 const NOW = Date.parse('2026-11-07T06:00:00Z')
 
@@ -74,6 +75,29 @@ test('an empty Mac uploads nulls, and merges without a first day are left out', 
   expect(body.github).toBe(null)
   expect(body.merges).toBe(null)
   expect(body.party).toBe(null)
+})
+
+test('a day uploads at most 32 model rows Buddy takes, the ones with the most tokens', async () => {
+  const models: Record<string, SproutModelRow> = { 'bad key': [9e9, 0, 0, 0, 0, 1], 'claude-haiku-5-5+long': [9e9, 0, 0, 0, 0, 0] }
+  for (let i = 0; i < 40; i++) models[`claude-m-${i}`] = [i * 1000.4, 0, 0, 0, 0, 1]
+  const body = uploadBodyOf({ ...INPUT, scan: { ...SCAN, days: [{ day: '2026-11-05', tokens: 1, costUsd: 0, models }] } })
+  const kept = body.days[0]?.models ?? {}
+
+  expect(Object.keys(kept).sort()).toEqual(Array.from({ length: 32 }, (_, i) => `claude-m-${i + 8}`).sort())
+  expect(kept['claude-m-39']).toEqual([39_016, 0, 0, 0, 0, 1])
+})
+
+test('a body over the size budget drops the model rows of the oldest days first', async () => {
+  const row: SproutModelRow = [123_456, 123_456, 123_456, 123_456, 123_456, 1]
+  const models = Object.fromEntries(Array.from({ length: 32 }, (_, i) => [`claude-some-model-name-${i}`, row]))
+  const days = Array.from({ length: 300 }, (_, i) => ({ day: addDays('2025-01-01', i), tokens: 1, costUsd: 0, models }))
+  const body = uploadBodyOf({ ...INPUT, scan: { ...SCAN, days } })
+  const firstKept = body.days.findIndex(d => d.models !== undefined)
+
+  expect(JSON.stringify(body).length).toBeLessThanOrEqual(480 * 1024)
+  expect(firstKept).toBeGreaterThan(0)
+  expect(body.days.slice(firstKept).every(d => d.models !== undefined)).toBe(true)
+  expect(body.days.at(-1)?.models).toEqual(models)
 })
 
 test('uploads are at most one in five minutes per Mac, and only when the data changed', async () => {

@@ -157,7 +157,8 @@ function buildOutput(cache) {
   const days = [];
   const totals = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, tokens: 0, costUsd: 0, messages: 0, cacheHitRate: 0 };
   for (const day of Object.keys(cache.days).sort()) {
-    const row = { day, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, messages: 0 };
+    // A model row: [input, output, cacheRead, write5m, write1h, messages]
+    const row = { day, input: 0, output: 0, cacheRead: 0, cacheWrite: 0, costUsd: 0, messages: 0, models: {} };
     for (const [key, b] of Object.entries(cache.days[day])) {
       if (b[5] <= 0) continue;
       const price = priceOn(key, day);
@@ -168,6 +169,7 @@ function buildOutput(cache) {
       row.cacheWrite += b[3] + b[4];
       row.messages += b[5];
       row.costUsd += costUsd(price, { input: b[0], output: b[1], cacheRead: b[2], write5m: b[3], write1h: b[4] });
+      row.models[key] = b.slice(0, 6);
     }
     if (row.messages <= 0) continue;
     days.push(row);

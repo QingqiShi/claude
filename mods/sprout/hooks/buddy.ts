@@ -3,6 +3,7 @@ import type {
   SproutGithub,
   SproutGrowth,
   SproutMerges,
+  SproutModelRow,
   SproutOthers,
   SproutParty,
   SproutPet,
@@ -19,6 +20,9 @@ export const VISITORS_EVERY_MS = 15 * MINUTE_MS
 const MAX_DAYS = 4000
 const MAX_SAMPLES = 2000
 const MAX_NAME = 64
+const MAX_MODELS = 32
+const BODY_BUDGET = 480 * 1024
+const PRICE_KEY = /^[A-Za-z0-9][A-Za-z0-9._:@/+-]{0,99}$/
 const DAY = /^\d{4}-(?:0[1-9]|1[0-2])-(?:0[1-9]|[12]\d|3[01])$/
 
 /**
@@ -54,12 +58,55 @@ export type UploadInput = {
 const whole = (n: number) => Math.max(0, Math.round(n))
 const dayOrNull = (day: string | null) => (day !== null && DAY.test(day) ? day : null)
 
+const rowTokens = (r: SproutModelRow) => r[0] + r[1] + r[2] + r[3] + r[4]
+
+/** The entries of a day's `models` that hold six finite numbers, or null when none does. */
+export function modelRowsOf(value: unknown): Record<string, SproutModelRow> | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
+  const rows = Object.entries(value).filter(
+    (entry): entry is [string, SproutModelRow] =>
+      Array.isArray(entry[1]) && entry[1].length === 6 && entry[1].every(n => typeof n === 'number' && Number.isFinite(n)),
+  )
+
+  return rows.length === 0 ? null : Object.fromEntries(rows)
+}
+
+/** The model rows Buddy takes: a valid key, whole counts, and the 32 rows with the most tokens. */
+function uploadModelsOf(models: unknown): SproutDay['models'] {
+  const rows = Object.entries(modelRowsOf(models) ?? {})
+    .filter(([key, r]) => PRICE_KEY.test(key) && whole(r[5]) > 0)
+    .map(([key, r]): [string, SproutModelRow] => [
+      key,
+      [whole(r[0]), whole(r[1]), whole(r[2]), whole(r[3]), whole(r[4]), whole(r[5])],
+    ])
+  if (rows.length === 0) return undefined
+  const kept = rows.length <= MAX_MODELS ? rows : rows.sort((a, b) => rowTokens(b[1]) - rowTokens(a[1])).slice(0, MAX_MODELS)
+
+  return Object.fromEntries(kept)
+}
+
 function dayOf(d: SproutDay): SproutDay {
   const out: SproutDay = { day: d.day, tokens: whole(d.tokens), costUsd: Math.max(0, d.costUsd) }
   if (d.cacheRead !== undefined) out.cacheRead = whole(d.cacheRead)
   if (d.promptTokens !== undefined) out.promptTokens = whole(d.promptTokens)
+  const models = uploadModelsOf(d.models)
+  if (models !== undefined) out.models = models
 
   return out
+}
+
+/**
+ * Removes the model rows of the oldest days until the body is under the budget. Buddy keeps the rows it already has
+ * for a day when an upload leaves them out, so nothing is lost. The body is ASCII, so its length is its size in bytes.
+ */
+function fitBudget(body: UploadBody) {
+  let size = JSON.stringify(body).length
+  for (const day of body.days) {
+    if (size <= BODY_BUDGET) return
+    if (day.models === undefined) continue
+    size -= ',"models":'.length + JSON.stringify(day.models).length
+    delete day.models
+  }
 }
 
 export function uploadBodyOf(input: UploadInput): UploadBody {
@@ -73,8 +120,7 @@ export function uploadBodyOf(input: UploadInput): UploadBody {
     ...(s.week === undefined ? {} : { week: s.week }),
   }))
   const hasQuota = quota.at !== null || quota.five !== null || quota.week !== null || samples.length > 0
-
-  return {
+  const body: UploadBody = {
     v: 1,
     at: whole(input.at),
     tzOffsetMin: Math.max(-720, Math.min(840, Math.round(input.tzOffsetMin))),
@@ -107,6 +153,9 @@ export function uploadBodyOf(input: UploadInput): UploadBody {
     },
     pet: { fed: whole(input.pet.fed), patted: whole(input.pet.patted) },
   }
+  fitBudget(body)
+
+  return body
 }
 
 /** The hash of what an upload says, without when it says it, so that two uploads of the same data compare equal. */
@@ -148,7 +197,8 @@ export function withOthers(scan: SproutScan | null, others: SproutOthers | null)
   for (const d of [...(scan?.days ?? []), ...others.days]) {
     const old = byDay.get(d.day)
     if (old === undefined) {
-      byDay.set(d.day, { ...d })
+      const { models: _models, ...rest } = d
+      byDay.set(d.day, rest)
       continue
     }
     const sum: SproutDay = { day: d.day, tokens: old.tokens + d.tokens, costUsd: old.costUsd + d.costUsd }
